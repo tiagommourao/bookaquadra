@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -20,14 +19,6 @@ export default {
 		},
 		extend: {
 			colors: {
-				court: {
-					green: '#3B7D4F',
-					lightGreen: '#90EE90',
-					clay: '#E26310',
-					blue: '#1E88E5',
-					surface: '#EAE6DD',
-					lines: '#FFFFFF'
-				},
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
