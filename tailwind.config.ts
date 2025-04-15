@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -27,7 +28,6 @@ export default {
 					surface: '#EAE6DD',
 					lines: '#FFFFFF'
 				},
-			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
