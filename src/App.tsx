@@ -1,108 +1,47 @@
+
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import Index from './pages/Index';
+import NotFound from './pages/NotFound';
+import Login from './pages/auth/Login';
 
-// Auth Pages
-import Login from "./pages/auth/Login";
+import Dashboard from './pages/user/Dashboard';
+import CourtReservation from './pages/user/CourtReservation';
+import MyBookings from './pages/user/MyBookings';
+import Account from './pages/user/Account';
 
-// User Pages
-import Dashboard from "./pages/user/Dashboard";
-import CourtReservation from "./pages/user/CourtReservation";
-import MyBookings from "./pages/user/MyBookings";
-import Account from "./pages/user/Account";
+import AdminDashboard from './pages/admin/AdminDashboard';
+import CourtsPage from './pages/admin/courts/CourtsPage';
+import SchedulesPage from './pages/admin/schedules/SchedulesPage';
+import BookingsPage from './pages/admin/bookings/BookingsPage';
 
-// Admin Pages
-import AdminDashboard from "./pages/admin/AdminDashboard";
-
-import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
-
-// Protected route for users
-const UserProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
-  }
-  
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
-};
-
-// Protected route for admins
-const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
-  
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
-  }
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-  
-  return isAdmin ? <>{children}</> : <Navigate to="/" />;
-};
-
-// Main App Component
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <SiteSettingsProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Authentication Routes */}
-              <Route path="/login" element={<Login />} />
-              
-              {/* User Routes */}
-              <Route path="/" element={
-                <UserProtectedRoute>
-                  <Dashboard />
-                </UserProtectedRoute>
-              } />
-              <Route path="/reservar" element={
-                <UserProtectedRoute>
-                  <CourtReservation />
-                </UserProtectedRoute>
-              } />
-              <Route path="/minhas-reservas" element={
-                <UserProtectedRoute>
-                  <MyBookings />
-                </UserProtectedRoute>
-              } />
-              <Route path="/conta" element={
-                <UserProtectedRoute>
-                  <Account />
-                </UserProtectedRoute>
-              } />
-              
-              {/* Admin Routes */}
-              <Route path="/admin" element={
-                <AdminProtectedRoute>
-                  <AdminDashboard />
-                </AdminProtectedRoute>
-              } />
-              <Route path="/admin/:path" element={
-                <AdminProtectedRoute>
-                  <AdminDashboard />
-                </AdminProtectedRoute>
-              } />
-              
-              {/* 404 Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </SiteSettingsProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <ThemeProvider defaultTheme="light">
+      <Router>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Login />} />
+          
+          {/* User Routes */}
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/reservas" element={<CourtReservation />} />
+          <Route path="/minhas-reservas" element={<MyBookings />} />
+          <Route path="/conta" element={<Account />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/quadras" element={<CourtsPage />} />
+          <Route path="/admin/horarios" element={<SchedulesPage />} />
+          <Route path="/admin/reservas" element={<BookingsPage />} />
+          
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Router>
+      <Toaster />
+    </ThemeProvider>
+  );
+}
 
 export default App;

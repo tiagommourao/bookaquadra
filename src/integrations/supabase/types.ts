@@ -9,7 +9,176 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      bookings: {
+        Row: {
+          amount: number
+          booking_date: string
+          court_id: string
+          created_at: string
+          id: string
+          payment_status: string
+          schedule_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          booking_date: string
+          court_id: string
+          created_at?: string
+          id?: string
+          payment_status: string
+          schedule_id: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          booking_date?: string
+          court_id?: string
+          created_at?: string
+          id?: string
+          payment_status?: string
+          schedule_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courts: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          court_id: string
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_blocked: boolean | null
+          price: number
+          start_time: string
+        }
+        Insert: {
+          court_id: string
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_blocked?: boolean | null
+          price: number
+          start_time: string
+        }
+        Update: {
+          court_id?: string
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_blocked?: boolean | null
+          price?: number
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_settings: {
+        Row: {
+          cancellation_policy: string | null
+          company_name: string
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          google_calendar_integration: boolean | null
+          id: string
+          logo: string | null
+          mercado_pago_key: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancellation_policy?: string | null
+          company_name: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          google_calendar_integration?: boolean | null
+          id?: string
+          logo?: string | null
+          mercado_pago_key?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancellation_policy?: string | null
+          company_name?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          google_calendar_integration?: boolean | null
+          id?: string
+          logo?: string | null
+          mercado_pago_key?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
