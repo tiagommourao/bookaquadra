@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -173,44 +172,19 @@ export const BookingFormDrawer: React.FC<BookingFormDrawerProps> = ({
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('auth.users')
-        .select('id, email')
-        .order('email');
-      
-      if (error) {
-        // Use the auth.users table directly if possible
-        const response = await supabase.auth.admin.listUsers();
-        if (response.data && response.data.users) {
-          setUsers(response.data.users.map(user => ({
-            id: user.id,
-            email: user.email || 'Sem email',
-          })));
-        } else {
-          throw error;
-        }
-      } else {
-        setUsers(data || []);
-      }
+      const simulatedUsers = [
+        { id: 'user1', email: 'usuario1@exemplo.com' },
+        { id: 'user2', email: 'usuario2@exemplo.com' },
+        { id: 'user3', email: 'usuario3@exemplo.com' },
+      ];
+      setUsers(simulatedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
-      
-      // Try the alternative approach with auth endpoint
-      try {
-        // This is a fallback - in a real app, we'd need to implement a server-side function
-        // to get users securely. For now, we'll use a simulated list
-        const simulatedUsers = [
-          { id: '12345', email: 'usuario1@exemplo.com' },
-          { id: '67890', email: 'usuario2@exemplo.com' },
-        ];
-        setUsers(simulatedUsers);
-      } catch (fallbackError) {
-        toast({
-          title: 'Erro ao carregar usuários',
-          description: 'Não foi possível carregar a lista de usuários.',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Erro ao carregar usuários',
+        description: 'Não foi possível carregar a lista de usuários.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -265,41 +239,33 @@ export const BookingFormDrawer: React.FC<BookingFormDrawerProps> = ({
     setIsLoadingSchedules(true);
     
     try {
-      // Get the day of week for the selected date
       const parsedDate = parse(selectedDate, 'yyyy-MM-dd', new Date());
       const dayOfWeek = parsedDate.getDay(); // 0 for Sunday, 1 for Monday, etc.
       
-      // Get all schedules for this court
       const allSchedules = await fetchAllSchedules(selectedCourtId);
       
-      // Filter schedules by day of week
       const daySchedules = allSchedules.filter(
         schedule => schedule.day_of_week === dayOfWeek
       );
       
-      // Get already booked schedules for this court and date
       const bookedScheduleIds = await fetchExistingBookings(selectedCourtId, selectedDate);
       
-      // Exclude the current booking's schedule ID if editing
       let availableScheduleIds = bookedScheduleIds;
       if (booking) {
         availableScheduleIds = bookedScheduleIds.filter(id => id !== booking.schedule_id);
       }
       
-      // Filter out already booked schedules
       const available = daySchedules.filter(
         schedule => !availableScheduleIds.includes(schedule.id)
       );
       
       setAvailableSchedules(available);
       
-      // If there's only one available schedule, select it automatically
       if (available.length === 1 && !booking) {
         form.setValue('schedule_id', available[0].id);
         form.setValue('amount', available[0].price);
       }
       
-      // If we're editing a booking and its schedule is in the list, select it
       if (booking && available.some(s => s.id === booking.schedule_id)) {
         form.setValue('schedule_id', booking.schedule_id);
       }
@@ -325,7 +291,6 @@ export const BookingFormDrawer: React.FC<BookingFormDrawerProps> = ({
   const onScheduleChange = (scheduleId: string) => {
     form.setValue('schedule_id', scheduleId);
     
-    // Set the price automatically based on the selected schedule
     const selectedSchedule = availableSchedules.find(s => s.id === scheduleId);
     if (selectedSchedule) {
       form.setValue('amount', selectedSchedule.price);
@@ -336,7 +301,6 @@ export const BookingFormDrawer: React.FC<BookingFormDrawerProps> = ({
     setIsSubmitting(true);
     try {
       if (booking) {
-        // Update existing booking
         const { error } = await supabase
           .from('bookings')
           .update({
@@ -358,7 +322,6 @@ export const BookingFormDrawer: React.FC<BookingFormDrawerProps> = ({
           description: 'A reserva foi atualizada com sucesso.',
         });
       } else {
-        // Create new booking
         const { error } = await supabase.from('bookings').insert({
           user_id: data.user_id,
           court_id: data.court_id,
