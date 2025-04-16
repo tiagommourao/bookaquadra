@@ -12,11 +12,14 @@ export const fetchApplicableSchedules = async (courtId: string, bookingDate: Dat
     return [];
   }
   
+  // Ajuste para garantir que o dia da semana está correto (1 = segunda, 7 = domingo)
+  const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+  
   const { data: schedules, error } = await supabase
     .from('schedules')
     .select('*')
     .eq('court_id', courtId)
-    .eq('day_of_week', dayOfWeek);
+    .eq('day_of_week', adjustedDayOfWeek);
     
   if (error) {
     console.error('Error fetching schedules:', error);

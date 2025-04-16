@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,8 +14,8 @@ import { Button } from '@/components/ui/button';
 const AdminDashboard = () => {
   const [weeklyRevenue, setWeeklyRevenue] = useState(0);
   const today = new Date();
-  const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 1 });
-  const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 1 });
+  const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 1 }); // Definindo segunda-feira como início da semana
+  const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 1 }); // Definindo domingo como fim da semana
   
   const { data: bookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ['dashboardBookings'],

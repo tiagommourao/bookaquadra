@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
@@ -298,7 +297,7 @@ const BookingsList = () => {
     return 'bg-red-50 hover:bg-red-100';
   };
 
-  // Get days of the week headers
+  // Get days of the week headers - ajustando para português e começando na segunda
   const weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
   if (isLoading) {
@@ -480,8 +479,8 @@ const BookingsList = () => {
                   </div>
                 ))}
                 
-                {/* Fill in empty spaces before first day of month */}
-                {Array.from({ length: getDay(dateRange.start) || 7 }).map((_, index) => (
+                {/* Fill in empty spaces before first day of month - ajustando para começar na segunda-feira */}
+                {Array.from({ length: getDay(dateRange.start) === 0 ? 6 : getDay(dateRange.start) - 1 }).map((_, index) => (
                   <div key={`empty-start-${index}`} className="h-24 p-1 bg-gray-50 border border-gray-100"></div>
                 ))}
                 
