@@ -76,6 +76,15 @@ export const BookingForm: React.FC<BookingFormProps> = ({
     }
   };
 
+  // Create hours options for select (00:00 to 23:00)
+  const hoursOptions = Array.from({ length: 24 }).map((_, i) => {
+    const hour = i.toString().padStart(2, '0');
+    return {
+      value: `${hour}:00`,
+      label: `${hour}:00`
+    };
+  });
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -183,10 +192,25 @@ export const BookingForm: React.FC<BookingFormProps> = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Hora Início</FormLabel>
-                  <FormControl>
-                    <Input placeholder="HH:MM" {...field} />
-                  </FormControl>
-                  <FormDescription>Formato: 08:00</FormDescription>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o horário" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {hoursOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Horários em hora fechada</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -198,10 +222,25 @@ export const BookingForm: React.FC<BookingFormProps> = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Hora Fim</FormLabel>
-                  <FormControl>
-                    <Input placeholder="HH:MM" {...field} />
-                  </FormControl>
-                  <FormDescription>Formato: 09:00</FormDescription>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o horário" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {hoursOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Horários em hora fechada</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
