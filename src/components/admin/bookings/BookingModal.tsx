@@ -81,6 +81,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [scheduleConflict, setScheduleConflict] = useState(false);
   const [courtRate, setCourtRate] = useState(0);
   const [weeks, setWeeks] = useState(0);
+  const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   
   // Fetch users (profiles)
   const { data: users } = useQuery({
@@ -145,16 +146,62 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
         
         try {
-          const { data: scheduleData, error } = await supabase
+          // First check for matching schedule with exactly the same times
+          const { data: exactSchedules, error: exactError } = await supabase
             .from('schedules')
-            .select('price, price_weekend, is_monthly, monthly_discount')
+            .select('*')
             .eq('court_id', watchCourtId)
             .eq('day_of_week', dayOfWeek)
-            .single();
+            .eq('start_time', watchStartTime)
+            .eq('end_time', watchEndTime);
           
-          if (error) {
-            console.error('Error fetching court rate:', error);
+          if (exactError) {
+            console.error('Error fetching exact court rate:', exactError);
             return;
+          }
+          
+          let scheduleData;
+          
+          if (exactSchedules && exactSchedules.length > 0) {
+            // Found an exact match
+            scheduleData = exactSchedules[0];
+            setSelectedSchedule(scheduleData);
+          } else {
+            // Find by overlapping time ranges
+            const { data: schedules, error } = await supabase
+              .from('schedules')
+              .select('*')
+              .eq('court_id', watchCourtId)
+              .eq('day_of_week', dayOfWeek);
+              
+            if (error) {
+              console.error('Error fetching court rate:', error);
+              return;
+            }
+            
+            if (!schedules || schedules.length === 0) {
+              console.error('No schedules found for this court and day');
+              return;
+            }
+            
+            // Find the schedule that encompasses our booking time
+            scheduleData = schedules.find(schedule => {
+              const bookingStart = watchStartTime;
+              const bookingEnd = watchEndTime;
+              const scheduleStart = schedule.start_time;
+              const scheduleEnd = schedule.end_time;
+              
+              // Check if booking time falls within this schedule
+              return bookingStart >= scheduleStart && bookingEnd <= scheduleEnd;
+            });
+            
+            if (!scheduleData) {
+              console.error('No matching schedule for this time range');
+              setSelectedSchedule(null);
+              return;
+            }
+            
+            setSelectedSchedule(scheduleData);
           }
 
           if (scheduleData) {
@@ -317,7 +364,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   }, [booking, form]);
 
   const onSubmit = async (values: BookingFormValues) => {
-    // Validate time difference is at least 1 hour
+    // Check if we have a valid schedule
+    if (!selectedSchedule) {
+      toast({
+        title: 'Horário inválido',
+        description: 'Não foi possível encontrar um horário disponível para esta quadra no dia e horário selecionados.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Validate time difference is at least the minimum booking time
     const [startHour, startMin] = values.start_time.split(':').map(Number);
     const [endHour, endMin] = values.end_time.split(':').map(Number);
     
@@ -334,10 +391,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     
     const diffMinutes = differenceInMinutes(endDate, startDate);
     
-    if (diffMinutes < 60) {
+    if (diffMinutes < selectedSchedule.min_booking_time) {
       toast({
         title: 'Tempo insuficiente',
-        description: 'A reserva deve ter no mínimo 1 hora de duração.',
+        description: `A reserva deve ter no mínimo ${selectedSchedule.min_booking_time} minutos de duração.`,
         variant: 'destructive'
       });
       return;
@@ -348,6 +405,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       toast({
         title: 'Conflito de horários',
         description: 'Já existe uma reserva para este horário.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Check if the time range is within the schedule's range
+    const scheduleStart = selectedSchedule.start_time.split(':').map(Number);
+    const scheduleEnd = selectedSchedule.end_time.split(':').map(Number);
+    
+    const scheduleStartDate = new Date();
+    scheduleStartDate.setHours(scheduleStart[0], scheduleStart[1], 0, 0);
+    
+    const scheduleEndDate = new Date();
+    scheduleEndDate.setHours(scheduleEnd[0], scheduleEnd[1], 0, 0);
+    
+    if (startDate < scheduleStartDate || endDate > scheduleEndDate) {
+      toast({
+        title: 'Horário fora do período disponível',
+        description: `Este horário não está disponível. Horários disponíveis: ${selectedSchedule.start_time} - ${selectedSchedule.end_time}`,
         variant: 'destructive'
       });
       return;
@@ -644,6 +720,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     </FormControl>
                     <FormDescription>
                       {courtRate > 0 && `Taxa horária: R$ ${courtRate.toFixed(2)}`}
+                      {selectedSchedule?.is_monthly && selectedSchedule?.monthly_discount > 0 && (
+                        <span className="block mt-1 text-green-600">
+                          Desconto mensalista: {selectedSchedule.monthly_discount}%
+                        </span>
+                      )}
                       {scheduleConflict && (
                         <span className="text-red-500 block mt-1">
                           ⚠️ Conflito de horário detectado

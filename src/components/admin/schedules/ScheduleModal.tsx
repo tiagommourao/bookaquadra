@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { Schedule } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +42,9 @@ const formSchema = z.object({
   max_booking_time: z.coerce.number().optional(),
   advance_booking_days: z.coerce.number().optional(),
   is_blocked: z.boolean().default(false),
-  apply_to_all_days: z.boolean().default(false)
+  apply_to_all_days: z.boolean().default(false),
+  is_monthly: z.boolean().default(false),
+  monthly_discount: z.coerce.number().optional()
 }).refine(data => {
   const start = data.start_time.split(':').map(Number);
   const end = data.end_time.split(':').map(Number);
@@ -86,7 +89,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       max_booking_time: undefined,
       advance_booking_days: 30,
       is_blocked: false,
-      apply_to_all_days: false
+      apply_to_all_days: false,
+      is_monthly: false,
+      monthly_discount: 10
     }
   });
 
@@ -102,7 +107,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         max_booking_time: schedule.max_booking_time ? Number(schedule.max_booking_time) : undefined,
         advance_booking_days: schedule.advance_booking_days ? Number(schedule.advance_booking_days) : undefined,
         is_blocked: schedule.is_blocked,
-        apply_to_all_days: false
+        apply_to_all_days: false,
+        is_monthly: schedule.is_monthly || false,
+        monthly_discount: schedule.monthly_discount ? Number(schedule.monthly_discount) : 10
       });
     } else {
       form.reset({
@@ -115,7 +122,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         max_booking_time: undefined,
         advance_booking_days: 30,
         is_blocked: false,
-        apply_to_all_days: false
+        apply_to_all_days: false,
+        is_monthly: false,
+        monthly_discount: 10
       });
     }
   }, [schedule, form]);
@@ -140,7 +149,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             min_booking_time: scheduleData.min_booking_time,
             max_booking_time: scheduleData.max_booking_time,
             advance_booking_days: scheduleData.advance_booking_days,
-            is_blocked: scheduleData.is_blocked
+            is_blocked: scheduleData.is_blocked,
+            is_monthly: scheduleData.is_monthly,
+            monthly_discount: scheduleData.is_monthly ? scheduleData.monthly_discount : null
           })
           .eq('id', schedule.id);
         
@@ -182,7 +193,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   min_booking_time: scheduleData.min_booking_time,
                   max_booking_time: scheduleData.max_booking_time,
                   advance_booking_days: scheduleData.advance_booking_days,
-                  is_blocked: scheduleData.is_blocked
+                  is_blocked: scheduleData.is_blocked,
+                  is_monthly: scheduleData.is_monthly,
+                  monthly_discount: scheduleData.is_monthly ? scheduleData.monthly_discount : null
                 })
                 .eq('id', existingSchedulesByDay[day]);
             } else {
@@ -200,7 +213,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   min_booking_time: scheduleData.min_booking_time,
                   max_booking_time: scheduleData.max_booking_time,
                   advance_booking_days: scheduleData.advance_booking_days,
-                  is_blocked: scheduleData.is_blocked
+                  is_blocked: scheduleData.is_blocked,
+                  is_monthly: scheduleData.is_monthly,
+                  monthly_discount: scheduleData.is_monthly ? scheduleData.monthly_discount : null
                 });
             }
           });
@@ -229,7 +244,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             min_booking_time: scheduleData.min_booking_time,
             max_booking_time: scheduleData.max_booking_time,
             advance_booking_days: scheduleData.advance_booking_days,
-            is_blocked: scheduleData.is_blocked
+            is_blocked: scheduleData.is_blocked,
+            is_monthly: scheduleData.is_monthly,
+            monthly_discount: scheduleData.is_monthly ? scheduleData.monthly_discount : null
           });
         
         if (error) throw error;
@@ -250,7 +267,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             min_booking_time: scheduleData.min_booking_time,
             max_booking_time: scheduleData.max_booking_time,
             advance_booking_days: scheduleData.advance_booking_days,
-            is_blocked: scheduleData.is_blocked
+            is_blocked: scheduleData.is_blocked,
+            is_monthly: scheduleData.is_monthly,
+            monthly_discount: scheduleData.is_monthly ? scheduleData.monthly_discount : null
           }));
           
           const { error: bulkInsertError } = await supabase
@@ -441,6 +460,54 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="is_monthly"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Disponível para Mensalistas</FormLabel>
+                      <FormDescription>
+                        Se marcado, este horário pode ser reservado como mensalidade
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('is_monthly') && (
+                <FormField
+                  control={form.control}
+                  name="monthly_discount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Desconto para Mensalista (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="1"
+                          placeholder="Desconto em percentual"
+                          value={field.value === undefined ? '' : field.value}
+                          onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Desconto aplicado para clientes mensalistas (ex: 10 = 10% de desconto)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
