@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, differenceInHours, differenceInMinutes, isBefore, addWeeks, eachWeekOfInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Dialog,
@@ -42,7 +42,9 @@ import { toast } from '@/hooks/use-toast';
 import { Booking, BookingStatus, Court, PaymentStatus, Profile } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const bookingSchema = z.object({
   user_id: z.string().uuid({ message: 'Selecione um usuário' }),
@@ -57,7 +59,9 @@ const bookingSchema = z.object({
   amount: z.coerce.number().positive({ message: "Valor deve ser positivo" }),
   status: z.enum(['pending', 'confirmed', 'cancelled', 'completed']),
   payment_status: z.enum(['pending', 'paid', 'refunded', 'failed']),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  is_monthly: z.boolean().default(false),
+  subscription_end_date: z.date().optional()
 });
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
@@ -74,7 +78,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   onClose
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [isValidatingSchedule, setIsValidatingSchedule] = useState(false);
+  const [scheduleConflict, setScheduleConflict] = useState(false);
+  const [courtRate, setCourtRate] = useState(0);
+  const [weeks, setWeeks] = useState(0);
+  
   // Fetch users (profiles)
   const { data: users } = useQuery({
     queryKey: ['profiles'],
@@ -112,26 +120,180 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       booking_date: new Date(),
       start_time: '08:00',
       end_time: '09:00',
-      amount: 60,
+      amount: 0,
       status: 'pending' as BookingStatus,
       payment_status: 'pending' as PaymentStatus,
-      notes: ''
+      notes: '',
+      is_monthly: false,
+      subscription_end_date: undefined
     }
   });
 
+  const watchCourtId = form.watch('court_id');
+  const watchStartTime = form.watch('start_time');
+  const watchEndTime = form.watch('end_time');
+  const watchBookingDate = form.watch('booking_date');
+  const watchIsMonthly = form.watch('is_monthly');
+  const watchSubscriptionEndDate = form.watch('subscription_end_date');
+
+  // Calculate total amount based on court rate and time difference
+  useEffect(() => {
+    if (watchCourtId && watchStartTime && watchEndTime) {
+      const fetchCourtRate = async () => {
+        // Convert booking date to day of week (0-6, Sunday-Saturday)
+        const bookingDay = watchBookingDate ? watchBookingDate.getDay() : new Date().getDay();
+        // Adjust to match the database format (where 0 is Monday, 6 is Sunday)
+        const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
+        
+        try {
+          const { data: scheduleData, error } = await supabase
+            .from('schedules')
+            .select('price, price_weekend')
+            .eq('court_id', watchCourtId)
+            .eq('day_of_week', dayOfWeek)
+            .single();
+          
+          if (error) {
+            console.error('Error fetching court rate:', error);
+            return;
+          }
+
+          if (scheduleData) {
+            const isWeekend = [5, 6].includes(dayOfWeek); // Friday and Saturday in our adjusted system
+            const hourlyRate = isWeekend && scheduleData.price_weekend ? 
+              scheduleData.price_weekend : scheduleData.price;
+            
+            setCourtRate(hourlyRate);
+            
+            // Calculate time difference in hours
+            const [startHour, startMin] = watchStartTime.split(':').map(Number);
+            const [endHour, endMin] = watchEndTime.split(':').map(Number);
+            
+            const startDate = new Date();
+            startDate.setHours(startHour, startMin, 0, 0);
+            
+            const endDate = new Date();
+            endDate.setHours(endHour, endMin, 0, 0);
+            
+            // If end time is before start time, assume it's the next day
+            if (endDate < startDate) {
+              endDate.setDate(endDate.getDate() + 1);
+            }
+            
+            const diffHours = differenceInMinutes(endDate, startDate) / 60;
+            
+            // Calculate total amount
+            // For monthly subscriptions, calculate weeks between start and end dates
+            if (watchIsMonthly && watchSubscriptionEndDate) {
+              const weeksList = eachWeekOfInterval({
+                start: startOfDay(watchBookingDate),
+                end: endOfDay(watchSubscriptionEndDate)
+              });
+              
+              const weekCount = weeksList.length;
+              setWeeks(weekCount);
+              
+              form.setValue('amount', Number((hourlyRate * diffHours * weekCount).toFixed(2)));
+            } else {
+              form.setValue('amount', Number((hourlyRate * diffHours).toFixed(2)));
+            }
+          }
+        } catch (error) {
+          console.error('Error calculating court rate:', error);
+        }
+      };
+      
+      fetchCourtRate();
+    }
+  }, [watchCourtId, watchStartTime, watchEndTime, watchBookingDate, watchIsMonthly, watchSubscriptionEndDate, form]);
+
+  // Check for booking conflicts
+  useEffect(() => {
+    if (watchCourtId && watchStartTime && watchEndTime && watchBookingDate) {
+      const checkBookingConflict = async () => {
+        setIsValidatingSchedule(true);
+        setScheduleConflict(false);
+        
+        try {
+          const bookingDateStr = format(watchBookingDate, 'yyyy-MM-dd');
+          
+          // Get existing bookings for this court and date
+          const { data: existingBookings, error } = await supabase
+            .from('bookings')
+            .select('*')
+            .eq('court_id', watchCourtId)
+            .eq('booking_date', bookingDateStr)
+            .neq('status', 'cancelled');
+            
+          if (error) {
+            console.error('Error checking booking conflicts:', error);
+            return;
+          }
+          
+          // Check if our time slot overlaps with any existing booking
+          // Exclude the current booking if we're editing
+          const conflictingBooking = existingBookings?.find(existingBooking => {
+            if (booking && existingBooking.id === booking.id) return false;
+            
+            const [startHour, startMin] = watchStartTime.split(':').map(Number);
+            const [endHour, endMin] = watchEndTime.split(':').map(Number);
+            
+            const [existingStartHour, existingStartMin] = existingBooking.start_time.split(':').map(Number);
+            const [existingEndHour, existingEndMin] = existingBooking.end_time.split(':').map(Number);
+            
+            const newStart = new Date(bookingDateStr);
+            newStart.setHours(startHour, startMin, 0, 0);
+            
+            const newEnd = new Date(bookingDateStr);
+            newEnd.setHours(endHour, endMin, 0, 0);
+            
+            const existingStart = new Date(existingBooking.booking_date);
+            existingStart.setHours(existingStartHour, existingStartMin, 0, 0);
+            
+            const existingEnd = new Date(existingBooking.booking_date);
+            existingEnd.setHours(existingEndHour, existingEndMin, 0, 0);
+            
+            // Check if the new booking overlaps with existing
+            return (newStart < existingEnd && newEnd > existingStart);
+          });
+          
+          if (conflictingBooking) {
+            setScheduleConflict(true);
+          }
+        } finally {
+          setIsValidatingSchedule(false);
+        }
+      };
+      
+      checkBookingConflict();
+    }
+  }, [watchCourtId, watchStartTime, watchEndTime, watchBookingDate, booking]);
+
   useEffect(() => {
     if (booking) {
-      form.reset({
+      const bookingDate = booking.booking_date instanceof Date ? 
+        booking.booking_date : 
+        new Date(booking.booking_date);
+      
+      const formValues: Partial<BookingFormValues> = {
         user_id: booking.user_id,
         court_id: booking.court_id,
-        booking_date: booking.booking_date instanceof Date ? booking.booking_date : new Date(booking.booking_date),
+        booking_date: bookingDate,
         start_time: booking.start_time,
         end_time: booking.end_time,
         amount: Number(booking.amount),
         status: booking.status,
         payment_status: booking.payment_status,
-        notes: booking.notes || ''
-      });
+        notes: booking.notes || '',
+        is_monthly: booking.is_monthly || false,
+        subscription_end_date: booking.subscription_end_date ? 
+          (booking.subscription_end_date instanceof Date ? 
+            booking.subscription_end_date : 
+            new Date(booking.subscription_end_date)) : 
+          undefined
+      };
+      
+      form.reset(formValues);
     } else {
       form.reset({
         user_id: '',
@@ -139,34 +301,78 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         booking_date: new Date(),
         start_time: '08:00',
         end_time: '09:00',
-        amount: 60,
+        amount: 0,
         status: 'pending' as BookingStatus,
         payment_status: 'pending' as PaymentStatus,
-        notes: ''
+        notes: '',
+        is_monthly: false,
+        subscription_end_date: undefined
       });
     }
   }, [booking, form]);
 
   const onSubmit = async (values: BookingFormValues) => {
+    // Validate time difference is at least 1 hour
+    const [startHour, startMin] = values.start_time.split(':').map(Number);
+    const [endHour, endMin] = values.end_time.split(':').map(Number);
+    
+    const startDate = new Date();
+    startDate.setHours(startHour, startMin, 0, 0);
+    
+    const endDate = new Date();
+    endDate.setHours(endHour, endMin, 0, 0);
+    
+    // If end time is before start time, assume it's the next day
+    if (endDate < startDate) {
+      endDate.setDate(endDate.getDate() + 1);
+    }
+    
+    const diffMinutes = differenceInMinutes(endDate, startDate);
+    
+    if (diffMinutes < 60) {
+      toast({
+        title: 'Tempo insuficiente',
+        description: 'A reserva deve ter no mínimo 1 hora de duração.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Check for schedule conflicts
+    if (scheduleConflict) {
+      toast({
+        title: 'Conflito de horários',
+        description: 'Já existe uma reserva para este horário.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
+      const bookingData = {
+        user_id: values.user_id,
+        court_id: values.court_id,
+        booking_date: format(values.booking_date, 'yyyy-MM-dd'),
+        start_time: values.start_time,
+        end_time: values.end_time,
+        amount: values.amount,
+        status: values.status,
+        payment_status: values.payment_status,
+        notes: values.notes,
+        is_monthly: values.is_monthly,
+        subscription_end_date: values.is_monthly && values.subscription_end_date ? 
+          format(values.subscription_end_date, 'yyyy-MM-dd') : 
+          null,
+        updated_at: new Date().toISOString()
+      };
+      
       if (booking) {
         // Update booking
         const { error } = await supabase
           .from('bookings')
-          .update({
-            user_id: values.user_id,
-            court_id: values.court_id,
-            booking_date: format(values.booking_date, 'yyyy-MM-dd'),
-            start_time: values.start_time,
-            end_time: values.end_time,
-            amount: values.amount,
-            status: values.status,
-            payment_status: values.payment_status,
-            notes: values.notes,
-            updated_at: new Date().toISOString()
-          })
+          .update(bookingData)
           .eq('id', booking.id);
         
         if (error) throw error;
@@ -180,15 +386,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         const { error } = await supabase
           .from('bookings')
           .insert({
-            user_id: values.user_id,
-            court_id: values.court_id,
-            booking_date: format(values.booking_date, 'yyyy-MM-dd'),
-            start_time: values.start_time,
-            end_time: values.end_time,
-            amount: values.amount,
-            status: values.status,
-            payment_status: values.payment_status,
-            notes: values.notes,
+            ...bookingData,
             created_by: null // TODO: get from auth context
           });
         
@@ -325,7 +523,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
+                          disabled={(date) => isBefore(date, startOfDay(new Date()))}
                           initialFocus
+                          className="p-3 pointer-events-auto"
                         />
                       </PopoverContent>
                     </Popover>
@@ -366,6 +566,70 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
               <FormField
                 control={form.control}
+                name="is_monthly"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Mensalista</FormLabel>
+                      <FormDescription>
+                        Cliente pagará mensalmente por este horário
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('is_monthly') && (
+                <FormField
+                  control={form.control}
+                  name="subscription_end_date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data Final da Mensalidade</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className="w-full pl-3 text-left font-normal"
+                            >
+                              {field.value ? (
+                                format(field.value, 'PPP', { locale: ptBR })
+                              ) : (
+                                <span>Selecione uma data</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) => isBefore(date, watchBookingDate)}
+                            initialFocus
+                            className="p-3 pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>
+                        {weeks > 0 && `${weeks} semana${weeks > 1 ? 's' : ''} de mensalidade`}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
@@ -373,6 +637,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     <FormControl>
                       <Input type="number" step="0.01" min="0" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      {courtRate > 0 && `Taxa horária: R$ ${courtRate.toFixed(2)}`}
+                      {scheduleConflict && (
+                        <span className="text-red-500 block mt-1">
+                          ⚠️ Conflito de horário detectado
+                        </span>
+                      )}
+                      {isValidatingSchedule && (
+                        <span className="text-blue-500 flex items-center gap-1 mt-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Verificando disponibilidade...
+                        </span>
+                      )}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -464,7 +741,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting || scheduleConflict || isValidatingSchedule}
+              >
                 {isSubmitting ? 'Salvando...' : booking ? 'Atualizar' : 'Criar'}
               </Button>
             </DialogFooter>

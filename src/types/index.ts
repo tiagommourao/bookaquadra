@@ -1,3 +1,4 @@
+
 // Core type definitions for BookaQuadra application
 
 // User role types
@@ -71,6 +72,8 @@ export interface Schedule {
   min_booking_time: number;
   max_booking_time?: number;
   is_blocked: boolean;
+  is_monthly?: boolean;
+  monthly_discount?: number;
   advance_booking_days?: number;
   created_at?: string;
   updated_at?: string;
@@ -109,6 +112,8 @@ export interface Booking {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  is_monthly?: boolean;
+  subscription_end_date?: Date | string | null;
   // Relações virtuais
   user?: Profile;
   court?: Court;
