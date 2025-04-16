@@ -50,9 +50,23 @@ export function useBookingForm({ booking, onClose }: {
     if (booking && form) {
       // Preserve the date exactly as it was selected, without timezone adjustments
       const dateStr = booking.booking_date;
-      const [year, month, day] = typeof dateStr === 'string' 
-        ? dateStr.split('-').map(Number) 
-        : [booking.booking_date.getFullYear(), booking.booking_date.getMonth() + 1, booking.booking_date.getDate()];
+      let year: number, month: number, day: number;
+      
+      if (typeof dateStr === 'string') {
+        // If it's a string, parse it as YYYY-MM-DD
+        [year, month, day] = dateStr.split('-').map(Number);
+      } else if (dateStr instanceof Date) {
+        // If it's already a Date object, extract the parts
+        year = dateStr.getFullYear();
+        month = dateStr.getMonth() + 1;
+        day = dateStr.getDate();
+      } else {
+        // Fallback to current date if booking_date is invalid
+        const today = new Date();
+        year = today.getFullYear();
+        month = today.getMonth() + 1;
+        day = today.getDate();
+      }
       
       // Create local date without time component to avoid timezone issues
       const bookingDate = new Date(year, month - 1, day, 12, 0, 0);
@@ -74,9 +88,24 @@ export function useBookingForm({ booking, onClose }: {
       // Handle subscription end date if it exists
       if (booking.subscription_end_date) {
         const subDateStr = booking.subscription_end_date;
-        const [subYear, subMonth, subDay] = typeof subDateStr === 'string'
-          ? subDateStr.split('-').map(Number)
-          : [booking.subscription_end_date.getFullYear(), booking.subscription_end_date.getMonth() + 1, booking.subscription_end_date.getDate()];
+        let subYear: number, subMonth: number, subDay: number;
+        
+        if (typeof subDateStr === 'string') {
+          // If it's a string, parse it as YYYY-MM-DD
+          [subYear, subMonth, subDay] = subDateStr.split('-').map(Number);
+        } else if (subDateStr instanceof Date) {
+          // If it's already a Date object, extract the parts
+          subYear = subDateStr.getFullYear();
+          subMonth = subDateStr.getMonth() + 1;
+          subDay = subDateStr.getDate();
+        } else {
+          // Fallback to a month from now if invalid
+          const nextMonth = new Date();
+          nextMonth.setMonth(nextMonth.getMonth() + 1);
+          subYear = nextMonth.getFullYear();
+          subMonth = nextMonth.getMonth() + 1;
+          subDay = nextMonth.getDate();
+        }
         
         formValues.subscription_end_date = new Date(subYear, subMonth - 1, subDay, 12, 0, 0);
       }
