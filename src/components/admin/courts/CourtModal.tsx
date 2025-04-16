@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -47,7 +46,7 @@ const formSchema = z.object({
   maintenance_info: z.string().optional(),
   location_info: z.string().optional(),
   dimensions: z.string().optional(),
-  capacity: z.string().optional().transform(val => val ? parseInt(val) : undefined),
+  capacity: z.string().optional().transform(val => val ? Number(val) : undefined),
   accessibility_features: z.string().optional()
 });
 
@@ -76,7 +75,7 @@ export const CourtModal: React.FC<CourtModalProps> = ({
         .order('name');
       
       if (error) throw error;
-      return data as CourtType[];
+      return data as unknown as CourtType[];
     }
   });
 

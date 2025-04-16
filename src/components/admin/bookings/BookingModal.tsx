@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -54,7 +53,7 @@ const bookingSchema = z.object({
   end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
     message: "Formato de hora inválido (HH:MM)"
   }),
-  amount: z.string().min(1).transform(val => parseFloat(val)),
+  amount: z.string().min(1).transform(val => Number(val)),
   status: z.enum(['pending', 'confirmed', 'cancelled', 'completed']),
   payment_status: z.enum(['pending', 'paid', 'refunded', 'failed']),
   notes: z.string().optional()
@@ -85,7 +84,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         .order('first_name');
       
       if (error) throw error;
-      return data as Profile[];
+      return data as unknown as Profile[];
     }
   });
 
@@ -100,7 +99,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         .order('name');
       
       if (error) throw error;
-      return data as Court[];
+      return data as unknown as Court[];
     }
   });
 
@@ -113,8 +112,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       start_time: '08:00',
       end_time: '09:00',
       amount: '60',
-      status: 'pending',
-      payment_status: 'pending',
+      status: 'pending' as BookingStatus,
+      payment_status: 'pending' as PaymentStatus,
       notes: ''
     }
   });
@@ -140,8 +139,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         start_time: '08:00',
         end_time: '09:00',
         amount: '60',
-        status: 'pending',
-        payment_status: 'pending',
+        status: 'pending' as BookingStatus,
+        payment_status: 'pending' as PaymentStatus,
         notes: ''
       });
     }

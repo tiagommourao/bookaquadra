@@ -34,12 +34,12 @@ const formSchema = z.object({
   end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
     message: "Formato de hora inválido (HH:MM)"
   }),
-  price: z.string().min(1, "Preço é obrigatório").transform(val => parseFloat(val)),
-  price_weekend: z.string().optional().transform(val => val ? parseFloat(val) : undefined),
-  price_holiday: z.string().optional().transform(val => val ? parseFloat(val) : undefined),
-  min_booking_time: z.string().min(1, "Tempo mínimo é obrigatório").transform(val => parseInt(val)),
-  max_booking_time: z.string().optional().transform(val => val ? parseInt(val) : undefined),
-  advance_booking_days: z.string().optional().transform(val => val ? parseInt(val) : undefined),
+  price: z.string().min(1, "Preço é obrigatório").transform(val => Number(val)),
+  price_weekend: z.string().optional().transform(val => val ? Number(val) : undefined),
+  price_holiday: z.string().optional().transform(val => val ? Number(val) : undefined),
+  min_booking_time: z.string().min(1, "Tempo mínimo é obrigatório").transform(val => Number(val)),
+  max_booking_time: z.string().optional().transform(val => val ? Number(val) : undefined),
+  advance_booking_days: z.string().optional().transform(val => val ? Number(val) : undefined),
   is_blocked: z.boolean().default(false)
 }).refine(data => {
   const start = data.start_time.split(':').map(Number);
