@@ -187,6 +187,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                       disabled={(date) => isBefore(date, startOfDay(new Date()))}
                       initialFocus
                       className="p-3 pointer-events-auto"
+                      weekStartsOn={1}
                     />
                   </PopoverContent>
                 </Popover>
@@ -308,6 +309,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                         onSelect={field.onChange}
                         disabled={(date) => isBefore(date, form.getValues("booking_date"))}
                         initialFocus
+                        weekStartsOn={1}
                         className="p-3 pointer-events-auto"
                       />
                     </PopoverContent>

@@ -41,7 +41,15 @@ export const checkBookingConflict = async (
   }
   
   try {
-    const bookingDateStr = format(bookingDate, 'yyyy-MM-dd');
+    // Format the date as YYYY-MM-DD without timezone issues
+    const formatDateForDB = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    const bookingDateStr = formatDateForDB(bookingDate);
     
     const { data: existingBookings, error } = await supabase
       .from('bookings')
@@ -64,17 +72,23 @@ export const checkBookingConflict = async (
       const [existingStartHour, existingStartMin] = existingBooking.start_time.split(':').map(Number);
       const [existingEndHour, existingEndMin] = existingBooking.end_time.split(':').map(Number);
       
-      const newStart = new Date(bookingDateStr);
+      const newStart = new Date(bookingDate);
       newStart.setHours(startHour, startMin, 0, 0);
       
-      const newEnd = new Date(bookingDateStr);
+      const newEnd = new Date(bookingDate);
       newEnd.setHours(endHour, endMin, 0, 0);
+      if (newEnd <= newStart) {
+        newEnd.setDate(newEnd.getDate() + 1);
+      }
       
-      const existingStart = new Date(existingBooking.booking_date);
+      const existingStart = new Date(bookingDate);
       existingStart.setHours(existingStartHour, existingStartMin, 0, 0);
       
-      const existingEnd = new Date(existingBooking.booking_date);
+      const existingEnd = new Date(bookingDate);
       existingEnd.setHours(existingEndHour, existingEndMin, 0, 0);
+      if (existingEnd <= existingStart) {
+        existingEnd.setDate(existingEnd.getDate() + 1);
+      }
       
       if (newStart < existingEnd && newEnd > existingStart) {
         return true;
