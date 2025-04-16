@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, User, Clock } from 'lucide-react';
+import { Home, Calendar, User, Clock, Trophy } from 'lucide-react';
 
 interface UserLayoutProps {
   children: React.ReactNode;
@@ -15,6 +15,7 @@ export const UserLayout: React.FC<UserLayoutProps> = ({ children }) => {
     { name: 'Início', path: '/', icon: <Home className="h-6 w-6" /> },
     { name: 'Reservar', path: '/reservar', icon: <Calendar className="h-6 w-6" /> },
     { name: 'Minhas Reservas', path: '/minhas-reservas', icon: <Clock className="h-6 w-6" /> },
+    { name: 'Social', path: '/social', icon: <Trophy className="h-6 w-6" /> },
     { name: 'Conta', path: '/conta', icon: <User className="h-6 w-6" /> },
   ];
 

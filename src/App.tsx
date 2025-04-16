@@ -17,6 +17,7 @@ import Dashboard from "./pages/user/Dashboard";
 import CourtReservation from "./pages/user/CourtReservation";
 import MyBookings from "./pages/user/MyBookings";
 import Account from "./pages/user/Account";
+import Social from "./pages/user/Social";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -101,6 +102,18 @@ const App = () => (
               <Route path="/conta" element={
                 <UserProtectedRoute>
                   <Account />
+                </UserProtectedRoute>
+              } />
+              
+              {/* Social & Community Routes */}
+              <Route path="/social" element={
+                <UserProtectedRoute>
+                  <Social />
+                </UserProtectedRoute>
+              } />
+              <Route path="/rankings" element={
+                <UserProtectedRoute>
+                  <Social />
                 </UserProtectedRoute>
               } />
               
