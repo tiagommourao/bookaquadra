@@ -1,11 +1,10 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SportType } from '@/types';
-import { Racquet, Waves, Dumbbell } from 'lucide-react';
+import { TennisBall, Waves, Dumbbell } from 'lucide-react';
 
 interface SportsSelectionStepProps {
   selectedSports: string[];
@@ -61,11 +60,10 @@ const SportsSelectionStep: React.FC<SportsSelectionStepProps> = ({
     onSubmit(selected);
   };
 
-  // Função para obter ícone baseado no nome da modalidade
   const getSportIcon = (sportName: string) => {
     const name = sportName.toLowerCase();
     if (name.includes('tênis') || name.includes('tennis') || name.includes('padel')) {
-      return <Racquet className="h-8 w-8" />;
+      return <TennisBall className="h-8 w-8" />;
     } else if (name.includes('vôlei') || name.includes('volley') || name.includes('beach')) {
       return <Waves className="h-8 w-8" />;
     } else {
