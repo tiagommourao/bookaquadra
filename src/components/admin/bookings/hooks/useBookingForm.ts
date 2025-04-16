@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay, addWeeks, isSameDay, parseISO } from 'date-fns';
+import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay, addWeeks, addDays, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Booking } from '@/types';
 import { bookingSchema, BookingFormValues } from '../booking-schema';
