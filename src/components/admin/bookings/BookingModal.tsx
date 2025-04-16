@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -97,8 +98,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [scheduleConflict, setScheduleConflict] = useState(false);
   const [courtRate, setCourtRate] = useState(0);
   const [weeks, setWeeks] = useState(0);
-  const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
-  const [overlappingSchedules, setOverlappingSchedules] = useState<any[]>([]);
+  const [selectedSchedules, setSelectedSchedules] = useState<any[]>([]);
+  const [bookingHours, setBookingHours] = useState(0);
   
   const { data: users } = useQuery({
     queryKey: ['profiles'],
@@ -156,7 +157,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return [];
     }
     
-    const bookingDay = watchBookingDate ? watchBookingDate.getDay() : new Date().getDay();
+    // Get day of week (0 = Sunday, 6 = Saturday)
+    const bookingDay = watchBookingDate.getDay();
+    // Convert to schedule format (0 = Monday, 6 = Sunday)
     const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
     
     const { data: schedules, error } = await supabase
@@ -180,74 +183,83 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           const [startHour, startMin] = watchStartTime.split(':').map(Number);
           const [endHour, endMin] = watchEndTime.split(':').map(Number);
           
-          const startDate = new Date();
+          // Create Date objects for start and end times
+          const startDate = new Date(watchBookingDate);
           startDate.setHours(startHour, startMin, 0, 0);
           
-          const endDate = new Date();
+          const endDate = new Date(watchBookingDate);
           endDate.setHours(endHour, endMin, 0, 0);
           
+          // If end time is before start time, assume it's the next day
           if (endDate < startDate) {
             endDate.setDate(endDate.getDate() + 1);
           }
           
+          // Calculate hours difference
           const diffHours = differenceInHours(endDate, startDate);
           
           if (diffHours <= 0) {
             setCourtRate(0);
+            setBookingHours(0);
             form.setValue('amount', 0);
             return;
           }
+          
+          setBookingHours(diffHours);
 
+          // Get applicable schedules
           const schedules = await fetchApplicableSchedules();
-          setOverlappingSchedules(schedules);
           
           if (!schedules || schedules.length === 0) {
             console.error('No schedules found for this court and day');
-            setSelectedSchedule(null);
+            setSelectedSchedules([]);
             form.setValue('amount', 0);
+            setCourtRate(0);
             return;
           }
 
-          const overlappingRates: { schedule: any; hours: number }[] = [];
+          // Check if the date is weekend
+          const bookingDay = watchBookingDate.getDay();
+          const isWeekend = [0, 6].includes(bookingDay); // 0 = Sunday, 6 = Saturday
           
-          for (const schedule of schedules) {
-            const scheduleStart = schedule.start_time.split(':').map(Number);
-            const scheduleEnd = schedule.end_time.split(':').map(Number);
+          // Find all schedule blocks that overlap with the booking time
+          const overlappingSchedules = schedules.filter(schedule => {
+            const [schStartHour, schStartMin] = schedule.start_time.split(':').map(Number);
+            const [schEndHour, schEndMin] = schedule.end_time.split(':').map(Number);
             
-            const scheduleStartDate = new Date();
-            scheduleStartDate.setHours(scheduleStart[0], scheduleStart[1], 0, 0);
+            const scheduleStart = new Date(watchBookingDate);
+            scheduleStart.setHours(schStartHour, schStartMin, 0, 0);
             
-            const scheduleEndDate = new Date();
-            scheduleEndDate.setHours(scheduleEnd[0], scheduleEnd[1], 0, 0);
+            const scheduleEnd = new Date(watchBookingDate);
+            scheduleEnd.setHours(schEndHour, schEndMin, 0, 0);
             
-            const overlapStart = startDate > scheduleStartDate ? startDate : scheduleStartDate;
-            const overlapEnd = endDate < scheduleEndDate ? endDate : scheduleEndDate;
-            
-            if (overlapEnd > overlapStart) {
-              const hoursInSchedule = differenceInHours(overlapEnd, overlapStart);
-              if (hoursInSchedule > 0) {
-                overlappingRates.push({ 
-                  schedule, 
-                  hours: hoursInSchedule 
-                });
-              }
+            // If schedule end is before schedule start, assume it spans to the next day
+            if (scheduleEnd < scheduleStart) {
+              scheduleEnd.setDate(scheduleEnd.getDate() + 1);
             }
-          }
+            
+            // Check if there is an overlap between booking time and schedule block
+            return (startDate < scheduleEnd && endDate > scheduleStart);
+          });
           
-          if (overlappingRates.length === 0) {
+          setSelectedSchedules(overlappingSchedules);
+          
+          if (overlappingSchedules.length === 0) {
             toast({
               title: 'Horário inválido',
               description: 'O horário selecionado não está disponível para esta quadra',
               variant: 'destructive'
             });
-            setSelectedSchedule(null);
             form.setValue('amount', 0);
+            setCourtRate(0);
             return;
           }
           
+          // Calculate total booking cost
           let totalAmount = 0;
           let weekCount = 1;
           
+          // Calculate total weeks if it's a monthly booking
           if (watchIsMonthly && watchSubscriptionEndDate) {
             const weeksList = eachWeekOfInterval({
               start: startOfDay(watchBookingDate),
@@ -258,28 +270,65 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             setWeeks(weekCount);
           }
           
-          const bookingDay = watchBookingDate ? watchBookingDate.getDay() : new Date().getDay();
-          const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
-          
-          for (const { schedule, hours } of overlappingRates) {
-            const isWeekend = [5, 6].includes(dayOfWeek);
-            let hourlyRate = schedule.price;
-            if (isWeekend && schedule.price_weekend) {
-              hourlyRate = schedule.price_weekend;
-            }
+          // Calculate cost for each hour based on applicable schedule blocks
+          for (let hour = 0; hour < diffHours; hour++) {
+            const hourStartDate = new Date(startDate);
+            hourStartDate.setHours(startDate.getHours() + hour);
             
-            if (watchIsMonthly && schedule.is_monthly && schedule.monthly_discount) {
-              hourlyRate = hourlyRate * (1 - schedule.monthly_discount / 100);
-            }
+            const hourEndDate = new Date(hourStartDate);
+            hourEndDate.setHours(hourStartDate.getHours() + 1);
             
-            totalAmount += hourlyRate * hours * weekCount;
+            // Find which schedule block this hour falls into
+            const applicableSchedule = overlappingSchedules.find(schedule => {
+              const [schStartHour, schStartMin] = schedule.start_time.split(':').map(Number);
+              const [schEndHour, schEndMin] = schedule.end_time.split(':').map(Number);
+              
+              const scheduleStart = new Date(watchBookingDate);
+              scheduleStart.setHours(schStartHour, schStartMin, 0, 0);
+              
+              const scheduleEnd = new Date(watchBookingDate);
+              scheduleEnd.setHours(schEndHour, schEndMin, 0, 0);
+              
+              if (scheduleEnd < scheduleStart) {
+                scheduleEnd.setDate(scheduleEnd.getDate() + 1);
+              }
+              
+              return hourStartDate >= scheduleStart && hourStartDate < scheduleEnd;
+            });
+            
+            if (applicableSchedule) {
+              // Determine the rate based on weekend/weekday
+              let hourlyRate = applicableSchedule.price;
+              
+              if (isWeekend && applicableSchedule.price_weekend) {
+                hourlyRate = applicableSchedule.price_weekend;
+              }
+              
+              totalAmount += hourlyRate;
+            }
           }
           
+          // Apply monthly discount if applicable
+          if (watchIsMonthly) {
+            const monthlyDiscountPercent = overlappingSchedules[0]?.monthly_discount || 0;
+            if (monthlyDiscountPercent > 0) {
+              totalAmount = totalAmount * (1 - monthlyDiscountPercent / 100);
+            }
+          }
+          
+          // Multiply by weeks for monthly bookings
+          totalAmount = totalAmount * weekCount;
+          
+          // Update form with calculated amount
           form.setValue('amount', Number(totalAmount.toFixed(2)));
           
-          if (overlappingRates.length > 0) {
-            setSelectedSchedule(overlappingRates[0].schedule);
-            setCourtRate(overlappingRates[0].schedule.price);
+          // Set court rate display value - use the weekend price if it's a weekend
+          if (overlappingSchedules.length > 0) {
+            const primarySchedule = overlappingSchedules[0];
+            const baseRate = isWeekend && primarySchedule.price_weekend 
+              ? primarySchedule.price_weekend 
+              : primarySchedule.price;
+            setCourtRate(baseRate);
           }
         } catch (error) {
           console.error('Error calculating court rate:', error);
@@ -402,7 +451,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
     
-    if (overlappingSchedules.length === 0) {
+    if (selectedSchedules.length === 0) {
       toast({
         title: 'Horário inválido',
         description: 'Não foi possível encontrar um horário disponível para esta quadra no dia e horário selecionados.',
@@ -740,10 +789,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       />
                     </FormControl>
                     <FormDescription>
-                      {courtRate > 0 && `Taxa horária: R$ ${courtRate.toFixed(2)}`}
-                      {selectedSchedule?.is_monthly && selectedSchedule?.monthly_discount > 0 && (
+                      {courtRate > 0 && (
+                        <div>
+                          <span className="block">Taxa horária: R$ {courtRate.toFixed(2)}</span>
+                          {bookingHours > 1 && (
+                            <span className="block">Duração: {bookingHours} horas</span>
+                          )}
+                        </div>
+                      )}
+                      {watchIsMonthly && selectedSchedules.length > 0 && selectedSchedules[0]?.monthly_discount > 0 && (
                         <span className="block mt-1 text-green-600">
-                          Desconto mensalista: {selectedSchedule.monthly_discount}%
+                          Desconto mensalista: {selectedSchedules[0].monthly_discount}%
                         </span>
                       )}
                       {scheduleConflict && (
