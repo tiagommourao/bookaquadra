@@ -48,16 +48,20 @@ export function useBookingForm({ booking, onClose }: {
   // Set form values when editing a booking
   useEffect(() => {
     if (booking && form) {
-      // Corrigir problema de timezone - garantir que a data seja corretamente preservada
-      const bookingDate = typeof booking.booking_date === 'string' 
-        ? new Date(booking.booking_date + 'T12:00:00') // Adicionar horário para evitar problemas com timezone
-        : booking.booking_date;
+      // Preserve the date exactly as it was selected, without timezone adjustments
+      const dateStr = booking.booking_date;
+      const [year, month, day] = typeof dateStr === 'string' 
+        ? dateStr.split('-').map(Number) 
+        : [booking.booking_date.getFullYear(), booking.booking_date.getMonth() + 1, booking.booking_date.getDate()];
+      
+      // Create local date without time component to avoid timezone issues
+      const bookingDate = new Date(year, month - 1, day, 12, 0, 0);
       
       const formValues: Partial<BookingFormValues> = {
         user_id: booking.user_id,
         court_id: booking.court_id,
         booking_date: bookingDate,
-        // Garantir que os valores de hora início e fim sejam mantidos
+        // Make sure to preserve the start and end times exactly as they were
         start_time: booking.start_time,
         end_time: booking.end_time,
         amount: Number(booking.amount),
@@ -65,12 +69,17 @@ export function useBookingForm({ booking, onClose }: {
         payment_status: booking.payment_status,
         notes: booking.notes || '',
         is_monthly: booking.is_monthly || false,
-        subscription_end_date: booking.subscription_end_date ? 
-          (typeof booking.subscription_end_date === 'string' ? 
-            new Date(booking.subscription_end_date + 'T12:00:00') : 
-            booking.subscription_end_date) : 
-          undefined
       };
+      
+      // Handle subscription end date if it exists
+      if (booking.subscription_end_date) {
+        const subDateStr = booking.subscription_end_date;
+        const [subYear, subMonth, subDay] = typeof subDateStr === 'string'
+          ? subDateStr.split('-').map(Number)
+          : [booking.subscription_end_date.getFullYear(), booking.subscription_end_date.getMonth() + 1, booking.subscription_end_date.getDate()];
+        
+        formValues.subscription_end_date = new Date(subYear, subMonth - 1, subDay, 12, 0, 0);
+      }
       
       form.reset(formValues);
     } else if (!booking) {
@@ -290,9 +299,11 @@ export function useBookingForm({ booking, onClose }: {
     setIsSubmitting(true);
     
     try {
-      // Usar o método toISOString apenas na parte da data, sem a parte do tempo
-      // para evitar problemas com timezone
-      const formattedDate = format(values.booking_date, 'yyyy-MM-dd');
+      // Format the date as YYYY-MM-DD without any timezone adjustments
+      const year = values.booking_date.getFullYear();
+      const month = String(values.booking_date.getMonth() + 1).padStart(2, '0');
+      const day = String(values.booking_date.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
       
       const bookingData = {
         user_id: values.user_id,
