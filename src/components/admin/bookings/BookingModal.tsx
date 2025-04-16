@@ -124,7 +124,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       form.reset({
         user_id: booking.user_id,
         court_id: booking.court_id,
-        booking_date: new Date(booking.booking_date),
+        booking_date: booking.booking_date instanceof Date ? booking.booking_date : new Date(booking.booking_date),
         start_time: booking.start_time,
         end_time: booking.end_time,
         amount: booking.amount.toString(),
@@ -156,8 +156,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         const { error } = await supabase
           .from('bookings')
           .update({
-            ...values,
+            user_id: values.user_id,
+            court_id: values.court_id,
             booking_date: format(values.booking_date, 'yyyy-MM-dd'),
+            start_time: values.start_time,
+            end_time: values.end_time,
+            amount: values.amount,
+            status: values.status,
+            payment_status: values.payment_status,
+            notes: values.notes,
             updated_at: new Date().toISOString()
           })
           .eq('id', booking.id);
@@ -172,11 +179,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         // Create booking
         const { error } = await supabase
           .from('bookings')
-          .insert([{
-            ...values,
+          .insert({
+            user_id: values.user_id,
+            court_id: values.court_id,
             booking_date: format(values.booking_date, 'yyyy-MM-dd'),
+            start_time: values.start_time,
+            end_time: values.end_time,
+            amount: values.amount,
+            status: values.status,
+            payment_status: values.payment_status,
+            notes: values.notes,
             created_by: null // TODO: get from auth context
-          }]);
+          });
         
         if (error) throw error;
         

@@ -140,7 +140,20 @@ export const CourtModal: React.FC<CourtModalProps> = ({
         // Update court
         const { error } = await supabase
           .from('courts')
-          .update(values)
+          .update({
+            name: values.name,
+            type_id: values.type_id,
+            description: values.description,
+            surface_type: values.surface_type,
+            is_active: values.is_active,
+            has_cover: values.has_cover,
+            has_lighting: values.has_lighting,
+            maintenance_info: values.maintenance_info,
+            location_info: values.location_info,
+            dimensions: values.dimensions,
+            capacity: values.capacity,
+            accessibility_features: values.accessibility_features
+          })
           .eq('id', court.id);
         
         if (error) throw error;
@@ -153,7 +166,20 @@ export const CourtModal: React.FC<CourtModalProps> = ({
         // Create court
         const { error } = await supabase
           .from('courts')
-          .insert([values]);
+          .insert({
+            name: values.name,
+            type_id: values.type_id,
+            description: values.description,
+            surface_type: values.surface_type,
+            is_active: values.is_active,
+            has_cover: values.has_cover,
+            has_lighting: values.has_lighting,
+            maintenance_info: values.maintenance_info,
+            location_info: values.location_info,
+            dimensions: values.dimensions,
+            capacity: values.capacity,
+            accessibility_features: values.accessibility_features
+          });
         
         if (error) throw error;
         

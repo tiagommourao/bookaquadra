@@ -124,7 +124,17 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         // Update schedule
         const { error } = await supabase
           .from('schedules')
-          .update(values)
+          .update({
+            start_time: values.start_time,
+            end_time: values.end_time,
+            price: values.price,
+            price_weekend: values.price_weekend,
+            price_holiday: values.price_holiday,
+            min_booking_time: values.min_booking_time,
+            max_booking_time: values.max_booking_time,
+            advance_booking_days: values.advance_booking_days,
+            is_blocked: values.is_blocked
+          })
           .eq('id', schedule.id);
         
         if (error) throw error;
@@ -137,11 +147,19 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         // Create schedule
         const { error } = await supabase
           .from('schedules')
-          .insert([{
-            ...values,
+          .insert({
             court_id: courtId,
-            day_of_week: dayOfWeek
-          }]);
+            day_of_week: dayOfWeek,
+            start_time: values.start_time,
+            end_time: values.end_time,
+            price: values.price,
+            price_weekend: values.price_weekend,
+            price_holiday: values.price_holiday,
+            min_booking_time: values.min_booking_time,
+            max_booking_time: values.max_booking_time,
+            advance_booking_days: values.advance_booking_days,
+            is_blocked: values.is_blocked
+          });
         
         if (error) throw error;
         

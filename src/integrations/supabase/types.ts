@@ -9,6 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      achievement_types: {
+        Row: {
+          category: string
+          conditions: Json | null
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          points: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          conditions?: Json | null
+          created_at?: string
+          description: string
+          icon: string
+          id?: string
+          name: string
+          points?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          conditions?: Json | null
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          points?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           amount: number
@@ -71,6 +107,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      challenges: {
+        Row: {
+          conditions: Json
+          created_at: string
+          description: string
+          end_date: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          points: number
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          conditions: Json
+          created_at?: string
+          description: string
+          end_date: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          points?: number
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          conditions?: Json
+          created_at?: string
+          description?: string
+          end_date?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          points?: number
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       court_types: {
         Row: {
@@ -161,6 +239,42 @@ export type Database = {
           },
         ]
       }
+      gamification_levels: {
+        Row: {
+          benefits: string | null
+          created_at: string
+          frame_color: string | null
+          icon: string | null
+          id: string
+          max_points: number | null
+          min_points: number
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          benefits?: string | null
+          created_at?: string
+          frame_color?: string | null
+          icon?: string | null
+          id?: string
+          max_points?: number | null
+          min_points: number
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          benefits?: string | null
+          created_at?: string
+          frame_color?: string | null
+          icon?: string | null
+          id?: string
+          max_points?: number | null
+          min_points?: number
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       holidays: {
         Row: {
           created_at: string
@@ -185,41 +299,121 @@ export type Database = {
         }
         Relationships: []
       }
+      point_transactions: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          points: number
+          source_id: string | null
+          source_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          points: number
+          source_id?: string | null
+          source_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          points?: number
+          source_id?: string | null
+          source_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
+          city: string | null
           created_at: string
           credit_balance: number | null
           first_name: string | null
           id: string
           is_active: boolean
           last_name: string | null
+          neighborhood: string | null
           phone: string | null
           preferences: Json | null
+          profile_progress: number | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
+          city?: string | null
           created_at?: string
           credit_balance?: number | null
           first_name?: string | null
           id: string
           is_active?: boolean
           last_name?: string | null
+          neighborhood?: string | null
           phone?: string | null
           preferences?: Json | null
+          profile_progress?: number | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
+          city?: string | null
           created_at?: string
           credit_balance?: number | null
           first_name?: string | null
           id?: string
           is_active?: boolean
           last_name?: string | null
+          neighborhood?: string | null
           phone?: string | null
           preferences?: Json | null
+          profile_progress?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      recognition_types: {
+        Row: {
+          created_at: string
+          description: string
+          icon: string | null
+          id: string
+          name: string
+          points: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          icon?: string | null
+          id?: string
+          name: string
+          points?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          points?: number
           updated_at?: string
         }
         Relationships: []
@@ -324,6 +518,71 @@ export type Database = {
           },
         ]
       }
+      skill_levels: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          rank_order: number
+          sport_type_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          rank_order: number
+          sport_type_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          rank_order?: number
+          sport_type_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_levels_sport_type_id_fkey"
+            columns: ["sport_type_id"]
+            isOneToOne: false
+            referencedRelation: "sport_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sport_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -377,6 +636,329 @@ export type Database = {
           },
           {
             foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_achievements: {
+        Row: {
+          achievement_type_id: string
+          created_at: string
+          earned_at: string
+          id: string
+          is_featured: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_type_id: string
+          created_at?: string
+          earned_at?: string
+          id?: string
+          is_featured?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_type_id?: string
+          created_at?: string
+          earned_at?: string
+          id?: string
+          is_featured?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_type_id_fkey"
+            columns: ["achievement_type_id"]
+            isOneToOne: false
+            referencedRelation: "achievement_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_challenges: {
+        Row: {
+          challenge_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          progress: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          progress?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          progress?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_challenges_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_challenges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_gamification: {
+        Row: {
+          active_avatar: string | null
+          active_frame: string | null
+          created_at: string
+          current_level_id: string | null
+          id: string
+          total_points: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_avatar?: string | null
+          active_frame?: string | null
+          created_at?: string
+          current_level_id?: string | null
+          id?: string
+          total_points?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_avatar?: string | null
+          active_frame?: string | null
+          created_at?: string
+          current_level_id?: string | null
+          id?: string
+          total_points?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_gamification_current_level_id_fkey"
+            columns: ["current_level_id"]
+            isOneToOne: false
+            referencedRelation: "gamification_levels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_gamification_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_preferences: {
+        Row: {
+          city: string | null
+          created_at: string
+          id: string
+          neighborhood: string | null
+          onboarding_completed: boolean
+          preferred_days: number[] | null
+          preferred_game_types: string[] | null
+          preferred_times: Json | null
+          terms_accepted: boolean
+          terms_accepted_at: string | null
+          updated_at: string
+          user_id: string
+          wants_notifications: boolean | null
+          zipcode: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          neighborhood?: string | null
+          onboarding_completed?: boolean
+          preferred_days?: number[] | null
+          preferred_game_types?: string[] | null
+          preferred_times?: Json | null
+          terms_accepted?: boolean
+          terms_accepted_at?: string | null
+          updated_at?: string
+          user_id: string
+          wants_notifications?: boolean | null
+          zipcode?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          neighborhood?: string | null
+          onboarding_completed?: boolean
+          preferred_days?: number[] | null
+          preferred_game_types?: string[] | null
+          preferred_times?: Json | null
+          terms_accepted?: boolean
+          terms_accepted_at?: string | null
+          updated_at?: string
+          user_id?: string
+          wants_notifications?: boolean | null
+          zipcode?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_recognitions: {
+        Row: {
+          booking_id: string
+          comment: string | null
+          created_at: string
+          from_user_id: string
+          id: string
+          recognition_type_id: string
+          to_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          comment?: string | null
+          created_at?: string
+          from_user_id: string
+          id?: string
+          recognition_type_id: string
+          to_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          comment?: string | null
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          recognition_type_id?: string
+          to_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_recognitions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recognitions_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recognitions_recognition_type_id_fkey"
+            columns: ["recognition_type_id"]
+            isOneToOne: false
+            referencedRelation: "recognition_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_recognitions_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_sports: {
+        Row: {
+          created_at: string
+          id: string
+          is_verified: boolean
+          notes: string | null
+          skill_level_id: string
+          sport_type_id: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_verified?: boolean
+          notes?: string | null
+          skill_level_id: string
+          sport_type_id: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_verified?: boolean
+          notes?: string | null
+          skill_level_id?: string
+          sport_type_id?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sports_skill_level_id_fkey"
+            columns: ["skill_level_id"]
+            isOneToOne: false
+            referencedRelation: "skill_levels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sports_sport_type_id_fkey"
+            columns: ["sport_type_id"]
+            isOneToOne: false
+            referencedRelation: "sport_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sports_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
