@@ -17,6 +17,9 @@ import Account from "./pages/user/Account";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import CourtsList from "./pages/admin/courts/CourtsList";
+import SchedulesList from "./pages/admin/schedules/SchedulesList";
+import BookingsList from "./pages/admin/bookings/BookingsList";
 
 import NotFound from "./pages/NotFound";
 
@@ -89,6 +92,29 @@ const App = () => (
                   <AdminDashboard />
                 </AdminProtectedRoute>
               } />
+              
+              {/* Admin Courts Management */}
+              <Route path="/admin/quadras" element={
+                <AdminProtectedRoute>
+                  <CourtsList />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Schedules Management */}
+              <Route path="/admin/horarios" element={
+                <AdminProtectedRoute>
+                  <SchedulesList />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Bookings Management */}
+              <Route path="/admin/reservas" element={
+                <AdminProtectedRoute>
+                  <BookingsList />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Other Admin Routes */}
               <Route path="/admin/:path" element={
                 <AdminProtectedRoute>
                   <AdminDashboard />
