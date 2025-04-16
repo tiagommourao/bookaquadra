@@ -1,4 +1,3 @@
-
 // Core type definitions for BookaQuadra application
 
 // User role types
@@ -36,8 +35,8 @@ export type CourtType = {
   id: string;
   name: string;
   description?: string;
-  created_at: string | Date;
-  updated_at: string | Date;
+  created_at?: string;
+  updated_at?: string;
 };
 
 // Court interface
@@ -46,20 +45,17 @@ export interface Court {
   name: string;
   type_id: string;
   description?: string;
-  image_url?: string;
+  surface_type?: string;
   is_active: boolean;
   has_cover: boolean;
   has_lighting: boolean;
-  surface_type?: string;
   maintenance_info?: string;
   location_info?: string;
   dimensions?: string;
   capacity?: number;
   accessibility_features?: string;
-  created_at: string | Date;
-  updated_at: string | Date;
-  // Relação virtual - não está no banco de dados
-  court_type?: CourtType;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Schedule interface
@@ -69,15 +65,15 @@ export interface Schedule {
   day_of_week: number; // 0-6 (Sunday-Saturday)
   start_time: string; // HH:MM format
   end_time: string; // HH:MM format
-  is_blocked: boolean;
   price: number;
-  price_weekend?: number | null;
-  price_holiday?: number | null;
+  price_weekend?: number;
+  price_holiday?: number;
   min_booking_time: number;
-  max_booking_time?: number | null;
-  advance_booking_days?: number | null;
-  created_at: string | Date;
-  updated_at: string | Date;
+  max_booking_time?: number;
+  is_blocked: boolean;
+  advance_booking_days?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Schedule Block interface
@@ -96,14 +92,14 @@ export interface ScheduleBlock {
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 // Payment status
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
 
 // Booking interface
 export interface Booking {
   id: string;
   user_id: string;
   court_id: string;
-  booking_date: string | Date;
+  booking_date: Date | string;
   start_time: string;
   end_time: string;
   status: BookingStatus;
@@ -111,8 +107,8 @@ export interface Booking {
   amount: number;
   created_by?: string;
   notes?: string;
-  created_at: string | Date;
-  updated_at: string | Date;
+  created_at?: string;
+  updated_at?: string;
   // Relações virtuais
   user?: Profile;
   court?: Court;
