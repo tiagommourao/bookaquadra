@@ -85,6 +85,19 @@ export const BookingForm: React.FC<BookingFormProps> = ({
     };
   });
 
+  // Ordena as faixas de horário por hora de início para exibição consistente
+  const sortedSchedules = selectedSchedules.length > 0 
+    ? [...selectedSchedules].sort((a, b) => {
+        const [aStartHour] = a.start_time.split(':').map(Number);
+        const [bStartHour] = b.start_time.split(':').map(Number);
+        return aStartHour - bStartHour;
+      })
+    : [];
+
+  // Obtém o dia da semana da data da reserva
+  const bookingDay = form.getValues("booking_date")?.getDay();
+  const isWeekend = bookingDay !== undefined ? [0, 6].includes(bookingDay) : false;
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -328,24 +341,39 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   />
                 </FormControl>
                 <FormDescription>
-                  {courtRate > 0 && (
-                    <div>
-                      <span className="block">Taxa horária: R$ {courtRate.toFixed(2)}</span>
+                  {/* Exibe todas as faixas de preço aplicáveis */}
+                  {sortedSchedules.length > 0 && (
+                    <div className="space-y-1">
+                      {sortedSchedules.map((schedule, index) => {
+                        const price = isWeekend && schedule.price_weekend ? 
+                          schedule.price_weekend : 
+                          schedule.price;
+                        
+                        return (
+                          <span key={index} className="block">
+                            Taxa hora {schedule.start_time} às {schedule.end_time}: R$ {price.toFixed(2)}
+                          </span>
+                        );
+                      })}
+                      
                       {bookingHours > 1 && (
-                        <span className="block">Duração: {bookingHours} horas</span>
+                        <span className="block mt-1">Duração: {bookingHours} horas</span>
                       )}
                     </div>
                   )}
+                  
                   {watchIsMonthly && selectedSchedules.length > 0 && selectedSchedules[0]?.monthly_discount > 0 && (
                     <span className="block mt-1 text-green-600">
                       Desconto mensalista: {selectedSchedules[0].monthly_discount}%
                     </span>
                   )}
+                  
                   {scheduleConflict && (
                     <span className="text-red-500 block mt-1">
                       ⚠️ Conflito de horário detectado
                     </span>
                   )}
+                  
                   {isValidatingSchedule && (
                     <span className="text-blue-500 flex items-center gap-1 mt-1">
                       <Loader2 className="h-3 w-3 animate-spin" /> Verificando disponibilidade...
