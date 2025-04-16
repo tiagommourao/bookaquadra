@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -12,25 +12,41 @@ import {
   CardFooter
 } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Plus, Filter, Eye, Edit, Ban } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Filter, Eye, Edit, Ban, Grid3X3, CalendarDays } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Booking, BookingStatus, Court, PaymentStatus } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingModal } from '@/components/admin/bookings/BookingModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
+import { 
+  format, 
+  isToday, 
+  isFuture, 
+  isPast, 
+  startOfDay,
+  endOfDay,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  parseISO,
+  isWeekend,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  getDay
+} from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const BookingsList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,6 +54,33 @@ const BookingsList = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedCourt, setSelectedCourt] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<BookingStatus | 'all'>('all');
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+  const [selectedDayDetails, setSelectedDayDetails] = useState<Date | null>(null);
+  
+  const isMobile = useIsMobile();
+
+  // Calculate start and end dates based on view mode
+  const dateRange = useMemo(() => {
+    if (viewMode === 'month') {
+      return {
+        start: startOfMonth(selectedDate),
+        end: endOfMonth(selectedDate)
+      };
+    } else {
+      return {
+        start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
+        end: endOfWeek(selectedDate, { weekStartsOn: 1 })
+      };
+    }
+  }, [selectedDate, viewMode]);
+
+  // Generate days for the calendar
+  const calendarDays = useMemo(() => {
+    return eachDayOfInterval({
+      start: dateRange.start,
+      end: dateRange.end
+    });
+  }, [dateRange]);
 
   // Fetch courts
   const { data: courts } = useQuery({
@@ -53,9 +96,9 @@ const BookingsList = () => {
     }
   });
 
-  // Fetch bookings
-  const { data: bookings, isLoading, error, refetch } = useQuery({
-    queryKey: ['bookings', selectedDate, selectedCourt, selectedStatus],
+  // Fetch bookings for the entire month/week
+  const { data: allBookings, isLoading, error, refetch } = useQuery({
+    queryKey: ['bookings', dateRange.start, dateRange.end, selectedCourt, selectedStatus],
     queryFn: async () => {
       let query = supabase
         .from('bookings')
@@ -64,7 +107,8 @@ const BookingsList = () => {
           profiles:user_id (first_name, last_name, phone),
           court:court_id (name)
         `)
-        .eq('booking_date', format(selectedDate, 'yyyy-MM-dd'));
+        .gte('booking_date', format(dateRange.start, 'yyyy-MM-dd'))
+        .lte('booking_date', format(dateRange.end, 'yyyy-MM-dd'));
       
       if (selectedCourt !== 'all') {
         query = query.eq('court_id', selectedCourt);
@@ -74,7 +118,7 @@ const BookingsList = () => {
         query = query.eq('status', selectedStatus);
       }
       
-      query = query.order('start_time');
+      query = query.order('booking_date');
       
       const { data, error } = await query;
       
@@ -87,6 +131,42 @@ const BookingsList = () => {
     }
   });
 
+  // Get bookings for a specific day
+  const getBookingsForDay = (day: Date) => {
+    if (!allBookings) return [];
+    
+    return allBookings.filter(booking => 
+      isSameDay(new Date(booking.booking_date), day)
+    );
+  };
+
+  // Calculate stats for selected period (week or month)
+  const periodStats = useMemo(() => {
+    if (!allBookings) {
+      return {
+        totalBookings: 0,
+        pendingBookings: 0,
+        paidBookings: 0,
+        totalRevenue: 0
+      };
+    }
+
+    // Filter bookings to current view period
+    const periodBookings = allBookings.filter(booking => {
+      const bookingDate = new Date(booking.booking_date);
+      return bookingDate >= dateRange.start && bookingDate <= dateRange.end;
+    });
+
+    return {
+      totalBookings: periodBookings.length,
+      pendingBookings: periodBookings.filter(b => b.status === 'pending').length,
+      paidBookings: periodBookings.filter(b => b.payment_status === 'paid').length,
+      totalRevenue: periodBookings
+        .filter(b => b.payment_status === 'paid')
+        .reduce((sum, booking) => sum + Number(booking.amount), 0)
+    };
+  }, [allBookings, dateRange]);
+
   const handleCreateBooking = () => {
     setSelectedBooking(null);
     setIsModalOpen(true);
@@ -95,17 +175,6 @@ const BookingsList = () => {
   const handleViewBooking = (booking: Booking) => {
     setSelectedBooking(booking);
     setIsModalOpen(true);
-  };
-
-  const handleTabChange = (value: string) => {
-    const now = new Date();
-    if (value === 'today') {
-      setSelectedDate(now);
-    } else if (value === 'future') {
-      // This doesn't change the date, but will filter in the UI
-    } else if (value === 'past') {
-      // This doesn't change the date, but will filter in the UI
-    }
   };
 
   const handleStatusChange = async (bookingId: string, newStatus: BookingStatus) => {
@@ -136,6 +205,21 @@ const BookingsList = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     refetch();
+  };
+
+  const handleDayClick = (day: Date) => {
+    setSelectedDayDetails(day);
+    setSelectedDate(day);
+  };
+
+  const handleChangeMonth = (date: Date) => {
+    setSelectedDate(date);
+    setSelectedDayDetails(null);
+  };
+
+  const toggleViewMode = () => {
+    setViewMode(viewMode === 'month' ? 'week' : 'month');
+    setSelectedDayDetails(null);
   };
 
   const getStatusBadgeVariant = (status: BookingStatus) => {
@@ -198,6 +282,24 @@ const BookingsList = () => {
     }
   };
 
+  // Get cell color based on number of bookings and revenue
+  const getCellColor = (bookings: (Booking & {
+    profiles: { first_name: string | null; last_name: string | null; phone: string | null };
+    court: { name: string };
+  })[]) => {
+    if (bookings.length === 0) return 'bg-white';
+    
+    const maxBookingsBeforeRed = 10; // Adjust as needed for your business
+    const ratio = Math.min(bookings.length / maxBookingsBeforeRed, 1);
+    
+    if (ratio < 0.3) return 'bg-green-50 hover:bg-green-100';
+    if (ratio < 0.7) return 'bg-yellow-50 hover:bg-yellow-100';
+    return 'bg-red-50 hover:bg-red-100';
+  };
+
+  // Get days of the week headers
+  const weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
   if (isLoading) {
     return (
       <AdminLayout>
@@ -223,25 +325,43 @@ const BookingsList = () => {
     );
   }
 
+  const selectedDayBookings = selectedDayDetails 
+    ? allBookings?.filter(b => isSameDay(new Date(b.booking_date), selectedDayDetails)) || []
+    : [];
+
   return (
     <AdminLayout>
       <div className="container mx-auto py-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">Reservas</h1>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={toggleViewMode} className="flex items-center gap-1">
+              {viewMode === 'month' ? (
+                <>
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="hidden md:inline">Ver Semana</span>
+                </>
+              ) : (
+                <>
+                  <Grid3X3 className="h-4 w-4" />
+                  <span className="hidden md:inline">Ver Mês</span>
+                </>
+              )}
+            </Button>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(selectedDate, 'PPP', { locale: ptBR })}
+                  {format(selectedDate, 'MMMM yyyy', { locale: ptBR })}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
+                  onSelect={(date) => date && handleChangeMonth(date)}
                   initialFocus
+                  className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -255,63 +375,63 @@ const BookingsList = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Reservas Hoje</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {viewMode === 'month' ? 'Reservas do Mês' : 'Reservas da Semana'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {bookings?.filter(b => 
-                  isToday(new Date(b.booking_date)) && 
-                  b.status !== 'cancelled'
-                ).length || 0}
+                {periodStats.totalBookings}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Reservas Pendentes</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Reservas Pendentes
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {bookings?.filter(b => b.status === 'pending').length || 0}
+                {periodStats.pendingBookings}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Pagamentos Pendentes</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Pagamentos Confirmados
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {bookings?.filter(b => b.payment_status === 'pending').length || 0}
+                {periodStats.paidBookings}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Faturamento do Dia</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {viewMode === 'month' ? 'Faturamento do Mês' : 'Faturamento da Semana'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                R$ {bookings?.filter(b => 
-                  isToday(new Date(b.booking_date)) && 
-                  b.status !== 'cancelled' && 
-                  b.payment_status === 'paid'
-                ).reduce((acc, curr) => acc + curr.amount, 0).toFixed(2) || '0.00'}
+                R$ {periodStats.totalRevenue.toFixed(2)}
               </div>
             </CardContent>
           </Card>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Gerenciar Reservas</CardTitle>
-            <CardDescription>
-              Visualize, edite e gerencie as reservas de quadras
-            </CardDescription>
-          </CardHeader>
-
-          <div className="px-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <CardHeader className="flex flex-col md:flex-row md:items-center justify-between">
+            <div>
+              <CardTitle>Gerenciar Reservas</CardTitle>
+              <CardDescription>
+                Calendário de reservas de quadras
+              </CardDescription>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 md:mt-0">
               <Select
                 value={selectedCourt}
                 onValueChange={setSelectedCourt}
@@ -345,19 +465,193 @@ const BookingsList = () => {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          </CardHeader>
 
-          <Tabs defaultValue="today" onValueChange={handleTabChange}>
-            <div className="px-6">
-              <TabsList className="mb-4">
-                <TabsTrigger value="today">Hoje</TabsTrigger>
-                <TabsTrigger value="future">Futuras</TabsTrigger>
-                <TabsTrigger value="past">Passadas</TabsTrigger>
-              </TabsList>
-            </div>
+          <CardContent>
+            {/* Calendar View */}
+            {viewMode === 'month' ? (
+              // Month view
+              <div className="grid grid-cols-7 gap-1 mb-6">
+                {/* Calendar headers */}
+                {weekDays.map((day) => (
+                  <div key={day} className="p-2 text-center font-semibold">
+                    {day}
+                  </div>
+                ))}
+                
+                {/* Fill in empty spaces before first day of month */}
+                {Array.from({ length: getDay(dateRange.start) || 7 }).map((_, index) => (
+                  <div key={`empty-start-${index}`} className="h-24 p-1 bg-gray-50 border border-gray-100"></div>
+                ))}
+                
+                {/* Calendar days */}
+                {calendarDays.map((day) => {
+                  const dayBookings = getBookingsForDay(day);
+                  const revenue = dayBookings.reduce((sum, b) => sum + Number(b.amount), 0);
+                  
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={`h-24 p-1 border cursor-pointer transition-all ${
+                        isToday(day) ? 'border-primary' : 'border-gray-100'
+                      } ${getCellColor(dayBookings)}`}
+                      onClick={() => handleDayClick(day)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className={`text-sm font-medium ${isWeekend(day) ? 'text-red-500' : ''}`}>
+                          {format(day, 'd')}
+                        </span>
+                        {dayBookings.length > 0 && (
+                          <span className="text-xs font-medium bg-primary/10 text-primary px-1 rounded">
+                            {dayBookings.length}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {dayBookings.length > 0 && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="mt-2 text-xs">
+                                <div className="font-semibold text-green-700">
+                                  R$ {revenue.toFixed(2)}
+                                </div>
+                                <div className="truncate mt-1">
+                                  {dayBookings.length > 2 
+                                    ? `${dayBookings.length} reservas`
+                                    : dayBookings.slice(0, 2).map((b, i) => (
+                                        <div key={i} className="truncate">
+                                          {b.start_time.slice(0, 5)} - {b.court?.name}
+                                        </div>
+                                      ))
+                                  }
+                                </div>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              <div className="space-y-1">
+                                <p className="font-semibold">Reservas do dia {format(day, 'dd/MM')}</p>
+                                {dayBookings.slice(0, 5).map((booking, i) => (
+                                  <div key={i} className="text-xs">
+                                    <span className="font-medium">{booking.start_time.slice(0, 5)}</span> - {booking.court?.name}{' '}
+                                    <span className="text-muted-foreground">
+                                      {booking.profiles?.first_name || 'Cliente'}
+                                    </span>
+                                  </div>
+                                ))}
+                                {dayBookings.length > 5 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    + {dayBookings.length - 5} mais reservas
+                                  </p>
+                                )}
+                                <p className="font-semibold text-green-600">
+                                  Total: R$ {revenue.toFixed(2)}
+                                </p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Week view
+              <div className="mb-6 overflow-x-auto">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="border p-2 bg-gray-50 w-24">Horário</th>
+                      {eachDayOfInterval({
+                        start: dateRange.start,
+                        end: dateRange.end
+                      }).map((day) => (
+                        <th key={day.toString()} className={`border p-2 ${isToday(day) ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                          <div className="text-center">
+                            <div className="font-semibold">{format(day, 'EEEE', { locale: ptBR })}</div>
+                            <div className={`text-sm ${isWeekend(day) ? 'text-red-500' : ''}`}>
+                              {format(day, 'dd/MM')}
+                            </div>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Create rows for each hour from 6:00 to 23:00 */}
+                    {Array.from({ length: 18 }).map((_, index) => {
+                      const hour = index + 6; // Start at 6:00
+                      const hourFormatted = `${hour.toString().padStart(2, '0')}:00`;
+                      
+                      return (
+                        <tr key={hourFormatted} className="hover:bg-gray-50">
+                          <td className="border p-2 text-center font-medium">
+                            {hourFormatted}
+                          </td>
+                          
+                          {eachDayOfInterval({
+                            start: dateRange.start,
+                            end: dateRange.end
+                          }).map((day) => {
+                            const bookingsAtHour = allBookings?.filter(b => 
+                              isSameDay(new Date(b.booking_date), day) && 
+                              b.start_time.startsWith(hourFormatted.slice(0, 2))
+                            ) || [];
+                            
+                            return (
+                              <td 
+                                key={`${day.toString()}-${hourFormatted}`} 
+                                className={`border p-1 relative min-h-[80px] ${
+                                  isToday(day) ? 'bg-blue-50/30' : ''
+                                }`}
+                                onClick={() => handleDayClick(day)}
+                              >
+                                {bookingsAtHour.map((booking) => (
+                                  <div 
+                                    key={booking.id}
+                                    className={`text-xs mb-1 p-1 rounded cursor-pointer ${
+                                      booking.status === 'confirmed' ? 'bg-green-100' :
+                                      booking.status === 'pending' ? 'bg-yellow-100' :
+                                      booking.status === 'cancelled' ? 'bg-red-100' : 'bg-gray-100'
+                                    }`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleViewBooking(booking);
+                                    }}
+                                  >
+                                    <div className="font-medium truncate">
+                                      {booking.start_time.slice(0, 5)}-{booking.end_time.slice(0, 5)}
+                                    </div>
+                                    <div className="truncate">{booking.court?.name}</div>
+                                    <div className="truncate">
+                                      {booking.profiles?.first_name || 'Cliente'}
+                                    </div>
+                                  </div>
+                                ))}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-            <CardContent>
-              <TabsContent value="today" className="m-0">
+            {/* Selected Day Details */}
+            {selectedDayDetails && (
+              <div className="mt-6 border-t pt-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">
+                    Reservas para {format(selectedDayDetails, 'dd/MM/yyyy', { locale: ptBR })}
+                  </h3>
+                  <Badge variant={isWeekend(selectedDayDetails) ? 'secondary' : 'outline'}>
+                    {format(selectedDayDetails, 'EEEE', { locale: ptBR })}
+                  </Badge>
+                </div>
+                
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -371,8 +665,8 @@ const BookingsList = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookings && bookings.length > 0 ? (
-                      bookings.filter(b => isToday(new Date(b.booking_date))).map((booking) => (
+                    {selectedDayBookings.length > 0 ? (
+                      selectedDayBookings.map((booking) => (
                         <TableRow key={booking.id}>
                           <TableCell className="font-medium">
                             {`${booking.start_time.slice(0, 5)} - ${booking.end_time.slice(0, 5)}`}
@@ -424,150 +718,18 @@ const BookingsList = () => {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-4">
-                          Nenhuma reserva encontrada para hoje
+                          Nenhuma reserva encontrada para este dia
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
-              </TabsContent>
-
-              <TabsContent value="future" className="m-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Horário</TableHead>
-                      <TableHead>Quadra</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Pagamento</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bookings && bookings.length > 0 ? (
-                      bookings
-                        .filter(b => {
-                          const bookingDate = new Date(b.booking_date);
-                          return isFuture(bookingDate) || isToday(bookingDate);
-                        })
-                        .map((booking) => (
-                          <TableRow key={booking.id}>
-                            <TableCell>
-                              {format(new Date(booking.booking_date), 'dd/MM/yyyy')}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {`${booking.start_time.slice(0, 5)} - ${booking.end_time.slice(0, 5)}`}
-                            </TableCell>
-                            <TableCell>{booking.court?.name}</TableCell>
-                            <TableCell>
-                              {booking.profiles?.first_name 
-                                ? `${booking.profiles.first_name} ${booking.profiles.last_name || ''}`
-                                : 'Cliente não identificado'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getStatusBadgeVariant(booking.status)}>
-                                {translateStatus(booking.status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getPaymentStatusBadgeVariant(booking.payment_status)}>
-                                {translatePaymentStatus(booking.payment_status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewBooking(booking)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4">
-                          Nenhuma reserva futura encontrada
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TabsContent>
-
-              <TabsContent value="past" className="m-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Horário</TableHead>
-                      <TableHead>Quadra</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Pagamento</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bookings && bookings.length > 0 ? (
-                      bookings
-                        .filter(b => {
-                          const bookingDate = new Date(b.booking_date);
-                          return isPast(bookingDate) && !isToday(bookingDate);
-                        })
-                        .map((booking) => (
-                          <TableRow key={booking.id}>
-                            <TableCell>
-                              {format(new Date(booking.booking_date), 'dd/MM/yyyy')}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {`${booking.start_time.slice(0, 5)} - ${booking.end_time.slice(0, 5)}`}
-                            </TableCell>
-                            <TableCell>{booking.court?.name}</TableCell>
-                            <TableCell>
-                              {booking.profiles?.first_name 
-                                ? `${booking.profiles.first_name} ${booking.profiles.last_name || ''}`
-                                : 'Cliente não identificado'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getStatusBadgeVariant(booking.status)}>
-                                {translateStatus(booking.status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getPaymentStatusBadgeVariant(booking.payment_status)}>
-                                {translatePaymentStatus(booking.payment_status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewBooking(booking)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4">
-                          Nenhuma reserva passada encontrada
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
+              </div>
+            )}
+          </CardContent>
           <CardFooter className="flex justify-between border-t pt-6">
             <p className="text-sm text-muted-foreground">
-              Total: {bookings?.length || 0} reservas encontradas
+              Total: {allBookings?.length || 0} reservas encontradas no período
             </p>
           </CardFooter>
         </Card>
