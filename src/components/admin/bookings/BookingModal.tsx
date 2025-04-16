@@ -2,85 +2,21 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { format, differenceInHours, differenceInMinutes, isBefore, addWeeks, eachWeekOfInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay } from 'date-fns';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { toast } from '@/hooks/use-toast';
-import { Booking, BookingStatus, Court, PaymentStatus, Profile } from '@/types';
+import { Booking } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarIcon, Loader2 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
-
-const isFullHourTime = (value: string) => {
-  const regex = /^([0-1]?[0-9]|2[0-3]):00$/;
-  return regex.test(value);
-};
-
-const bookingSchema = z.object({
-  user_id: z.string().uuid({ message: 'Selecione um usuário' }),
-  court_id: z.string().uuid({ message: 'Selecione uma quadra' }),
-  booking_date: z.date({ required_error: 'Selecione uma data' }),
-  start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: "Formato de hora inválido (HH:MM)"
-  }).refine(isFullHourTime, {
-    message: "O horário de início deve ser uma hora fechada (ex: 08:00, 09:00)"
-  }),
-  end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: "Formato de hora inválido (HH:MM)"
-  }).refine(isFullHourTime, {
-    message: "O horário de término deve ser uma hora fechada (ex: 09:00, 10:00)"
-  }),
-  amount: z.coerce.number().positive({ message: "Valor deve ser positivo" }),
-  status: z.enum(['pending', 'confirmed', 'cancelled', 'completed']),
-  payment_status: z.enum(['pending', 'paid', 'refunded', 'failed']),
-  notes: z.string().optional(),
-  is_monthly: z.boolean().default(false),
-  subscription_end_date: z.date().optional()
-}).refine((data) => {
-  if (data.is_monthly && !data.subscription_end_date) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Data final da mensalidade é obrigatória quando mensalista está selecionado",
-  path: ["subscription_end_date"]
-});
-
-type BookingFormValues = z.infer<typeof bookingSchema>;
+import { BookingForm } from './BookingForm';
+import { bookingSchema, BookingFormValues } from './booking-schema';
+import { checkBookingConflict, fetchApplicableSchedules, calculateTotalAmount } from './booking-utils';
 
 interface BookingModalProps {
   booking: Booking | null;
@@ -110,7 +46,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         .order('first_name');
       
       if (error) throw error;
-      return data as unknown as Profile[];
+      return data;
     }
   });
 
@@ -124,7 +60,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         .order('name');
       
       if (error) throw error;
-      return data as unknown as Court[];
+      return data;
     }
   });
 
@@ -137,8 +73,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       start_time: '08:00',
       end_time: '09:00',
       amount: 0,
-      status: 'pending' as BookingStatus,
-      payment_status: 'pending' as PaymentStatus,
+      status: 'pending',
+      payment_status: 'pending',
       notes: '',
       is_monthly: false,
       subscription_end_date: undefined
@@ -152,33 +88,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const watchIsMonthly = form.watch('is_monthly');
   const watchSubscriptionEndDate = form.watch('subscription_end_date');
 
-  const fetchApplicableSchedules = async () => {
-    if (!watchCourtId || !watchBookingDate || !watchStartTime || !watchEndTime) {
-      return [];
-    }
-    
-    // Get day of week (0 = Sunday, 6 = Saturday)
-    const bookingDay = watchBookingDate.getDay();
-    // Convert to schedule format (0 = Monday, 6 = Sunday)
-    const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
-    
-    const { data: schedules, error } = await supabase
-      .from('schedules')
-      .select('*')
-      .eq('court_id', watchCourtId)
-      .eq('day_of_week', dayOfWeek);
-      
-    if (error) {
-      console.error('Error fetching schedules:', error);
-      return [];
-    }
-    
-    return schedules || [];
-  };
-
   useEffect(() => {
     if (watchCourtId && watchStartTime && watchEndTime && watchBookingDate) {
-      const calculateTotalAmount = async () => {
+      const calculateAmount = async () => {
         try {
           const [startHour, startMin] = watchStartTime.split(':').map(Number);
           const [endHour, endMin] = watchEndTime.split(':').map(Number);
@@ -206,9 +118,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           }
           
           setBookingHours(diffHours);
+          
+          // Get day of week (0 = Sunday, 6 = Saturday)
+          const bookingDay = watchBookingDate.getDay();
+          // Convert to schedule format (0 = Monday, 6 = Sunday)
+          const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
 
           // Get applicable schedules
-          const schedules = await fetchApplicableSchedules();
+          const schedules = await fetchApplicableSchedules(watchCourtId, watchBookingDate, dayOfWeek);
           
           if (!schedules || schedules.length === 0) {
             console.error('No schedules found for this court and day');
@@ -219,7 +136,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           }
 
           // Check if the date is weekend
-          const bookingDay = watchBookingDate.getDay();
           const isWeekend = [0, 6].includes(bookingDay); // 0 = Sunday, 6 = Saturday
           
           // Find all schedule blocks that overlap with the booking time
@@ -254,9 +170,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             setCourtRate(0);
             return;
           }
-          
-          // Calculate total booking cost
-          let totalAmount = 0;
+
+          // Calculate weekly count for monthly bookings
           let weekCount = 1;
           
           // Calculate total weeks if it's a monthly booking
@@ -270,57 +185,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             setWeeks(weekCount);
           }
           
-          // Calculate cost for each hour based on applicable schedule blocks
-          for (let hour = 0; hour < diffHours; hour++) {
-            const hourStartDate = new Date(startDate);
-            hourStartDate.setHours(startDate.getHours() + hour);
-            
-            const hourEndDate = new Date(hourStartDate);
-            hourEndDate.setHours(hourStartDate.getHours() + 1);
-            
-            // Find which schedule block this hour falls into
-            const applicableSchedule = overlappingSchedules.find(schedule => {
-              const [schStartHour, schStartMin] = schedule.start_time.split(':').map(Number);
-              const [schEndHour, schEndMin] = schedule.end_time.split(':').map(Number);
-              
-              const scheduleStart = new Date(watchBookingDate);
-              scheduleStart.setHours(schStartHour, schStartMin, 0, 0);
-              
-              const scheduleEnd = new Date(watchBookingDate);
-              scheduleEnd.setHours(schEndHour, schEndMin, 0, 0);
-              
-              if (scheduleEnd < scheduleStart) {
-                scheduleEnd.setDate(scheduleEnd.getDate() + 1);
-              }
-              
-              return hourStartDate >= scheduleStart && hourStartDate < scheduleEnd;
-            });
-            
-            if (applicableSchedule) {
-              // Determine the rate based on weekend/weekday
-              let hourlyRate = applicableSchedule.price;
-              
-              if (isWeekend && applicableSchedule.price_weekend) {
-                hourlyRate = applicableSchedule.price_weekend;
-              }
-              
-              totalAmount += hourlyRate;
-            }
-          }
-          
-          // Apply monthly discount if applicable
-          if (watchIsMonthly) {
-            const monthlyDiscountPercent = overlappingSchedules[0]?.monthly_discount || 0;
-            if (monthlyDiscountPercent > 0) {
-              totalAmount = totalAmount * (1 - monthlyDiscountPercent / 100);
-            }
-          }
-          
-          // Multiply by weeks for monthly bookings
-          totalAmount = totalAmount * weekCount;
+          // Calculate total amount
+          const totalAmount = calculateTotalAmount(
+            watchStartTime,
+            watchEndTime,
+            watchBookingDate,
+            overlappingSchedules,
+            watchIsMonthly,
+            weekCount
+          );
           
           // Update form with calculated amount
-          form.setValue('amount', Number(totalAmount.toFixed(2)));
+          form.setValue('amount', totalAmount);
           
           // Set court rate display value - use the weekend price if it's a weekend
           if (overlappingSchedules.length > 0) {
@@ -336,66 +212,32 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         }
       };
       
-      calculateTotalAmount();
+      calculateAmount();
     }
   }, [watchCourtId, watchStartTime, watchEndTime, watchBookingDate, watchIsMonthly, watchSubscriptionEndDate, form]);
 
   useEffect(() => {
     if (watchCourtId && watchStartTime && watchEndTime && watchBookingDate) {
-      const checkBookingConflict = async () => {
+      const validateBookingAvailability = async () => {
         setIsValidatingSchedule(true);
         setScheduleConflict(false);
         
         try {
-          const bookingDateStr = format(watchBookingDate, 'yyyy-MM-dd');
+          const hasConflict = await checkBookingConflict(
+            watchCourtId,
+            watchBookingDate,
+            watchStartTime,
+            watchEndTime,
+            booking?.id
+          );
           
-          const { data: existingBookings, error } = await supabase
-            .from('bookings')
-            .select('*')
-            .eq('court_id', watchCourtId)
-            .eq('booking_date', bookingDateStr)
-            .neq('status', 'cancelled');
-            
-          if (error) {
-            console.error('Error checking booking conflicts:', error);
-            return;
-          }
-          
-          const conflictingBooking = existingBookings?.find(existingBooking => {
-            if (booking && existingBooking.id === booking.id) return false;
-            
-            const [startHour, startMin] = watchStartTime.split(':').map(Number);
-            const [endHour, endMin] = watchEndTime.split(':').map(Number);
-            
-            const [existingStartHour, existingStartMin] = existingBooking.start_time.split(':').map(Number);
-            const [existingEndHour, existingEndMin] = existingBooking.end_time.split(':').map(Number);
-            
-            const newStart = new Date(bookingDateStr);
-            newStart.setHours(startHour, startMin, 0, 0);
-            
-            const newEnd = new Date(bookingDateStr);
-            newEnd.setHours(endHour, endMin, 0, 0);
-            
-            const existingStart = new Date(existingBooking.booking_date);
-            existingStart.setHours(existingStartHour, existingStartMin, 0, 0);
-            
-            const existingEnd = new Date(existingBooking.booking_date);
-            existingEnd.setHours(existingEndHour, existingEndMin, 0, 0);
-            
-            if (newStart < existingEnd && newEnd > existingStart) {
-              return true;
-            }
-          });
-          
-          if (conflictingBooking) {
-            setScheduleConflict(true);
-          }
+          setScheduleConflict(hasConflict);
         } finally {
           setIsValidatingSchedule(false);
         }
       };
       
-      checkBookingConflict();
+      validateBookingAvailability();
     }
   }, [watchCourtId, watchStartTime, watchEndTime, watchBookingDate, booking]);
 
@@ -432,8 +274,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         start_time: '08:00',
         end_time: '09:00',
         amount: 0,
-        status: 'pending' as BookingStatus,
-        payment_status: 'pending' as PaymentStatus,
+        status: 'pending',
+        payment_status: 'pending',
         notes: '',
         is_monthly: false,
         subscription_end_date: undefined
@@ -442,15 +284,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   }, [booking, form]);
 
   const onSubmit = async (values: BookingFormValues) => {
-    if (!isFullHourTime(values.start_time) || !isFullHourTime(values.end_time)) {
-      toast({
-        title: 'Horários inválidos',
-        description: 'Os horários de início e término devem ser horas fechadas (ex: 08:00, 09:00)',
-        variant: 'destructive'
-      });
-      return;
-    }
-    
     if (selectedSchedules.length === 0) {
       toast({
         title: 'Horário inválido',
@@ -553,16 +386,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
-  const formatUserName = (user: Profile) => {
-    if (user.first_name && user.last_name) {
-      return `${user.first_name} ${user.last_name}`;
-    } else if (user.first_name) {
-      return user.first_name;
-    } else {
-      return `Usuário ${user.id.slice(0, 8)}`;
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
@@ -577,342 +400,22 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="user_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cliente</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um cliente" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {users?.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {formatUserName(user)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="court_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quadra</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma quadra" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {courts?.map((court) => (
-                          <SelectItem key={court.id} value={court.id}>
-                            {court.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="booking_date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Data da Reserva</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className="w-full pl-3 text-left font-normal"
-                          >
-                            {field.value ? (
-                              format(field.value, 'PPP', { locale: ptBR })
-                            ) : (
-                              <span>Selecione uma data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => isBefore(date, startOfDay(new Date()))}
-                          initialFocus
-                          className="p-3 pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="start_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hora Início</FormLabel>
-                      <FormControl>
-                        <Input placeholder="HH:MM" {...field} />
-                      </FormControl>
-                      <FormDescription>Formato: 08:00</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="end_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hora Fim</FormLabel>
-                      <FormControl>
-                        <Input placeholder="HH:MM" {...field} />
-                      </FormControl>
-                      <FormDescription>Formato: 09:00</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="is_monthly"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                    <div className="space-y-0.5">
-                      <FormLabel>Mensalista</FormLabel>
-                      <FormDescription>
-                        Cliente pagará mensalmente por este horário
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              {form.watch('is_monthly') && (
-                <FormField
-                  control={form.control}
-                  name="subscription_end_date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Data Final da Mensalidade</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className="w-full pl-3 text-left font-normal"
-                            >
-                              {field.value ? (
-                                format(field.value, 'PPP', { locale: ptBR })
-                              ) : (
-                                <span>Selecione uma data</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => isBefore(date, watchBookingDate)}
-                            initialFocus
-                            className="p-3 pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        {weeks > 0 && `${weeks} semana${weeks > 1 ? 's' : ''} de mensalidade`}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Valor (R$)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
-                        readOnly={true} 
-                        className="bg-muted"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {courtRate > 0 && (
-                        <div>
-                          <span className="block">Taxa horária: R$ {courtRate.toFixed(2)}</span>
-                          {bookingHours > 1 && (
-                            <span className="block">Duração: {bookingHours} horas</span>
-                          )}
-                        </div>
-                      )}
-                      {watchIsMonthly && selectedSchedules.length > 0 && selectedSchedules[0]?.monthly_discount > 0 && (
-                        <span className="block mt-1 text-green-600">
-                          Desconto mensalista: {selectedSchedules[0].monthly_discount}%
-                        </span>
-                      )}
-                      {scheduleConflict && (
-                        <span className="text-red-500 block mt-1">
-                          ⚠️ Conflito de horário detectado
-                        </span>
-                      )}
-                      {isValidatingSchedule && (
-                        <span className="text-blue-500 flex items-center gap-1 mt-1">
-                          <Loader2 className="h-3 w-3 animate-spin" /> Verificando disponibilidade...
-                        </span>
-                      )}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="pending">Pendente</SelectItem>
-                          <SelectItem value="confirmed">Confirmada</SelectItem>
-                          <SelectItem value="cancelled">Cancelada</SelectItem>
-                          <SelectItem value="completed">Concluída</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="payment_status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pagamento</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="pending">Pendente</SelectItem>
-                          <SelectItem value="paid">Pago</SelectItem>
-                          <SelectItem value="failed">Falhou</SelectItem>
-                          <SelectItem value="refunded">Reembolsado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Observações</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Observações adicionais sobre esta reserva" 
-                        className="resize-none" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <DialogFooter className="pt-6 sticky bottom-0 bg-background pb-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isSubmitting || scheduleConflict || isValidatingSchedule}
-              >
-                {isSubmitting ? 'Salvando...' : booking ? 'Atualizar' : 'Criar'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        <BookingForm 
+          form={form}
+          users={users}
+          courts={courts}
+          onSubmit={onSubmit}
+          isSubmitting={isSubmitting}
+          courtRate={courtRate}
+          bookingHours={bookingHours}
+          selectedSchedules={selectedSchedules}
+          weeks={weeks}
+          scheduleConflict={scheduleConflict}
+          isValidatingSchedule={isValidatingSchedule}
+          watchIsMonthly={watchIsMonthly}
+          onCancel={onClose}
+          isUpdating={!!booking}
+        />
       </DialogContent>
     </Dialog>
   );
