@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { format, differenceInHours, isBefore, startOfDay } from 'date-fns';
@@ -76,7 +75,6 @@ export const BookingForm: React.FC<BookingFormProps> = ({
     }
   };
 
-  // Create hours options for select (00:00 to 23:00)
   const hoursOptions = Array.from({ length: 24 }).map((_, i) => {
     const hour = i.toString().padStart(2, '0');
     return {
@@ -85,7 +83,6 @@ export const BookingForm: React.FC<BookingFormProps> = ({
     };
   });
 
-  // Ordena as faixas de horário por hora de início para exibição consistente
   const sortedSchedules = selectedSchedules.length > 0 
     ? [...selectedSchedules].sort((a, b) => {
         const [aStartHour] = a.start_time.split(':').map(Number);
@@ -94,7 +91,6 @@ export const BookingForm: React.FC<BookingFormProps> = ({
       })
     : [];
 
-  // Obtém o dia da semana da data da reserva
   const bookingDay = form.getValues("booking_date")?.getDay();
   const isWeekend = bookingDay !== undefined ? [0, 6].includes(bookingDay) : false;
 
@@ -341,7 +337,6 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   />
                 </FormControl>
                 <FormDescription>
-                  {/* Exibe todas as faixas de preço aplicáveis */}
                   {sortedSchedules.length > 0 && (
                     <div className="space-y-1">
                       {sortedSchedules.map((schedule, index) => {
@@ -351,7 +346,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                         
                         return (
                           <span key={index} className="block">
-                            Taxa hora {schedule.start_time} às {schedule.end_time}: R$ {price.toFixed(2)}
+                            Taxa hora {schedule.start_time.slice(0, 5)} as {schedule.end_time.slice(0, 5)} R$ {price.toFixed(2)}
                           </span>
                         );
                       })}
