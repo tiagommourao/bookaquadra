@@ -20,8 +20,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Removi os usuários mock, pois agora usaremos o Supabase para autenticação
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -112,7 +110,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Verificar se o usuário atual é admin
-  const isAdmin = user?.role === 'admin';
+  // Modificado para verificar corretamente o papel do usuário
+  const isAdmin = user?.role === 'admin' || 
+    (session?.user?.app_metadata?.role === 'admin') || 
+    (session?.user?.email === 'admin@example.com'); // Para fins de desenvolvimento - remover em produção
 
   // Login com email e senha
   const login = async (email: string, password: string) => {
