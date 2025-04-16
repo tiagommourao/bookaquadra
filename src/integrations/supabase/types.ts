@@ -54,10 +54,12 @@ export type Database = {
           created_by: string | null
           end_time: string
           id: string
+          is_monthly: boolean | null
           notes: string | null
           payment_status: string
           start_time: string
           status: string
+          subscription_end_date: string | null
           updated_at: string
           user_id: string
         }
@@ -69,10 +71,12 @@ export type Database = {
           created_by?: string | null
           end_time: string
           id?: string
+          is_monthly?: boolean | null
           notes?: string | null
           payment_status: string
           start_time: string
           status: string
+          subscription_end_date?: string | null
           updated_at?: string
           user_id: string
         }
@@ -84,10 +88,12 @@ export type Database = {
           created_by?: string | null
           end_time?: string
           id?: string
+          is_monthly?: boolean | null
           notes?: string | null
           payment_status?: string
           start_time?: string
           status?: string
+          subscription_end_date?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -468,8 +474,10 @@ export type Database = {
           end_time: string
           id: string
           is_blocked: boolean
+          is_monthly: boolean | null
           max_booking_time: number | null
           min_booking_time: number
+          monthly_discount: number | null
           price: number
           price_holiday: number | null
           price_weekend: number | null
@@ -484,8 +492,10 @@ export type Database = {
           end_time: string
           id?: string
           is_blocked?: boolean
+          is_monthly?: boolean | null
           max_booking_time?: number | null
           min_booking_time?: number
+          monthly_discount?: number | null
           price: number
           price_holiday?: number | null
           price_weekend?: number | null
@@ -500,8 +510,10 @@ export type Database = {
           end_time?: string
           id?: string
           is_blocked?: boolean
+          is_monthly?: boolean | null
           max_booking_time?: number | null
           min_booking_time?: number
+          monthly_discount?: number | null
           price?: number
           price_holiday?: number | null
           price_weekend?: number | null

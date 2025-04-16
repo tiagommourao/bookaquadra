@@ -44,7 +44,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
 
 const bookingSchema = z.object({
   user_id: z.string().uuid({ message: 'Selecione um usuário' }),
@@ -148,7 +147,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         try {
           const { data: scheduleData, error } = await supabase
             .from('schedules')
-            .select('price, price_weekend')
+            .select('price, price_weekend, is_monthly, monthly_discount')
             .eq('court_id', watchCourtId)
             .eq('day_of_week', dayOfWeek)
             .single();
@@ -193,7 +192,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               const weekCount = weeksList.length;
               setWeeks(weekCount);
               
-              form.setValue('amount', Number((hourlyRate * diffHours * weekCount).toFixed(2)));
+              // Apply monthly discount if available
+              let discountedRate = hourlyRate;
+              if (scheduleData.is_monthly && scheduleData.monthly_discount) {
+                discountedRate = hourlyRate * (1 - scheduleData.monthly_discount / 100);
+              }
+              
+              form.setValue('amount', Number((discountedRate * diffHours * weekCount).toFixed(2)));
             } else {
               form.setValue('amount', Number((hourlyRate * diffHours).toFixed(2)));
             }
