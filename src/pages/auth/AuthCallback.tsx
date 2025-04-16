@@ -11,6 +11,18 @@ const AuthCallback = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      // Capturar qualquer parâmetro de erro da URL
+      const errorParam = new URLSearchParams(window.location.search).get('error');
+      const errorDescription = new URLSearchParams(window.location.search).get('error_description');
+      
+      if (errorParam) {
+        console.error('Erro na autenticação:', errorDescription);
+        setError(errorDescription || 'Erro desconhecido na autenticação');
+        toast.error('Erro na autenticação: ' + (errorDescription || 'Erro desconhecido'));
+        setTimeout(() => navigate('/login'), 2000);
+        return;
+      }
+      
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -61,13 +73,16 @@ const AuthCallback = () => {
             }
             
             // Redirecionar para o onboarding
+            toast.success('Login realizado com sucesso! Complete seu perfil.');
             navigate('/onboarding');
           } else {
             // Se já completou o onboarding, redirecionar para a página inicial
+            toast.success('Login realizado com sucesso!');
             navigate('/');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Erro ao verificar status do usuário:', error);
+          toast.error('Erro ao verificar status do usuário');
           navigate('/');
         }
       } else {

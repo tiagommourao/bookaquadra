@@ -46,6 +46,7 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
+      // Garantir que a URL de redirecionamento esteja correta
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
