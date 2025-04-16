@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +9,8 @@ import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 
 // Auth Pages
 import Login from "./pages/auth/Login";
+import AuthCallback from "./pages/auth/AuthCallback";
+import Onboarding from "./pages/auth/Onboarding";
 
 // User Pages
 import Dashboard from "./pages/user/Dashboard";
@@ -63,6 +66,8 @@ const App = () => (
             <Routes>
               {/* Authentication Routes */}
               <Route path="/login" element={<Login />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               
               {/* User Routes */}
               <Route path="/" element={

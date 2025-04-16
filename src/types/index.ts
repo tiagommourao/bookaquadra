@@ -24,6 +24,9 @@ export interface Profile {
   avatar_url?: string;
   preferences?: any;
   is_active: boolean;
+  city?: string;
+  neighborhood?: string;
+  profile_progress?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -158,3 +161,193 @@ export interface SiteSettings {
   mercadoPagoKey?: string;
   googleCalendarIntegration?: boolean;
 }
+
+// Novas entidades para o fluxo do usuário atleta
+
+// Sport type interface
+export interface SportType {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Skill level interface
+export interface SkillLevel {
+  id: string;
+  sport_type_id: string;
+  name: string;
+  description?: string;
+  rank_order: number;
+  created_at: Date;
+  updated_at: Date;
+  sport_type?: SportType;
+}
+
+// User sport interface (relação entre usuário e modalidade esportiva)
+export interface UserSport {
+  id: string;
+  user_id: string;
+  sport_type_id: string;
+  skill_level_id: string;
+  notes?: string;
+  is_verified: boolean;
+  verified_by?: string;
+  verified_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+  // Relações virtuais
+  sport_type?: SportType;
+  skill_level?: SkillLevel;
+}
+
+// User preferences interface
+export interface UserPreferences {
+  id: string;
+  user_id: string;
+  city?: string;
+  neighborhood?: string;
+  zipcode?: string;
+  wants_notifications: boolean;
+  preferred_game_types?: string[];
+  preferred_days?: number[];
+  preferred_times?: any;
+  onboarding_completed: boolean;
+  terms_accepted: boolean;
+  terms_accepted_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Recognition type interface
+export interface RecognitionType {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  points: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// User recognition interface
+export interface UserRecognition {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  booking_id: string;
+  recognition_type_id: string;
+  comment?: string;
+  created_at: Date;
+  updated_at: Date;
+  // Relações virtuais
+  recognition_type?: RecognitionType;
+  from_user?: Profile;
+}
+
+// Gamification level interface
+export interface GamificationLevel {
+  id: string;
+  name: string;
+  min_points: number;
+  max_points?: number;
+  icon?: string;
+  frame_color?: string;
+  benefits?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// User gamification interface
+export interface UserGamification {
+  id: string;
+  user_id: string;
+  total_points: number;
+  current_level_id?: string;
+  active_frame?: string;
+  active_avatar?: string;
+  created_at: Date;
+  updated_at: Date;
+  // Relação virtual
+  current_level?: GamificationLevel;
+}
+
+// Achievement type interface
+export interface AchievementType {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  points: number;
+  conditions?: any;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// User achievement interface
+export interface UserAchievement {
+  id: string;
+  user_id: string;
+  achievement_type_id: string;
+  earned_at: Date;
+  is_featured: boolean;
+  created_at: Date;
+  updated_at: Date;
+  // Relação virtual
+  achievement_type?: AchievementType;
+}
+
+// Point transaction interface
+export interface PointTransaction {
+  id: string;
+  user_id: string;
+  points: number;
+  source_type: string;
+  source_id?: string;
+  description: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Challenge interface
+export interface Challenge {
+  id: string;
+  name: string;
+  description: string;
+  start_date: Date;
+  end_date: Date;
+  points: number;
+  conditions: any;
+  icon?: string;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// User challenge interface
+export interface UserChallenge {
+  id: string;
+  user_id: string;
+  challenge_id: string;
+  progress: any;
+  is_completed: boolean;
+  completed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+  // Relação virtual
+  challenge?: Challenge;
+}
+
+// Onboarding step type
+export type OnboardingStep = 
+  | 'personal-info'
+  | 'sports-selection'
+  | 'skill-levels'
+  | 'preferences'
+  | 'terms';
+
+// Game type preferences
+export type GameTypePreference = 'individual' | 'doubles' | 'group';

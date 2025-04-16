@@ -1,122 +1,193 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '@/types';
+import { User, UserRole, Profile } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
+  profile: Profile | null;
+  session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user for development
-const mockUser: User = {
-  id: '1',
-  name: 'Test User',
-  email: 'test@example.com',
-  role: 'user',
-  avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-  createdAt: new Date(),
-};
-
-// Mock admin for development
-const mockAdmin: User = {
-  id: '2',
-  name: 'Admin User',
-  email: 'admin@example.com',
-  role: 'admin',
-  avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
-  createdAt: new Date(),
-};
+// Removi os usuários mock, pois agora usaremos o Supabase para autenticação
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check for saved user on mount
+  // Função para converter do formato do Supabase para o formato User do nosso app
+  const formatUser = (session: Session | null): User | null => {
+    if (!session?.user) return null;
+    
+    return {
+      id: session.user.id,
+      name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuário',
+      email: session.user.email || '',
+      role: session.user.app_metadata?.role || 'user',
+      avatarUrl: session.user.user_metadata?.avatar_url,
+      createdAt: new Date(session.user.created_at),
+    };
+  };
+
+  // Função para buscar perfil do usuário
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        const profileData: Profile = {
+          ...data,
+          created_at: new Date(data.created_at),
+          updated_at: new Date(data.updated_at)
+        };
+        setProfile(profileData);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar perfil do usuário:', error);
+    }
+  };
+
+  // Verificar status da autenticação ao montar o componente
   useEffect(() => {
-    const checkUser = async () => {
+    const initialize = async () => {
+      setIsLoading(true);
+      
       try {
-        // Here we would normally check for session with Supabase
-        // For now, just simulate loading
-        setTimeout(() => {
-          setIsLoading(false);
-          
-          // Remove this when implementing real auth
-          const path = window.location.pathname;
-          if (path.startsWith('/admin')) {
-            setUser(mockAdmin);
-          } else {
-            // Uncomment to auto-login during development
-            // setUser(mockUser);
+        // Primeiro configurar o listener para mudanças no estado de auth
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (event, currentSession) => {
+            setSession(currentSession);
+            setUser(formatUser(currentSession));
+            
+            if (currentSession?.user) {
+              // Usar setTimeout para evitar deadlocks e garantir que os demais estados sejam atualizados primeiro
+              setTimeout(() => {
+                fetchProfile(currentSession.user.id);
+              }, 0);
+            } else {
+              setProfile(null);
+            }
           }
-        }, 1000);
+        );
+        
+        // Então verificar se já existe uma sessão ativa
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        setSession(currentSession);
+        setUser(formatUser(currentSession));
+        
+        if (currentSession?.user) {
+          await fetchProfile(currentSession.user.id);
+        }
+        
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (error) {
-        console.error('Error checking authentication:', error);
+        console.error('Erro ao inicializar autenticação:', error);
+      } finally {
         setIsLoading(false);
       }
     };
     
-    checkUser();
+    initialize();
   }, []);
 
-  // Quick check if current user is an admin
+  // Verificar se o usuário atual é admin
   const isAdmin = user?.role === 'admin';
 
-  // Mock login function for development
+  // Login com email e senha
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
-      // Mock admin login
-      if (email === 'admin@example.com' && password === 'admin') {
-        setUser(mockAdmin);
-      } else {
-        // Regular user login
-        setUser(mockUser);
-      }
-    } catch (error) {
+      if (error) throw error;
+      
+      // onAuthStateChange vai atualizar o estado
+    } catch (error: any) {
       console.error('Login error:', error);
+      toast.error(error.message || 'Erro ao realizar login');
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Mock Google login
+  // Login com Google
   const loginWithGoogle = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUser(mockUser);
-    } catch (error) {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Redirecionamento acontece, então não atualizamos o estado aqui
+    } catch (error: any) {
       console.error('Google login error:', error);
+      toast.error(error.message || 'Erro ao realizar login com Google');
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  // Logout
+  const logout = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // onAuthStateChange vai atualizar o estado
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      toast.error(error.message || 'Erro ao realizar logout');
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Mock logout
-  const logout = async () => {
-    setIsLoading(true);
+  // Função para atualizar dados do usuário e perfil
+  const refreshUser = async () => {
+    if (!session?.user) return;
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUser(null);
+      const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+      setSession(refreshedSession);
+      setUser(formatUser(refreshedSession));
+      
+      if (refreshedSession?.user) {
+        await fetchProfile(refreshedSession.user.id);
+      }
     } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
+      console.error('Erro ao atualizar dados do usuário:', error);
     }
   };
 
@@ -124,12 +195,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        profile,
+        session,
         isAuthenticated: !!user,
         isLoading,
         isAdmin,
         login,
         loginWithGoogle,
         logout,
+        refreshUser
       }}
     >
       {children}
