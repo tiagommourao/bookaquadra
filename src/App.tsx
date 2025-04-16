@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,6 +23,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import CourtsList from "./pages/admin/courts/CourtsList";
 import SchedulesList from "./pages/admin/schedules/SchedulesList";
 import BookingsList from "./pages/admin/bookings/BookingsList";
+import UsersList from "./pages/admin/users/UsersList";
 
 import NotFound from "./pages/NotFound";
 
@@ -142,6 +142,13 @@ const App = () => (
               <Route path="/admin/reservas" element={
                 <AdminProtectedRoute>
                   <BookingsList />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Users Management */}
+              <Route path="/admin/usuarios" element={
+                <AdminProtectedRoute>
+                  <UsersList />
                 </AdminProtectedRoute>
               } />
               
