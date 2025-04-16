@@ -24,6 +24,7 @@ import { Booking, BookingStatus, Court, PaymentStatus } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingModal } from '@/components/admin/bookings/BookingModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { 
   format, 
   isToday, 
