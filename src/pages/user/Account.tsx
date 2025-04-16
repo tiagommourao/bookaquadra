@@ -1,12 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { UserLayout } from '@/components/layouts/UserLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ChevronRight, LogOut, Users, Trophy, Heart } from 'lucide-react';
+import { ChevronRight, LogOut, Users, Trophy, Heart, Camera } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { UserLevel } from '@/components/gamification/UserLevel';
@@ -14,15 +14,23 @@ import { BadgesGrid } from '@/components/gamification/BadgesGrid';
 import { NextAchievement } from '@/components/gamification/NextAchievement';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
+import { FrameSelector } from '@/components/gamification/FrameSelector';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from '@/hooks/use-toast';
 
 const Account = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   // Mock gamification data (would come from API in real app)
   const userLevel = 'silver';
   const userPoints = 780;
-  const frameType = 'silver';
+  const [frameType, setFrameType] = useState<'none' | 'bronze' | 'silver' | 'gold' | 'legend' | 'tennis' | 'padel' | 'beach' | 'special'>('silver');
+  
+  // Additional unlocked frames
+  const unlockedFrames = ['silver', 'tennis', 'padel'];
   
   const handleLogout = async () => {
     try {
@@ -31,6 +39,13 @@ const Account = () => {
     } catch (error) {
       console.error('Logout error:', error);
     }
+  };
+
+  const handleShareProgress = () => {
+    toast({
+      title: "Progresso compartilhado!",
+      description: "Seus amigos podem ver sua jornada até a próxima conquista.",
+    });
   };
 
   return (
@@ -58,15 +73,41 @@ const Account = () => {
             <CardContent>
               <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
                 <div className="flex flex-col items-center">
-                  <AvatarFrame
-                    src={user?.avatarUrl} 
-                    fallback={user?.name || 'U'} 
-                    frameType={frameType as any}
-                    size="lg"
-                  />
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <div className="relative cursor-pointer group">
+                        <AvatarFrame
+                          src={user?.avatarUrl} 
+                          fallback={user?.name || 'U'} 
+                          frameType={frameType}
+                          size="lg"
+                          showTooltip
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-full flex items-center justify-center transition-all duration-200">
+                          <Camera className="text-white opacity-0 group-hover:opacity-100 h-6 w-6" />
+                        </div>
+                      </div>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Personalizar seu avatar</DialogTitle>
+                        <DialogDescription>
+                          Escolha uma moldura para destacar seu perfil
+                        </DialogDescription>
+                      </DialogHeader>
+                      <FrameSelector 
+                        avatarSrc={user?.avatarUrl}
+                        fallback={user?.name || 'U'}
+                        userLevel={userLevel}
+                        selectedFrame={frameType}
+                        onFrameChange={setFrameType}
+                        unlockedFrames={unlockedFrames}
+                      />
+                    </DialogContent>
+                  </Dialog>
                   
                   <div className="mt-2 text-center">
-                    <UserLevel level={userLevel as any} points={userPoints} />
+                    <UserLevel level={userLevel as any} points={userPoints} showDetails />
                   </div>
                 </div>
                 
@@ -98,6 +139,15 @@ const Account = () => {
                 </div>
               </div>
               
+              {/* Seasonal alert */}
+              <Alert className="mb-4 bg-blue-50 border-blue-100">
+                <Trophy className="h-4 w-4 text-blue-600" />
+                <AlertTitle>Desafio do mês</AlertTitle>
+                <AlertDescription className="text-sm">
+                  Jogue 5 partidas este mês para ganhar o badge "Jogador do Mês" e 50 pontos extras!
+                </AlertDescription>
+              </Alert>
+              
               {/* Badges/Achievements Section */}
               <div className="mb-6">
                 <h4 className="font-medium mb-3 flex items-center">
@@ -105,13 +155,14 @@ const Account = () => {
                   Minhas Conquistas
                 </h4>
                 
-                <BadgesGrid maxDisplay={8} />
+                <BadgesGrid maxDisplay={8} showCategories={true} />
                 
                 <div className="mt-3">
                   <NextAchievement 
                     name="Próxima conquista: Explorador"
                     description="Jogue em 3 quadras diferentes (2/3)"
                     progress={66}
+                    onShare={handleShareProgress}
                   />
                 </div>
               </div>
@@ -184,6 +235,14 @@ const Account = () => {
                   <div>
                     <Label className="font-medium">Atividades Sociais</Label>
                     <p className="text-sm text-gray-500">Notificações sobre rankings e conquistas da comunidade</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">Desafios Sazonais</Label>
+                    <p className="text-sm text-gray-500">Notificações sobre badges e eventos especiais por tempo limitado</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
