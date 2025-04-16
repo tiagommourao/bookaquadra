@@ -43,7 +43,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {booking ? 'Detalhes da Reserva' : 'Nova Reserva'}
+            {booking ? 'Editar Reserva' : 'Nova Reserva'}
           </DialogTitle>
           <DialogDescription>
             {booking

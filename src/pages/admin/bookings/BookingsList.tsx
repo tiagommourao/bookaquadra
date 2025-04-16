@@ -59,7 +59,6 @@ const BookingsList = () => {
   
   const isMobile = useIsMobile();
 
-  // Calculate start and end dates based on view mode
   const dateRange = useMemo(() => {
     if (viewMode === 'month') {
       return {
@@ -74,7 +73,6 @@ const BookingsList = () => {
     }
   }, [selectedDate, viewMode]);
 
-  // Generate days for the calendar
   const calendarDays = useMemo(() => {
     return eachDayOfInterval({
       start: dateRange.start,
@@ -82,7 +80,6 @@ const BookingsList = () => {
     });
   }, [dateRange]);
 
-  // Fetch courts
   const { data: courts } = useQuery({
     queryKey: ['courts'],
     queryFn: async () => {
@@ -96,7 +93,6 @@ const BookingsList = () => {
     }
   });
 
-  // Fetch bookings for the entire month/week
   const { data: allBookings, isLoading, error, refetch } = useQuery({
     queryKey: ['bookings', dateRange.start, dateRange.end, selectedCourt, selectedStatus],
     queryFn: async () => {
@@ -131,7 +127,6 @@ const BookingsList = () => {
     }
   });
 
-  // Get bookings for a specific day
   const getBookingsForDay = (day: Date) => {
     if (!allBookings) return [];
     
@@ -140,7 +135,6 @@ const BookingsList = () => {
     );
   };
 
-  // Calculate stats for selected period (week or month)
   const periodStats = useMemo(() => {
     if (!allBookings) {
       return {
@@ -151,7 +145,6 @@ const BookingsList = () => {
       };
     }
 
-    // Filter bookings to current view period
     const periodBookings = allBookings.filter(booking => {
       const bookingDate = new Date(booking.booking_date);
       return bookingDate >= dateRange.start && bookingDate <= dateRange.end;
@@ -172,34 +165,9 @@ const BookingsList = () => {
     setIsModalOpen(true);
   };
 
-  const handleViewBooking = (booking: Booking) => {
+  const handleEditBooking = (booking: Booking) => {
     setSelectedBooking(booking);
     setIsModalOpen(true);
-  };
-
-  const handleStatusChange = async (bookingId: string, newStatus: BookingStatus) => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: newStatus })
-        .eq('id', bookingId);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Status atualizado",
-        description: `Reserva marcada como ${newStatus}`,
-      });
-      
-      refetch();
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      toast({
-        title: "Erro ao atualizar",
-        description: "Não foi possível atualizar o status da reserva",
-        variant: "destructive"
-      });
-    }
   };
 
   const handleCloseModal = () => {
@@ -225,13 +193,13 @@ const BookingsList = () => {
   const getStatusBadgeVariant = (status: BookingStatus) => {
     switch (status) {
       case 'confirmed':
-        return 'default'; // green
+        return 'default';
       case 'pending':
-        return 'secondary'; // yellow
+        return 'secondary';
       case 'cancelled':
-        return 'destructive'; // red
+        return 'destructive';
       case 'completed':
-        return 'outline'; // gray
+        return 'outline';
       default:
         return 'default';
     }
@@ -240,13 +208,13 @@ const BookingsList = () => {
   const getPaymentStatusBadgeVariant = (status: PaymentStatus) => {
     switch (status) {
       case 'paid':
-        return 'default'; // green
+        return 'default';
       case 'pending':
-        return 'secondary'; // yellow
+        return 'secondary';
       case 'failed':
-        return 'destructive'; // red
+        return 'destructive';
       case 'refunded':
-        return 'outline'; // gray
+        return 'outline';
       default:
         return 'default';
     }
@@ -282,14 +250,13 @@ const BookingsList = () => {
     }
   };
 
-  // Get cell color based on number of bookings and revenue
   const getCellColor = (bookings: (Booking & {
     profiles: { first_name: string | null; last_name: string | null; phone: string | null };
     court: { name: string };
   })[]) => {
     if (bookings.length === 0) return 'bg-white';
     
-    const maxBookingsBeforeRed = 10; // Adjust as needed for your business
+    const maxBookingsBeforeRed = 10;
     const ratio = Math.min(bookings.length / maxBookingsBeforeRed, 1);
     
     if (ratio < 0.3) return 'bg-green-50 hover:bg-green-100';
@@ -297,7 +264,6 @@ const BookingsList = () => {
     return 'bg-red-50 hover:bg-red-100';
   };
 
-  // Get days of the week headers - ajustando para português e começando na segunda
   const weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
   if (isLoading) {
@@ -468,23 +434,18 @@ const BookingsList = () => {
           </CardHeader>
 
           <CardContent>
-            {/* Calendar View */}
             {viewMode === 'month' ? (
-              // Month view
               <div className="grid grid-cols-7 gap-1 mb-6">
-                {/* Calendar headers */}
                 {weekDays.map((day) => (
                   <div key={day} className="p-2 text-center font-semibold">
                     {day}
                   </div>
                 ))}
                 
-                {/* Fill in empty spaces before first day of month - ajustando para começar na segunda-feira */}
                 {Array.from({ length: getDay(dateRange.start) === 0 ? 6 : getDay(dateRange.start) - 1 }).map((_, index) => (
                   <div key={`empty-start-${index}`} className="h-24 p-1 bg-gray-50 border border-gray-100"></div>
                 ))}
                 
-                {/* Calendar days */}
                 {calendarDays.map((day) => {
                   const dayBookings = getBookingsForDay(day);
                   const revenue = dayBookings.reduce((sum, b) => sum + Number(b.amount), 0);
@@ -557,7 +518,6 @@ const BookingsList = () => {
                 })}
               </div>
             ) : (
-              // Week view
               <div className="mb-6 overflow-x-auto">
                 <table className="min-w-full border-collapse">
                   <thead>
@@ -579,9 +539,8 @@ const BookingsList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Create rows for each hour from 6:00 to 23:00 */}
                     {Array.from({ length: 18 }).map((_, index) => {
-                      const hour = index + 6; // Start at 6:00
+                      const hour = index + 6;
                       const hourFormatted = `${hour.toString().padStart(2, '0')}:00`;
                       
                       return (
@@ -617,7 +576,7 @@ const BookingsList = () => {
                                     }`}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleViewBooking(booking);
+                                      handleEditBooking(booking);
                                     }}
                                   >
                                     <div className="font-medium truncate">
@@ -640,7 +599,6 @@ const BookingsList = () => {
               </div>
             )}
 
-            {/* Selected Day Details */}
             {selectedDayDetails && (
               <div className="mt-6 border-t pt-6">
                 <div className="flex justify-between items-center mb-4">
@@ -692,26 +650,11 @@ const BookingsList = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleViewBooking(booking)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewBooking(booking)}
+                              onClick={() => handleEditBooking(booking)}
+                              title="Editar reserva"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {booking.status !== 'cancelled' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleStatusChange(booking.id, 'cancelled')}
-                              >
-                                <Ban className="h-4 w-4" />
-                              </Button>
-                            )}
                           </TableCell>
                         </TableRow>
                       ))
