@@ -70,7 +70,8 @@ export function useBookingSubmission({
           booking_date: formatDateForDB(recurringDate),
           start_time: values.start_time,
           end_time: values.end_time,
-          amount: values.amount / (recurringDates.length + 1), // Divide o valor entre todas as reservas
+          // Todo o valor fica na reserva principal
+          amount: 0,
           status: values.status,
           payment_status: values.payment_status,
           notes: `${values.notes || ''} (Parte de reserva mensal: ${mainBookingId})`,
@@ -177,6 +178,34 @@ export function useBookingSubmission({
           .select();
         
         if (error) throw error;
+        
+        // Atualiza o status de todas as reservas secundárias se esta for a principal
+        if (booking.is_monthly) {
+          // Busca todas as reservas associadas que foram criadas depois da atual (são as recorrentes)
+          const { data: relatedBookings, error: relatedError } = await supabase
+            .from('bookings')
+            .select('*')
+            .ilike('notes', `%${booking.id}%`);
+            
+          if (!relatedError && relatedBookings && relatedBookings.length > 0) {
+            // Atualiza o status e payment_status das reservas associadas
+            for (const relatedBooking of relatedBookings) {
+              await supabase
+                .from('bookings')
+                .update({
+                  status: values.status,
+                  payment_status: values.payment_status,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', relatedBooking.id);
+            }
+            
+            toast({
+              title: 'Reservas associadas atualizadas',
+              description: `${relatedBookings.length} reservas associadas tiveram seu status atualizado`
+            });
+          }
+        }
         
         toast({
           title: 'Reserva atualizada',
