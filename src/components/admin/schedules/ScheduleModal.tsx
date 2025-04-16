@@ -97,9 +97,21 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   useEffect(() => {
     if (schedule) {
+      // Format the time fields to ensure they're in HH:MM format without seconds
+      const formatTime = (timeString: string) => {
+        // If the time includes seconds, remove them
+        if (timeString.includes(':')) {
+          const parts = timeString.split(':');
+          if (parts.length === 3) {
+            return `${parts[0]}:${parts[1]}`;
+          }
+        }
+        return timeString;
+      };
+
       form.reset({
-        start_time: schedule.start_time,
-        end_time: schedule.end_time,
+        start_time: formatTime(schedule.start_time),
+        end_time: formatTime(schedule.end_time),
         price: Number(schedule.price),
         price_weekend: schedule.price_weekend ? Number(schedule.price_weekend) : undefined,
         price_holiday: schedule.price_holiday ? Number(schedule.price_holiday) : undefined,
@@ -302,7 +314,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {schedule ? 'Editar Horário' : 'Novo Horário'}
@@ -552,7 +564,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
               />
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="pt-6 sticky bottom-0 bg-background pb-2">
               <Button 
                 type="button" 
                 variant="outline" 

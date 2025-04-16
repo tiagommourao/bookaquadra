@@ -1,52 +1,138 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, DollarSign, Users, Calendar } from 'lucide-react';
-
-// Mock data for statistics
-const stats = [
-  { 
-    title: 'Reservas Hoje', 
-    value: '12', 
-    description: '+2.1% em relação a ontem', 
-    trend: 'up',
-    icon: <Calendar className="h-5 w-5 text-blue-500" /> 
-  },
-  { 
-    title: 'Usuários Ativos', 
-    value: '342', 
-    description: '+5.4% em relação ao mês passado', 
-    trend: 'up',
-    icon: <Users className="h-5 w-5 text-green-500" /> 
-  },
-  { 
-    title: 'Faturamento Mensal', 
-    value: 'R$ 7.430', 
-    description: '+12% em relação ao mês passado', 
-    trend: 'up',
-    icon: <DollarSign className="h-5 w-5 text-amber-500" /> 
-  },
-  { 
-    title: 'Taxa de Ocupação', 
-    value: '68%', 
-    description: '+3% em relação à semana passada', 
-    trend: 'up',
-    icon: <BarChart className="h-5 w-5 text-purple-500" /> 
-  }
-];
-
-// Mock data for recent bookings
-const recentBookings = [
-  { id: '1', user: 'Carlos Silva', court: 'Beach Tennis 01', time: '09:00 - 10:00', status: 'confirmed', paymentStatus: 'paid' },
-  { id: '2', user: 'Ana Oliveira', court: 'Padel 02', time: '10:00 - 11:30', status: 'confirmed', paymentStatus: 'pending' },
-  { id: '3', user: 'Bruno Costa', court: 'Tênis 01', time: '14:00 - 15:00', status: 'confirmed', paymentStatus: 'paid' },
-  { id: '4', user: 'Juliana Santos', court: 'Beach Tennis 02', time: '16:00 - 17:00', status: 'confirmed', paymentStatus: 'paid' },
-  { id: '5', user: 'Marcos Pereira', court: 'Vôlei', time: '18:00 - 19:00', status: 'pending', paymentStatus: 'pending' },
-];
+import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { Booking } from '@/types';
+import { Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
+  const [weeklyRevenue, setWeeklyRevenue] = useState(0);
+  const today = new Date();
+  const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 1 });
+  const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 1 });
+  
+  // Get stats for bookings and revenue
+  const { data: bookings, isLoading: bookingsLoading } = useQuery({
+    queryKey: ['dashboardBookings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .order('booking_date', { ascending: false });
+      
+      if (error) throw error;
+      return data as Booking[];
+    }
+  });
+
+  // Calculate stats
+  useEffect(() => {
+    if (bookings) {
+      // Calculate weekly revenue
+      const weeklyBookings = bookings.filter(booking => {
+        const bookingDate = new Date(booking.booking_date);
+        return bookingDate >= startOfCurrentWeek && bookingDate <= endOfCurrentWeek;
+      });
+      
+      const weeklyTotal = weeklyBookings.reduce((sum, booking) => {
+        return sum + Number(booking.amount);
+      }, 0);
+      
+      setWeeklyRevenue(weeklyTotal);
+    }
+  }, [bookings]);
+
+  // Filter today's bookings
+  const todayBookings = bookings?.filter(booking => 
+    booking.booking_date === format(today, 'yyyy-MM-dd')
+  ) || [];
+  
+  // Filter bookings with pending status
+  const pendingBookings = bookings?.filter(booking => 
+    booking.status === 'pending'
+  ) || [];
+  
+  // Filter bookings with pending payment
+  const pendingPayments = bookings?.filter(booking => 
+    booking.payment_status === 'pending'
+  ) || [];
+  
+  // Format currency
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+  
+  // Format date range for weekly revenue
+  const weekRange = `${format(startOfCurrentWeek, 'dd/MM', { locale: ptBR })} - ${format(endOfCurrentWeek, 'dd/MM', { locale: ptBR })}`;
+
+  // Calculate daily revenue
+  const dailyRevenue = todayBookings.reduce((sum, booking) => {
+    return sum + Number(booking.amount);
+  }, 0);
+
+  // Stats cards data
+  const stats = [
+    { 
+      title: 'Reservas Hoje', 
+      value: todayBookings.length.toString(), 
+      description: 'Reservas para o dia atual', 
+      trend: 'neutral',
+      icon: <Calendar className="h-5 w-5 text-blue-500" /> 
+    },
+    { 
+      title: 'Reservas Pendentes', 
+      value: pendingBookings.length.toString(), 
+      description: 'Aguardando confirmação', 
+      trend: 'neutral',
+      icon: <Users className="h-5 w-5 text-amber-500" /> 
+    },
+    { 
+      title: `Faturamento Semanal (${weekRange})`, 
+      value: formatCurrency(weeklyRevenue), 
+      description: 'Total da semana atual', 
+      trend: 'neutral',
+      icon: <DollarSign className="h-5 w-5 text-green-500" /> 
+    },
+    { 
+      title: 'Pagamentos Pendentes', 
+      value: pendingPayments.length.toString(), 
+      description: `${formatCurrency(pendingPayments.reduce((sum, b) => sum + Number(b.amount), 0))}`, 
+      trend: 'neutral',
+      icon: <BarChart className="h-5 w-5 text-purple-500" /> 
+    }
+  ];
+
+  // Recent bookings (last 5)
+  const recentBookings = bookings?.slice(0, 5) || [];
+  
+  // Format booking status display
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'Confirmado';
+      case 'pending': return 'Pendente';
+      case 'cancelled': return 'Cancelado';
+      case 'completed': return 'Concluído';
+      default: return status;
+    }
+  };
+  
+  // Format payment status display
+  const getPaymentDisplay = (status: string) => {
+    switch (status) {
+      case 'paid': return 'Pago';
+      case 'pending': return 'Pendente';
+      case 'refunded': return 'Reembolsado';
+      case 'failed': return 'Falhou';
+      default: return status;
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -70,7 +156,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
-                <p className={`text-xs ${stat.trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+                <p className="text-xs text-muted-foreground">
                   {stat.description}
                 </p>
               </CardContent>
@@ -91,7 +177,9 @@ const AdminDashboard = () => {
               <CardHeader>
                 <CardTitle>Reservas Recentes</CardTitle>
                 <CardDescription>
-                  Foram feitas 12 reservas nas últimas 24 horas.
+                  {bookingsLoading 
+                    ? 'Carregando reservas...' 
+                    : `Últimas ${recentBookings.length} reservas realizadas.`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -99,19 +187,27 @@ const AdminDashboard = () => {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="border-b">
-                        <th className="pb-3 font-medium">Cliente</th>
-                        <th className="pb-3 font-medium">Quadra</th>
+                        <th className="pb-3 font-medium">Data</th>
                         <th className="pb-3 font-medium">Horário</th>
+                        <th className="pb-3 font-medium">Quadra</th>
                         <th className="pb-3 font-medium">Status</th>
                         <th className="pb-3 font-medium">Pagamento</th>
+                        <th className="pb-3 font-medium">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {recentBookings.map((booking) => (
                         <tr key={booking.id} className="border-b">
-                          <td className="py-3">{booking.user}</td>
-                          <td className="py-3">{booking.court}</td>
-                          <td className="py-3">{booking.time}</td>
+                          <td className="py-3">
+                            {format(new Date(booking.booking_date), 'dd/MM/yyyy')}
+                          </td>
+                          <td className="py-3">
+                            {booking.start_time} - {booking.end_time}
+                          </td>
+                          <td className="py-3">
+                            {/* Court name would ideally come from a join */}
+                            Quadra {booking.court_id.substring(0, 4)}
+                          </td>
                           <td className="py-3">
                             <span 
                               className={`px-2 py-1 text-xs rounded-full ${
@@ -119,33 +215,52 @@ const AdminDashboard = () => {
                                   ? 'bg-green-100 text-green-800'
                                   : booking.status === 'pending'
                                   ? 'bg-amber-100 text-amber-800'
+                                  : booking.status === 'completed'
+                                  ? 'bg-blue-100 text-blue-800'
                                   : 'bg-red-100 text-red-800'
                               }`}
                             >
-                              {booking.status === 'confirmed' ? 'Confirmado' : booking.status === 'pending' ? 'Pendente' : 'Cancelado'}
+                              {getStatusDisplay(booking.status)}
                             </span>
                           </td>
                           <td className="py-3">
                             <span
                               className={`px-2 py-1 text-xs rounded-full ${
-                                booking.paymentStatus === 'paid'
+                                booking.payment_status === 'paid'
                                   ? 'bg-green-100 text-green-800'
-                                  : 'bg-amber-100 text-amber-800'
+                                  : booking.payment_status === 'pending'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : booking.payment_status === 'refunded'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-red-100 text-red-800'
                               }`}
                             >
-                              {booking.paymentStatus === 'paid' ? 'Pago' : 'Pendente'}
+                              {getPaymentDisplay(booking.payment_status)}
                             </span>
+                          </td>
+                          <td className="py-3">
+                            <Link to="/admin/bookings" className="text-sm text-primary hover:underline">
+                              Gerenciar
+                            </Link>
                           </td>
                         </tr>
                       ))}
+                      
+                      {recentBookings.length === 0 && !bookingsLoading && (
+                        <tr>
+                          <td colSpan={6} className="py-4 text-center text-muted-foreground">
+                            Nenhuma reserva encontrada
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
               </CardContent>
               <CardFooter>
-                <button className="text-sm text-blue-500 hover:underline">
+                <Link to="/admin/bookings" className="text-sm text-blue-500 hover:underline">
                   Ver todas as reservas
-                </button>
+                </Link>
               </CardFooter>
             </Card>
             
@@ -174,7 +289,12 @@ const AdminDashboard = () => {
                 <CardTitle>Todas as Reservas</CardTitle>
               </CardHeader>
               <CardContent>
-                <p>Conteúdo detalhado de reservas (implementação pendente)</p>
+                <div className="flex flex-col space-y-4">
+                  <p>Gerencie todas as reservas no sistema</p>
+                  <Link to="/admin/bookings">
+                    <Button variant="outline">Ir para Reservas</Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
