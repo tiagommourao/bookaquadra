@@ -130,9 +130,10 @@ const BookingsList = () => {
   const getBookingsForDay = (day: Date) => {
     if (!allBookings) return [];
     
-    return allBookings.filter(booking => 
-      isSameDay(new Date(booking.booking_date), day)
-    );
+    return allBookings.filter(booking => {
+      const bookingDate = new Date(booking.booking_date);
+      return isSameDay(bookingDate, day);
+    });
   };
 
   const periodStats = useMemo(() => {
@@ -292,7 +293,10 @@ const BookingsList = () => {
   }
 
   const selectedDayBookings = selectedDayDetails 
-    ? allBookings?.filter(b => isSameDay(new Date(b.booking_date), selectedDayDetails)) || []
+    ? allBookings?.filter(b => {
+        const bookingDate = new Date(b.booking_date);
+        return isSameDay(bookingDate, selectedDayDetails);
+      }) || []
     : [];
 
   return (
@@ -553,10 +557,11 @@ const BookingsList = () => {
                             start: dateRange.start,
                             end: dateRange.end
                           }).map((day) => {
-                            const bookingsAtHour = allBookings?.filter(b => 
-                              isSameDay(new Date(b.booking_date), day) && 
-                              b.start_time.startsWith(hourFormatted.slice(0, 2))
-                            ) || [];
+                            const bookingsAtHour = allBookings?.filter(b => {
+                              const bookingDate = new Date(b.booking_date);
+                              return isSameDay(bookingDate, day) && 
+                                b.start_time.startsWith(hourFormatted.slice(0, 2));
+                            }) || [];
                             
                             return (
                               <td 
