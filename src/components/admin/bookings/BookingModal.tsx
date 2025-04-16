@@ -258,6 +258,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             setWeeks(weekCount);
           }
           
+          const bookingDay = watchBookingDate ? watchBookingDate.getDay() : new Date().getDay();
+          const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
+          
           for (const { schedule, hours } of overlappingRates) {
             const isWeekend = [5, 6].includes(dayOfWeek);
             let hourlyRate = schedule.price;

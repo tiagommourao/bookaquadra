@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Booking } from '@/types';
 import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const AdminDashboard = () => {
   const [weeklyRevenue, setWeeklyRevenue] = useState(0);
@@ -17,7 +17,6 @@ const AdminDashboard = () => {
   const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 1 });
   const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 1 });
   
-  // Get stats for bookings and revenue
   const { data: bookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ['dashboardBookings'],
     queryFn: async () => {
@@ -31,10 +30,8 @@ const AdminDashboard = () => {
     }
   });
 
-  // Calculate stats
   useEffect(() => {
     if (bookings) {
-      // Calculate weekly revenue
       const weeklyBookings = bookings.filter(booking => {
         const bookingDate = new Date(booking.booking_date);
         return bookingDate >= startOfCurrentWeek && bookingDate <= endOfCurrentWeek;
@@ -48,35 +45,28 @@ const AdminDashboard = () => {
     }
   }, [bookings]);
 
-  // Filter today's bookings
   const todayBookings = bookings?.filter(booking => 
     booking.booking_date === format(today, 'yyyy-MM-dd')
   ) || [];
   
-  // Filter bookings with pending status
   const pendingBookings = bookings?.filter(booking => 
     booking.status === 'pending'
   ) || [];
   
-  // Filter bookings with pending payment
   const pendingPayments = bookings?.filter(booking => 
     booking.payment_status === 'pending'
   ) || [];
   
-  // Format currency
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
   
-  // Format date range for weekly revenue
   const weekRange = `${format(startOfCurrentWeek, 'dd/MM', { locale: ptBR })} - ${format(endOfCurrentWeek, 'dd/MM', { locale: ptBR })}`;
 
-  // Calculate daily revenue
   const dailyRevenue = todayBookings.reduce((sum, booking) => {
     return sum + Number(booking.amount);
   }, 0);
 
-  // Stats cards data
   const stats = [
     { 
       title: 'Reservas Hoje', 
@@ -108,10 +98,8 @@ const AdminDashboard = () => {
     }
   ];
 
-  // Recent bookings (last 5)
   const recentBookings = bookings?.slice(0, 5) || [];
   
-  // Format booking status display
   const getStatusDisplay = (status: string) => {
     switch (status) {
       case 'confirmed': return 'Confirmado';
@@ -122,7 +110,6 @@ const AdminDashboard = () => {
     }
   };
   
-  // Format payment status display
   const getPaymentDisplay = (status: string) => {
     switch (status) {
       case 'paid': return 'Pago';
@@ -136,7 +123,6 @@ const AdminDashboard = () => {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Page header */}
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground">
@@ -144,7 +130,6 @@ const AdminDashboard = () => {
           </p>
         </div>
         
-        {/* Stats cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => (
             <Card key={index}>
@@ -172,7 +157,6 @@ const AdminDashboard = () => {
           </TabsList>
           
           <TabsContent value="overview" className="space-y-4">
-            {/* Recent bookings */}
             <Card>
               <CardHeader>
                 <CardTitle>Reservas Recentes</CardTitle>
@@ -205,7 +189,6 @@ const AdminDashboard = () => {
                             {booking.start_time} - {booking.end_time}
                           </td>
                           <td className="py-3">
-                            {/* Court name would ideally come from a join */}
                             Quadra {booking.court_id.substring(0, 4)}
                           </td>
                           <td className="py-3">
@@ -264,7 +247,6 @@ const AdminDashboard = () => {
               </CardFooter>
             </Card>
             
-            {/* Placeholder for a chart */}
             <Card>
               <CardHeader>
                 <CardTitle>Taxa de Ocupação por Período</CardTitle>
@@ -282,7 +264,6 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
           
-          {/* Placeholder for other tabs */}
           <TabsContent value="reservas">
             <Card>
               <CardHeader>
