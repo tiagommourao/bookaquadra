@@ -2,12 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay, addWeeks, isSameDay } from 'date-fns';
+import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay, addWeeks, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Booking } from '@/types';
 import { bookingSchema, BookingFormValues } from '../booking-schema';
 import { toast } from '@/hooks/use-toast';
-import { checkBookingConflict, calculateTotalAmount, fetchApplicableSchedules } from '../booking-utils';
+import { checkBookingConflict, calculateTotalAmount, fetchApplicableSchedules, formatDateForDB } from '../booking-utils';
 
 export function useBookingForm({ booking, onClose }: { 
   booking: Booking | null; 
@@ -48,28 +48,21 @@ export function useBookingForm({ booking, onClose }: {
   // Set form values when editing a booking
   useEffect(() => {
     if (booking && form) {
-      // Preserve the date exactly as it was selected, without timezone adjustments
-      const dateStr = booking.booking_date;
+      // Converte a string da data para objeto Date, preservando o dia exato
       let bookingDate: Date;
       
-      if (typeof dateStr === 'string') {
-        // If it's a string, parse it as YYYY-MM-DD
-        const [year, month, day] = dateStr.split('-').map(Number);
-        // Note: months are 0-indexed in JavaScript Date
-        bookingDate = new Date(year, month - 1, day, 12, 0, 0);
-      } else if (dateStr instanceof Date) {
-        // If it's already a Date object, use it directly
-        bookingDate = dateStr;
+      if (typeof booking.booking_date === 'string') {
+        // Garante que a data seja processada corretamente sem ajuste de timezone
+        bookingDate = parseISO(booking.booking_date);
       } else {
-        // Fallback to current date if booking_date is invalid
-        bookingDate = new Date();
+        bookingDate = booking.booking_date;
       }
       
       const formValues: Partial<BookingFormValues> = {
         user_id: booking.user_id,
         court_id: booking.court_id,
         booking_date: bookingDate,
-        // Make sure to preserve start and end times exactly as they were
+        // Mantém os horários de início e fim exatamente como foram salvos
         start_time: booking.start_time,
         end_time: booking.end_time,
         amount: Number(booking.amount),
@@ -79,23 +72,15 @@ export function useBookingForm({ booking, onClose }: {
         is_monthly: booking.is_monthly || false,
       };
       
-      // Handle subscription end date if it exists
+      // Trata a data de fim da assinatura se existir
       if (booking.subscription_end_date) {
-        const subDateStr = booking.subscription_end_date;
         let subscriptionEndDate: Date;
         
-        if (typeof subDateStr === 'string') {
-          // If it's a string, parse it as YYYY-MM-DD
-          const [year, month, day] = subDateStr.split('-').map(Number);
-          subscriptionEndDate = new Date(year, month - 1, day, 12, 0, 0);
-        } else if (subDateStr instanceof Date) {
-          // If it's already a Date object, use it directly
-          subscriptionEndDate = subDateStr;
+        if (typeof booking.subscription_end_date === 'string') {
+          // Converte a string para Date sem ajustes de timezone
+          subscriptionEndDate = parseISO(booking.subscription_end_date);
         } else {
-          // Fallback to a month from now if invalid
-          const nextMonth = new Date();
-          nextMonth.setMonth(nextMonth.getMonth() + 1);
-          subscriptionEndDate = nextMonth;
+          subscriptionEndDate = booking.subscription_end_date;
         }
         
         formValues.subscription_end_date = subscriptionEndDate;
@@ -153,8 +138,6 @@ export function useBookingForm({ booking, onClose }: {
           
           // Get day of week (0 = Sunday, 6 = Saturday)
           const bookingDay = watchBookingDate.getDay();
-          // Convert to schedule format (0 = Monday, 6 = Sunday)
-          const dayOfWeek = bookingDay === 0 ? 6 : bookingDay - 1;
 
           // Get applicable schedules
           const schedules = await fetchApplicableSchedules(watchCourtId, watchBookingDate, bookingDay);
@@ -211,7 +194,7 @@ export function useBookingForm({ booking, onClose }: {
             const weeksList = eachWeekOfInterval({
               start: startOfDay(watchBookingDate),
               end: endOfDay(watchSubscriptionEndDate)
-            });
+            }, { weekStartsOn: 1 }); // Definindo segunda-feira como início da semana
             
             weekCount = weeksList.length;
             setWeeks(weekCount);
@@ -274,46 +257,57 @@ export function useBookingForm({ booking, onClose }: {
     }
   }, [watchCourtId, watchStartTime, watchEndTime, watchBookingDate, booking]);
 
+  const generateRecurringDates = (startDate: Date, endDate: Date): Date[] => {
+    if (!startDate || !endDate) return [];
+    
+    // Pegamos o dia da semana da data inicial
+    const dayOfWeek = startDate.getDay();
+    let currentDate = new Date(startDate);
+    const dates = [new Date(startDate)]; // Inclui a data inicial
+
+    // Avança a data em 7 dias até chegar à data final ou ultrapassá-la
+    while (true) {
+      // Adiciona 7 dias para criar a próxima data (mesma semana a cada vez)
+      currentDate = addDays(currentDate, 7);
+      
+      // Verifica se passou da data final
+      if (currentDate > endDate) break;
+      
+      // Adiciona a nova data ao array
+      dates.push(new Date(currentDate));
+    }
+    
+    return dates;
+  };
+
   const createRecurringBookings = async (values: BookingFormValues, mainBookingId: string) => {
     if (!values.is_monthly || !values.subscription_end_date || !values.booking_date) {
       return;
     }
     
     try {
-      // Create a series of weekly bookings from start date to end date
-      const startDate = values.booking_date;
-      const endDate = values.subscription_end_date;
+      // Gera todas as datas recorrentes entre as datas de início e fim
+      // EXCLUINDO a primeira data (que já foi criada como a reserva principal)
+      const recurringDates = generateRecurringDates(values.booking_date, values.subscription_end_date).slice(1);
       
-      let currentDate = addWeeks(startDate, 1); // Start from next week
-      const weeklyBookings = [];
-      
-      // Generate all weekly booking dates between start and end
-      while (currentDate <= endDate) {
-        weeklyBookings.push(currentDate);
-        currentDate = addWeeks(currentDate, 1);
+      if (recurringDates.length === 0) {
+        console.log('Não há datas recorrentes para criar');
+        return;
       }
       
-      // Format the date as YYYY-MM-DD
-      const formatDateForDB = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-      
-      // Create booking entries for each week
-      for (const weeklyDate of weeklyBookings) {
+      // Cria reservas para cada data recorrente
+      for (const recurringDate of recurringDates) {
         const bookingData = {
           user_id: values.user_id,
           court_id: values.court_id,
-          booking_date: formatDateForDB(weeklyDate),
+          booking_date: formatDateForDB(recurringDate),
           start_time: values.start_time,
           end_time: values.end_time,
-          amount: values.amount / weeklyBookings.length + 1, // Divide amount among all bookings
+          amount: values.amount / (recurringDates.length + 1), // Divide o valor entre todas as reservas
           status: values.status,
           payment_status: values.payment_status,
           notes: `${values.notes || ''} (Parte de reserva mensal: ${mainBookingId})`,
-          is_monthly: false, // Individual bookings aren't monthly themselves
+          is_monthly: false, // As reservas individuais não são mensais
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           created_by: null
@@ -324,17 +318,17 @@ export function useBookingForm({ booking, onClose }: {
           .insert(bookingData);
           
         if (error) {
-          console.error(`Error creating recurring booking for ${formatDateForDB(weeklyDate)}:`, error);
+          console.error(`Erro ao criar reserva recorrente para ${formatDateForDB(recurringDate)}:`, error);
         }
       }
       
       toast({
         title: 'Reservas recorrentes criadas',
-        description: `Foram criadas ${weeklyBookings.length} reservas semanais até ${format(endDate, 'dd/MM/yyyy')}`
+        description: `Foram criadas ${recurringDates.length} reservas semanais até ${format(values.subscription_end_date, 'dd/MM/yyyy')}`
       });
       
     } catch (error) {
-      console.error('Error creating recurring bookings:', error);
+      console.error('Erro ao criar reservas recorrentes:', error);
       toast({
         title: 'Erro ao criar reservas recorrentes',
         description: 'Algumas reservas recorrentes podem não ter sido criadas',
@@ -388,18 +382,13 @@ export function useBookingForm({ booking, onClose }: {
     setIsSubmitting(true);
     
     try {
-      // Format the date as YYYY-MM-DD without any timezone adjustments
-      const formatDateForDB = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
+      // Usa a função auxiliar para formatar a data
+      const bookingDateForDB = formatDateForDB(values.booking_date);
       
       const bookingData = {
         user_id: values.user_id,
         court_id: values.court_id,
-        booking_date: formatDateForDB(values.booking_date),
+        booking_date: bookingDateForDB,
         start_time: values.start_time,
         end_time: values.end_time,
         amount: values.amount,

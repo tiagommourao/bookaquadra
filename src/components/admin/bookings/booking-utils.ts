@@ -1,5 +1,5 @@
 
-import { format, differenceInHours, isBefore, addHours } from 'date-fns';
+import { format, differenceInHours, isBefore, addHours, addDays, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 export const isFullHourTime = (value: string) => {
@@ -29,6 +29,20 @@ export const fetchApplicableSchedules = async (courtId: string, bookingDate: Dat
   return schedules || [];
 };
 
+// Função para formatar datas de maneira consistente para o banco de dados, sem problemas de timezone
+export const formatDateForDB = (date: Date | string): string => {
+  if (!date) return '';
+  
+  // Se for string, converte para Date usando parseISO (mantém a data exata)
+  const dateObj = typeof date === 'string' ? parseISO(date) : new Date(date);
+  
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+};
+
 export const checkBookingConflict = async (
   courtId: string, 
   bookingDate: Date,
@@ -41,14 +55,6 @@ export const checkBookingConflict = async (
   }
   
   try {
-    // Format the date as YYYY-MM-DD without timezone issues
-    const formatDateForDB = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    
     const bookingDateStr = formatDateForDB(bookingDate);
     
     const { data: existingBookings, error } = await supabase
