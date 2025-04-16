@@ -5,7 +5,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 
-type FrameType = 'none' | 'bronze' | 'silver' | 'gold' | 'legend' | 'tennis' | 'padel' | 'beach' | 'special';
+// Export the type so it can be imported elsewhere
+export type FrameType = 'none' | 'bronze' | 'silver' | 'gold' | 'legend' | 'tennis' | 'padel' | 'beach' | 'special';
 
 interface FrameSelectorProps {
   avatarSrc?: string;

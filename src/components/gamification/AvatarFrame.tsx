@@ -1,10 +1,8 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-type FrameType = 'none' | 'bronze' | 'silver' | 'gold' | 'legend' | 'tennis' | 'padel' | 'beach' | 'special';
+import { FrameType } from './FrameSelector';
 
 interface AvatarFrameProps {
   src?: string;
@@ -66,7 +64,6 @@ export const AvatarFrame = ({
     special: 'Edição limitada sazonal',
   };
   
-  // Special styles for the avatar badge depending on frame type
   const badgeIcon = frameType === 'legend' ? '👑' :
                     frameType === 'padel' ? '🏓' :
                     frameType === 'tennis' ? '🎾' :

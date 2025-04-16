@@ -19,6 +19,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from '@/hooks/use-toast';
 
+// Define frame type to match what's expected in FrameSelector
+type FrameType = 'none' | 'bronze' | 'silver' | 'gold' | 'legend' | 'tennis' | 'padel' | 'beach' | 'special';
+
 const Account = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -27,10 +30,10 @@ const Account = () => {
   // Mock gamification data (would come from API in real app)
   const userLevel = 'silver';
   const userPoints = 780;
-  const [frameType, setFrameType] = useState<'none' | 'bronze' | 'silver' | 'gold' | 'legend' | 'tennis' | 'padel' | 'beach' | 'special'>('silver');
+  const [frameType, setFrameType] = useState<FrameType>('silver');
   
-  // Additional unlocked frames
-  const unlockedFrames = ['silver', 'tennis', 'padel'];
+  // Additional unlocked frames - now explicitly typed as FrameType[]
+  const unlockedFrames: FrameType[] = ['silver', 'tennis', 'padel'];
   
   const handleLogout = async () => {
     try {

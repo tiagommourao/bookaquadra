@@ -21,8 +21,50 @@ import { AchievementToast } from '@/components/gamification/AchievementToast';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+// Define interfaces for our different data types
+interface Player {
+  id: string;
+  name: string;
+  level: string;
+  points: number;
+  avatar: null;
+  position: number;
+  sport: string;
+}
+
+interface Achievement {
+  id: string;
+  userId: string;
+  userName: string;
+  level: string;
+  avatar: null;
+  achievementName: string;
+  achievementIcon: React.ReactNode;
+  date: string;
+  isSeasonal: boolean;
+}
+
+interface Friend {
+  id: string;
+  name: string;
+  level: string;
+  points: number;
+  avatar: null;
+  isFollowing: boolean;
+  sport: string;
+}
+
+// Type guard functions to check which type an item is
+const isAchievement = (item: any): item is Achievement => {
+  return 'achievementName' in item && 'userId' in item;
+};
+
+const isFriend = (item: any): item is Friend => {
+  return 'isFollowing' in item;
+};
+
 // Mock data for the community page
-const topPlayers = [
+const topPlayers: Player[] = [
   { id: '1', name: 'Carlos Silva', level: 'gold', points: 1240, avatar: null, position: 1, sport: 'padel' },
   { id: '2', name: 'Maria Oliveira', level: 'gold', points: 1180, avatar: null, position: 2, sport: 'tennis' },
   { id: '3', name: 'João Santos', level: 'silver', points: 930, avatar: null, position: 3, sport: 'padel' },
@@ -30,7 +72,7 @@ const topPlayers = [
   { id: '5', name: 'Roberto Costa', level: 'silver', points: 790, avatar: null, position: 5, sport: 'tennis' },
 ];
 
-const recentAchievements = [
+const recentAchievements: Achievement[] = [
   { 
     id: '1', 
     userId: '101', 
@@ -77,7 +119,7 @@ const recentAchievements = [
   },
 ];
 
-const friends = [
+const friends: Friend[] = [
   { id: '1', name: 'Marcos Souza', level: 'bronze', points: 450, avatar: null, isFollowing: true, sport: 'tennis' },
   { id: '2', name: 'Patrícia Mendes', level: 'silver', points: 720, avatar: null, isFollowing: true, sport: 'padel' },
   { id: '3', name: 'Bruno Garcia', level: 'bronze', points: 380, avatar: null, isFollowing: false, sport: 'beach' },
@@ -94,14 +136,25 @@ const Social = () => {
   );
 
   const handleCongratulate = (userId: string) => {
-    const user = [...recentAchievements, ...friends].find(u => u.userId === userId || u.id === userId);
+    // Use type guards to correctly access properties based on the object type
+    const user = [...recentAchievements, ...friends].find(u => {
+      if (isAchievement(u)) {
+        return u.userId === userId;
+      } else if (isFriend(u)) {
+        return u.id === userId;
+      }
+      return false;
+    });
+
     toast({
       title: "Parabéns enviados!",
-      description: `Você enviou parabéns para ${user?.userName || user?.name || 'o usuário'}.`,
+      description: `Você enviou parabéns para ${
+        user ? (isAchievement(user) ? user.userName : user.name) : 'o usuário'
+      }.`,
     });
   };
 
-  const showAchievementToast = (achievement: any) => {
+  const showAchievementToast = (achievement: Achievement) => {
     toast({
       // Using the custom AchievementToast component inside the toast
       description: (
