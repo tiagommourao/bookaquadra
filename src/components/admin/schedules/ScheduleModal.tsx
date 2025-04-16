@@ -40,7 +40,8 @@ const formSchema = z.object({
   min_booking_time: z.coerce.number().min(1, "Tempo mínimo é obrigatório"),
   max_booking_time: z.coerce.number().optional(),
   advance_booking_days: z.coerce.number().optional(),
-  is_blocked: z.boolean().default(false)
+  is_blocked: z.boolean().default(false),
+  apply_to_all_days: z.boolean().default(false)
 }).refine(data => {
   const start = data.start_time.split(':').map(Number);
   const end = data.end_time.split(':').map(Number);
@@ -84,7 +85,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       min_booking_time: 60,
       max_booking_time: undefined,
       advance_booking_days: 30,
-      is_blocked: false
+      is_blocked: false,
+      apply_to_all_days: false
     }
   });
 
@@ -99,7 +101,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         min_booking_time: Number(schedule.min_booking_time),
         max_booking_time: schedule.max_booking_time ? Number(schedule.max_booking_time) : undefined,
         advance_booking_days: schedule.advance_booking_days ? Number(schedule.advance_booking_days) : undefined,
-        is_blocked: schedule.is_blocked
+        is_blocked: schedule.is_blocked,
+        apply_to_all_days: false
       });
     } else {
       form.reset({
@@ -111,7 +114,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         min_booking_time: 60,
         max_booking_time: undefined,
         advance_booking_days: 30,
-        is_blocked: false
+        is_blocked: false,
+        apply_to_all_days: false
       });
     }
   }, [schedule, form]);
@@ -120,28 +124,95 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     setIsSubmitting(true);
     
     try {
+      // Extract the apply_to_all_days value and remove it from the data to be sent to the database
+      const { apply_to_all_days, ...scheduleData } = values;
+      
       if (schedule) {
         // Update schedule
         const { error } = await supabase
           .from('schedules')
           .update({
-            start_time: values.start_time,
-            end_time: values.end_time,
-            price: values.price,
-            price_weekend: values.price_weekend,
-            price_holiday: values.price_holiday,
-            min_booking_time: values.min_booking_time,
-            max_booking_time: values.max_booking_time,
-            advance_booking_days: values.advance_booking_days,
-            is_blocked: values.is_blocked
+            start_time: scheduleData.start_time,
+            end_time: scheduleData.end_time,
+            price: scheduleData.price,
+            price_weekend: scheduleData.price_weekend,
+            price_holiday: scheduleData.price_holiday,
+            min_booking_time: scheduleData.min_booking_time,
+            max_booking_time: scheduleData.max_booking_time,
+            advance_booking_days: scheduleData.advance_booking_days,
+            is_blocked: scheduleData.is_blocked
           })
           .eq('id', schedule.id);
         
         if (error) throw error;
         
+        // If apply_to_all_days is checked, copy this schedule to all other days of the week
+        if (apply_to_all_days) {
+          const allDays = [0, 1, 2, 3, 4, 5, 6];
+          const otherDays = allDays.filter(day => day !== dayOfWeek);
+          
+          // First, check if there are existing schedules with the same time for other days
+          const { data: existingSchedules, error: fetchError } = await supabase
+            .from('schedules')
+            .select('id, day_of_week')
+            .eq('court_id', courtId)
+            .eq('start_time', scheduleData.start_time)
+            .eq('end_time', scheduleData.end_time);
+          
+          if (fetchError) throw fetchError;
+          
+          // Create a map of existing schedules by day
+          const existingSchedulesByDay = existingSchedules?.reduce((acc, s) => {
+            acc[s.day_of_week] = s.id;
+            return acc;
+          }, {} as Record<number, string>) || {};
+          
+          // For each day of the week, update or insert the schedule
+          const promises = otherDays.map(async (day) => {
+            if (existingSchedulesByDay[day]) {
+              // Update existing schedule for this day
+              return supabase
+                .from('schedules')
+                .update({
+                  start_time: scheduleData.start_time,
+                  end_time: scheduleData.end_time,
+                  price: scheduleData.price,
+                  price_weekend: scheduleData.price_weekend,
+                  price_holiday: scheduleData.price_holiday,
+                  min_booking_time: scheduleData.min_booking_time,
+                  max_booking_time: scheduleData.max_booking_time,
+                  advance_booking_days: scheduleData.advance_booking_days,
+                  is_blocked: scheduleData.is_blocked
+                })
+                .eq('id', existingSchedulesByDay[day]);
+            } else {
+              // Insert new schedule for this day
+              return supabase
+                .from('schedules')
+                .insert({
+                  court_id: courtId,
+                  day_of_week: day,
+                  start_time: scheduleData.start_time,
+                  end_time: scheduleData.end_time,
+                  price: scheduleData.price,
+                  price_weekend: scheduleData.price_weekend,
+                  price_holiday: scheduleData.price_holiday,
+                  min_booking_time: scheduleData.min_booking_time,
+                  max_booking_time: scheduleData.max_booking_time,
+                  advance_booking_days: scheduleData.advance_booking_days,
+                  is_blocked: scheduleData.is_blocked
+                });
+            }
+          });
+          
+          await Promise.all(promises);
+        }
+        
         toast({
           title: 'Horário atualizado',
-          description: 'O horário foi atualizado com sucesso',
+          description: apply_to_all_days 
+            ? 'O horário foi atualizado para todos os dias da semana'
+            : 'O horário foi atualizado com sucesso',
         });
       } else {
         // Create schedule
@@ -150,22 +221,50 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           .insert({
             court_id: courtId,
             day_of_week: dayOfWeek,
-            start_time: values.start_time,
-            end_time: values.end_time,
-            price: values.price,
-            price_weekend: values.price_weekend,
-            price_holiday: values.price_holiday,
-            min_booking_time: values.min_booking_time,
-            max_booking_time: values.max_booking_time,
-            advance_booking_days: values.advance_booking_days,
-            is_blocked: values.is_blocked
+            start_time: scheduleData.start_time,
+            end_time: scheduleData.end_time,
+            price: scheduleData.price,
+            price_weekend: scheduleData.price_weekend,
+            price_holiday: scheduleData.price_holiday,
+            min_booking_time: scheduleData.min_booking_time,
+            max_booking_time: scheduleData.max_booking_time,
+            advance_booking_days: scheduleData.advance_booking_days,
+            is_blocked: scheduleData.is_blocked
           });
         
         if (error) throw error;
         
+        // If apply_to_all_days is checked, create the same schedule for all other days of the week
+        if (apply_to_all_days) {
+          const allDays = [0, 1, 2, 3, 4, 5, 6];
+          const otherDays = allDays.filter(day => day !== dayOfWeek);
+          
+          const bulkInsertData = otherDays.map(day => ({
+            court_id: courtId,
+            day_of_week: day,
+            start_time: scheduleData.start_time,
+            end_time: scheduleData.end_time,
+            price: scheduleData.price,
+            price_weekend: scheduleData.price_weekend,
+            price_holiday: scheduleData.price_holiday,
+            min_booking_time: scheduleData.min_booking_time,
+            max_booking_time: scheduleData.max_booking_time,
+            advance_booking_days: scheduleData.advance_booking_days,
+            is_blocked: scheduleData.is_blocked
+          }));
+          
+          const { error: bulkInsertError } = await supabase
+            .from('schedules')
+            .insert(bulkInsertData);
+          
+          if (bulkInsertError) throw bulkInsertError;
+        }
+        
         toast({
           title: 'Horário criado',
-          description: 'O horário foi criado com sucesso',
+          description: apply_to_all_days 
+            ? 'O horário foi criado para todos os dias da semana'
+            : 'O horário foi criado com sucesso',
         });
       }
       
@@ -358,6 +457,27 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       <FormLabel>Bloqueado</FormLabel>
                       <FormDescription>
                         Se marcado, este horário não estará disponível para reservas
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="apply_to_all_days"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 sm:col-span-2 bg-muted/20">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Aplicar a todos os dias da semana</FormLabel>
+                      <FormDescription>
+                        Se marcado, este horário será adicionado ou atualizado para todos os dias da semana
                       </FormDescription>
                     </div>
                   </FormItem>
