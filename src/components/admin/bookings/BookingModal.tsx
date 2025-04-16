@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -242,15 +242,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   }, [watchCourtId, watchStartTime, watchEndTime, watchBookingDate, booking]);
 
   useEffect(() => {
-    if (booking) {
-      const bookingDate = booking.booking_date instanceof Date ? 
-        booking.booking_date : 
-        new Date(booking.booking_date);
+    if (booking && isOpen) {
+      // Corrigir problema de timezone - garantir que a data seja corretamente preservada
+      const bookingDate = typeof booking.booking_date === 'string' 
+        ? new Date(booking.booking_date + 'T12:00:00') // Adicionar horário para evitar problemas com timezone
+        : booking.booking_date;
       
       const formValues: Partial<BookingFormValues> = {
         user_id: booking.user_id,
         court_id: booking.court_id,
         booking_date: bookingDate,
+        // Garantir que os valores de hora início e fim sejam mantidos
         start_time: booking.start_time,
         end_time: booking.end_time,
         amount: Number(booking.amount),
@@ -259,14 +261,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         notes: booking.notes || '',
         is_monthly: booking.is_monthly || false,
         subscription_end_date: booking.subscription_end_date ? 
-          (booking.subscription_end_date instanceof Date ? 
-            booking.subscription_end_date : 
-            new Date(booking.subscription_end_date)) : 
+          (typeof booking.subscription_end_date === 'string' ? 
+            new Date(booking.subscription_end_date + 'T12:00:00') : 
+            booking.subscription_end_date) : 
           undefined
       };
       
       form.reset(formValues);
-    } else {
+    } else if (!booking) {
       form.reset({
         user_id: '',
         court_id: '',
@@ -281,7 +283,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         subscription_end_date: undefined
       });
     }
-  }, [booking, form]);
+  }, [booking, isOpen, form]);
 
   const onSubmit = async (values: BookingFormValues) => {
     if (selectedSchedules.length === 0) {
@@ -328,10 +330,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     setIsSubmitting(true);
     
     try {
+      // Usar o método toISOString apenas na parte da data, sem a parte do tempo
+      // para evitar problemas com timezone
+      const formattedDate = format(values.booking_date, 'yyyy-MM-dd');
+      
       const bookingData = {
         user_id: values.user_id,
         court_id: values.court_id,
-        booking_date: format(values.booking_date, 'yyyy-MM-dd'),
+        booking_date: formattedDate,
         start_time: values.start_time,
         end_time: values.end_time,
         amount: values.amount,
