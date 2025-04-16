@@ -85,38 +85,62 @@ export const checkBookingConflict = async (
   }
 };
 
-// Function to determine which schedule applies to a given hour
-const findScheduleForHour = (schedules, hour, bookingDate) => {
+// Função para encontrar e calcular o preço correto para cada hora específica
+const findScheduleForHour = (schedules, hourStart, bookingDate) => {
+  if (!schedules || schedules.length === 0) {
+    console.warn('No schedules provided for price calculation');
+    return null;
+  }
+
   const bookingDay = bookingDate.getDay();
   const isWeekend = [0, 6].includes(bookingDay); // 0 = Sunday, 6 = Saturday
   
-  for (const schedule of schedules) {
+  // Vamos ordenar as faixas de horário para garantir processamento consistente
+  const sortedSchedules = [...schedules].sort((a, b) => {
+    const [aStartHour] = a.start_time.split(':').map(Number);
+    const [bStartHour] = b.start_time.split(':').map(Number);
+    return aStartHour - bStartHour;
+  });
+  
+  // Hora exata da reserva para esta iteração
+  const exactHour = new Date(hourStart);
+  
+  // Procura a faixa que contém esta hora específica
+  for (const schedule of sortedSchedules) {
     const [startHour, startMin] = schedule.start_time.split(':').map(Number);
     const [endHour, endMin] = schedule.end_time.split(':').map(Number);
     
-    // Create date objects for schedule times
+    // Cria objetos Date para os horários das faixas
     const scheduleStart = new Date(bookingDate);
     scheduleStart.setHours(startHour, startMin, 0, 0);
     
     const scheduleEnd = new Date(bookingDate);
     scheduleEnd.setHours(endHour, endMin, 0, 0);
     
-    // Handle schedules that span to next day
+    // Trata faixas que passam para o dia seguinte
     if (scheduleEnd <= scheduleStart) {
       scheduleEnd.setDate(scheduleEnd.getDate() + 1);
     }
     
-    // Check if the hour falls within this schedule's range
-    if (hour >= scheduleStart && hour < scheduleEnd) {
-      // Return the schedule and the appropriate price based on weekend or weekday
+    // Verifica se a hora atual está dentro da faixa
+    // Inclui o início (>=) e exclui o final (<)
+    if (exactHour >= scheduleStart && exactHour < scheduleEnd) {
+      // Retorna a faixa e o preço apropriado (fim de semana ou dia normal)
+      const price = isWeekend && schedule.price_weekend ? 
+        schedule.price_weekend : 
+        schedule.price;
+      
+      console.log(`Hour ${format(exactHour, 'HH:mm')} fits in schedule ${schedule.start_time}-${schedule.end_time}: R$ ${price}`);
+      
       return {
         schedule,
-        price: isWeekend && schedule.price_weekend ? schedule.price_weekend : schedule.price
+        price
       };
     }
   }
   
-  // No schedule found for this hour
+  console.warn(`No schedule found for time: ${format(exactHour, 'HH:mm')}`);
+  // Nenhuma faixa encontrada para esta hora
   return null;
 };
 
@@ -129,60 +153,82 @@ export const calculateTotalAmount = (
   weekCount: number
 ) => {
   if (!startTime || !endTime || !bookingDate || schedules.length === 0) {
+    console.warn('Missing required data for price calculation');
     return 0;
   }
+
+  console.log(`Calculating price for booking from ${startTime} to ${endTime} on ${format(bookingDate, 'yyyy-MM-dd')}`);
+  console.log(`Available schedules:`, schedules);
 
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
   
-  // Create Date objects for start and end times
+  // Cria objetos Date para horários de início e fim
   const startDate = new Date(bookingDate);
   startDate.setHours(startHour, startMin, 0, 0);
   
   const endDate = new Date(bookingDate);
   endDate.setHours(endHour, endMin, 0, 0);
   
-  // If end time is before start time, assume it's the next day
+  // Se o horário final for anterior ao inicial, assumimos que é do dia seguinte
   if (endDate <= startDate) {
     endDate.setDate(endDate.getDate() + 1);
   }
   
-  // Calculate total booking cost by summing up hourly rates
+  // Calcula o valor total somando cada hora individualmente
   let totalAmount = 0;
   let currentHour = new Date(startDate);
+  let hourlyBreakdown = [];
   
-  // Process each hour in the booking range
+  // Para cada hora dentro do intervalo da reserva
   while (currentHour < endDate) {
-    // Find the applicable schedule and rate for this hour
+    // Encontra a faixa aplicável e o valor para esta hora específica
+    const nextHour = new Date(currentHour);
+    nextHour.setHours(nextHour.getHours() + 1);
+    
     const scheduleInfo = findScheduleForHour(schedules, currentHour, bookingDate);
     
     if (!scheduleInfo) {
-      console.warn(`No schedule found for time slot starting at ${format(currentHour, 'HH:mm')}`);
-      // If we can't find a schedule for this hour, we might want to:
-      // 1. Return an error
-      // 2. Use a default rate
-      // 3. Skip this hour
-      // For now, we'll skip this hour
+      console.warn(`No pricing found for time slot starting at ${format(currentHour, 'HH:mm')}`);
     } else {
       totalAmount += scheduleInfo.price;
+      
+      // Registra o detalhamento de preços para debugging
+      hourlyBreakdown.push({
+        hour: format(currentHour, 'HH:mm'),
+        schedule: `${scheduleInfo.schedule.start_time}-${scheduleInfo.schedule.end_time}`,
+        price: scheduleInfo.price
+      });
     }
     
-    // Move to next hour
-    currentHour = addHours(currentHour, 1);
+    // Avança para a próxima hora
+    currentHour = nextHour;
   }
   
-  // Apply monthly discount if applicable
+  console.log('Hourly price breakdown:', hourlyBreakdown);
+  console.log(`Raw total before adjustments: R$ ${totalAmount.toFixed(2)}`);
+  
+  // Aplica desconto para mensalistas, se aplicável
+  let finalAmount = totalAmount;
   if (isMonthly && schedules.length > 0) {
-    // Find the highest monthly discount percentage among the schedules
+    // Encontra o maior percentual de desconto entre as faixas
     const monthlyDiscountPercent = Math.max(...schedules.map(s => s.monthly_discount || 0));
     
     if (monthlyDiscountPercent > 0) {
-      totalAmount = totalAmount * (1 - monthlyDiscountPercent / 100);
+      const discountAmount = totalAmount * (monthlyDiscountPercent / 100);
+      finalAmount = totalAmount - discountAmount;
+      console.log(`Applied monthly discount of ${monthlyDiscountPercent}%: -R$ ${discountAmount.toFixed(2)}`);
     }
   }
   
-  // Multiply by weeks for monthly bookings
-  totalAmount = totalAmount * weekCount;
+  // Multiplica pelo número de semanas para reservas mensais
+  finalAmount = finalAmount * weekCount;
   
-  return Number(totalAmount.toFixed(2));
+  if (weekCount > 1) {
+    console.log(`Multiplied by ${weekCount} weeks: R$ ${finalAmount.toFixed(2)}`);
+  }
+  
+  console.log(`Final calculated amount: R$ ${finalAmount.toFixed(2)}`);
+  
+  return Number(finalAmount.toFixed(2));
 };
