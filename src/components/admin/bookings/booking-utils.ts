@@ -1,5 +1,5 @@
 
-import { format, differenceInHours, isBefore } from 'date-fns';
+import { format, differenceInHours, isBefore, addHours } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 export const isFullHourTime = (value: string) => {
@@ -85,15 +85,50 @@ export const checkBookingConflict = async (
   }
 };
 
+// Function to determine which schedule applies to a given hour
+const findScheduleForHour = (schedules, hour, bookingDate) => {
+  const bookingDay = bookingDate.getDay();
+  const isWeekend = [0, 6].includes(bookingDay); // 0 = Sunday, 6 = Saturday
+  
+  for (const schedule of schedules) {
+    const [startHour, startMin] = schedule.start_time.split(':').map(Number);
+    const [endHour, endMin] = schedule.end_time.split(':').map(Number);
+    
+    // Create date objects for schedule times
+    const scheduleStart = new Date(bookingDate);
+    scheduleStart.setHours(startHour, startMin, 0, 0);
+    
+    const scheduleEnd = new Date(bookingDate);
+    scheduleEnd.setHours(endHour, endMin, 0, 0);
+    
+    // Handle schedules that span to next day
+    if (scheduleEnd <= scheduleStart) {
+      scheduleEnd.setDate(scheduleEnd.getDate() + 1);
+    }
+    
+    // Check if the hour falls within this schedule's range
+    if (hour >= scheduleStart && hour < scheduleEnd) {
+      // Return the schedule and the appropriate price based on weekend or weekday
+      return {
+        schedule,
+        price: isWeekend && schedule.price_weekend ? schedule.price_weekend : schedule.price
+      };
+    }
+  }
+  
+  // No schedule found for this hour
+  return null;
+};
+
 export const calculateTotalAmount = (
   startTime: string,
   endTime: string,
   bookingDate: Date,
-  overlappingSchedules: any[],
+  schedules: any[],
   isMonthly: boolean,
   weekCount: number
 ) => {
-  if (!startTime || !endTime || !bookingDate || overlappingSchedules.length === 0) {
+  if (!startTime || !endTime || !bookingDate || schedules.length === 0) {
     return 0;
   }
 
@@ -108,65 +143,39 @@ export const calculateTotalAmount = (
   endDate.setHours(endHour, endMin, 0, 0);
   
   // If end time is before start time, assume it's the next day
-  if (endDate < startDate) {
+  if (endDate <= startDate) {
     endDate.setDate(endDate.getDate() + 1);
   }
   
-  // Calculate hours difference
-  const diffHours = differenceInHours(endDate, startDate);
-  
-  if (diffHours <= 0) {
-    return 0;
-  }
-
-  // Check if the date is weekend
-  const bookingDay = bookingDate.getDay();
-  const isWeekend = [0, 6].includes(bookingDay); // 0 = Sunday, 6 = Saturday
-  
-  // Calculate total booking cost
+  // Calculate total booking cost by summing up hourly rates
   let totalAmount = 0;
+  let currentHour = new Date(startDate);
   
-  // Calculate cost for each hour based on applicable schedule blocks
-  for (let hour = 0; hour < diffHours; hour++) {
-    const hourStartDate = new Date(startDate);
-    hourStartDate.setHours(startDate.getHours() + hour);
+  // Process each hour in the booking range
+  while (currentHour < endDate) {
+    // Find the applicable schedule and rate for this hour
+    const scheduleInfo = findScheduleForHour(schedules, currentHour, bookingDate);
     
-    const hourEndDate = new Date(hourStartDate);
-    hourEndDate.setHours(hourStartDate.getHours() + 1);
-    
-    // Find which schedule block this hour falls into
-    const applicableSchedule = overlappingSchedules.find(schedule => {
-      const [schStartHour, schStartMin] = schedule.start_time.split(':').map(Number);
-      const [schEndHour, schEndMin] = schedule.end_time.split(':').map(Number);
-      
-      const scheduleStart = new Date(bookingDate);
-      scheduleStart.setHours(schStartHour, schStartMin, 0, 0);
-      
-      const scheduleEnd = new Date(bookingDate);
-      scheduleEnd.setHours(schEndHour, schEndMin, 0, 0);
-      
-      if (scheduleEnd < scheduleStart) {
-        scheduleEnd.setDate(scheduleEnd.getDate() + 1);
-      }
-      
-      return hourStartDate >= scheduleStart && hourStartDate < scheduleEnd;
-    });
-    
-    if (applicableSchedule) {
-      // Determine the rate based on weekend/weekday
-      let hourlyRate = applicableSchedule.price;
-      
-      if (isWeekend && applicableSchedule.price_weekend) {
-        hourlyRate = applicableSchedule.price_weekend;
-      }
-      
-      totalAmount += hourlyRate;
+    if (!scheduleInfo) {
+      console.warn(`No schedule found for time slot starting at ${format(currentHour, 'HH:mm')}`);
+      // If we can't find a schedule for this hour, we might want to:
+      // 1. Return an error
+      // 2. Use a default rate
+      // 3. Skip this hour
+      // For now, we'll skip this hour
+    } else {
+      totalAmount += scheduleInfo.price;
     }
+    
+    // Move to next hour
+    currentHour = addHours(currentHour, 1);
   }
   
   // Apply monthly discount if applicable
-  if (isMonthly) {
-    const monthlyDiscountPercent = overlappingSchedules[0]?.monthly_discount || 0;
+  if (isMonthly && schedules.length > 0) {
+    // Find the highest monthly discount percentage among the schedules
+    const monthlyDiscountPercent = Math.max(...schedules.map(s => s.monthly_discount || 0));
+    
     if (monthlyDiscountPercent > 0) {
       totalAmount = totalAmount * (1 - monthlyDiscountPercent / 100);
     }
