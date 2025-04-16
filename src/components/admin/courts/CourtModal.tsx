@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -46,7 +47,7 @@ const formSchema = z.object({
   maintenance_info: z.string().optional(),
   location_info: z.string().optional(),
   dimensions: z.string().optional(),
-  capacity: z.string().optional().transform(val => val ? Number(val) : undefined),
+  capacity: z.coerce.number().optional(),
   accessibility_features: z.string().optional()
 });
 
@@ -92,7 +93,7 @@ export const CourtModal: React.FC<CourtModalProps> = ({
       maintenance_info: '',
       location_info: '',
       dimensions: '',
-      capacity: '',
+      capacity: undefined,
       accessibility_features: ''
     }
   });
@@ -110,7 +111,7 @@ export const CourtModal: React.FC<CourtModalProps> = ({
         maintenance_info: court.maintenance_info || '',
         location_info: court.location_info || '',
         dimensions: court.dimensions || '',
-        capacity: court.capacity ? String(court.capacity) : '',
+        capacity: court.capacity || undefined,
         accessibility_features: court.accessibility_features || ''
       });
     } else {
@@ -125,7 +126,7 @@ export const CourtModal: React.FC<CourtModalProps> = ({
         maintenance_info: '',
         location_info: '',
         dimensions: '',
-        capacity: '',
+        capacity: undefined,
         accessibility_features: ''
       });
     }

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,12 +33,12 @@ const formSchema = z.object({
   end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
     message: "Formato de hora inválido (HH:MM)"
   }),
-  price: z.string().min(1, "Preço é obrigatório").transform(val => Number(val)),
-  price_weekend: z.string().optional().transform(val => val ? Number(val) : undefined),
-  price_holiday: z.string().optional().transform(val => val ? Number(val) : undefined),
-  min_booking_time: z.string().min(1, "Tempo mínimo é obrigatório").transform(val => Number(val)),
-  max_booking_time: z.string().optional().transform(val => val ? Number(val) : undefined),
-  advance_booking_days: z.string().optional().transform(val => val ? Number(val) : undefined),
+  price: z.coerce.number().min(1, "Preço é obrigatório"),
+  price_weekend: z.coerce.number().optional(),
+  price_holiday: z.coerce.number().optional(),
+  min_booking_time: z.coerce.number().min(1, "Tempo mínimo é obrigatório"),
+  max_booking_time: z.coerce.number().optional(),
+  advance_booking_days: z.coerce.number().optional(),
   is_blocked: z.boolean().default(false)
 }).refine(data => {
   const start = data.start_time.split(':').map(Number);
@@ -78,12 +77,12 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     defaultValues: {
       start_time: '08:00',
       end_time: '09:00',
-      price: '60',
-      price_weekend: '',
-      price_holiday: '',
-      min_booking_time: '60',
-      max_booking_time: '',
-      advance_booking_days: '30',
+      price: 60,
+      price_weekend: undefined,
+      price_holiday: undefined,
+      min_booking_time: 60,
+      max_booking_time: undefined,
+      advance_booking_days: 30,
       is_blocked: false
     }
   });
@@ -93,24 +92,24 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       form.reset({
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        price: schedule.price.toString(),
-        price_weekend: schedule.price_weekend?.toString() || '',
-        price_holiday: schedule.price_holiday?.toString() || '',
-        min_booking_time: schedule.min_booking_time.toString(),
-        max_booking_time: schedule.max_booking_time?.toString() || '',
-        advance_booking_days: schedule.advance_booking_days?.toString() || '',
+        price: Number(schedule.price),
+        price_weekend: schedule.price_weekend ? Number(schedule.price_weekend) : undefined,
+        price_holiday: schedule.price_holiday ? Number(schedule.price_holiday) : undefined,
+        min_booking_time: Number(schedule.min_booking_time),
+        max_booking_time: schedule.max_booking_time ? Number(schedule.max_booking_time) : undefined,
+        advance_booking_days: schedule.advance_booking_days ? Number(schedule.advance_booking_days) : undefined,
         is_blocked: schedule.is_blocked
       });
     } else {
       form.reset({
         start_time: '08:00',
         end_time: '09:00',
-        price: '60',
-        price_weekend: '',
-        price_holiday: '',
-        min_booking_time: '60',
-        max_booking_time: '',
-        advance_booking_days: '30',
+        price: 60,
+        price_weekend: undefined,
+        price_holiday: undefined,
+        min_booking_time: 60,
+        max_booking_time: undefined,
+        advance_booking_days: 30,
         is_blocked: false
       });
     }
@@ -250,7 +249,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   <FormItem>
                     <FormLabel>Preço Fim de Semana (R$)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" min="0" placeholder="Opcional" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        min="0" 
+                        placeholder="Opcional" 
+                        value={field.value === undefined ? '' : field.value}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                      />
                     </FormControl>
                     <FormDescription>Deixe em branco para usar o preço padrão</FormDescription>
                     <FormMessage />
@@ -265,7 +271,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   <FormItem>
                     <FormLabel>Preço Feriado (R$)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" min="0" placeholder="Opcional" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        min="0" 
+                        placeholder="Opcional" 
+                        value={field.value === undefined ? '' : field.value}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                      />
                     </FormControl>
                     <FormDescription>Deixe em branco para usar o preço padrão</FormDescription>
                     <FormMessage />
@@ -294,7 +307,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   <FormItem>
                     <FormLabel>Tempo Máximo de Reserva (min)</FormLabel>
                     <FormControl>
-                      <Input type="number" min="15" step="15" placeholder="Opcional" {...field} />
+                      <Input 
+                        type="number" 
+                        min="15" 
+                        step="15" 
+                        placeholder="Opcional" 
+                        value={field.value === undefined ? '' : field.value}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                      />
                     </FormControl>
                     <FormDescription>Deixe em branco se não houver limite</FormDescription>
                     <FormMessage />
@@ -309,7 +329,13 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   <FormItem>
                     <FormLabel>Dias de Antecedência para Reserva</FormLabel>
                     <FormControl>
-                      <Input type="number" min="1" placeholder="Padrão: 30 dias" {...field} />
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        placeholder="Padrão: 30 dias" 
+                        value={field.value === undefined ? '' : field.value}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
