@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserLayout } from '@/components/layouts/UserLayout';
 import { Button } from '@/components/ui/button';
@@ -19,11 +20,13 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from '@/hooks/use-toast';
 import { Booking } from '@/types/booking';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const MyBookings = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [cancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   const { data: bookings, isLoading, error, refetch } = useUserBookings();
   const cancelBooking = useCancelBooking();
@@ -202,9 +205,19 @@ const MyBookings = () => {
                     size="sm" 
                     onClick={() => handlePayment(booking)}
                     className="text-xs flex items-center"
+                    disabled={isProcessingPayment}
                   >
-                    <CreditCard className="h-3 w-3 mr-1" />
-                    Pagar
+                    {isProcessingPayment ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-3 w-3 mr-1" />
+                        Pagar
+                      </>
+                    )}
                   </Button>
                 )}
                 
@@ -228,6 +241,8 @@ const MyBookings = () => {
 
   const handlePayment = async (booking: Booking) => {
     try {
+      setIsProcessingPayment(true);
+      
       toast({
         title: "Processando pagamento",
         description: "Aguarde enquanto preparamos seu pagamento...",
@@ -246,13 +261,37 @@ const MyBookings = () => {
       
       console.log("Resposta da função create-payment:", data);
       
-      if (data?.payment_url) {
-        window.location.href = data.payment_url;
-      } else if (data?.sandbox_url && process.env.NODE_ENV !== 'production') {
-        window.location.href = data.sandbox_url;
-      } else {
+      // Verificar erros específicos
+      if (data?.error) {
+        if (data?.setup_required) {
+          toast({
+            title: "Configuração necessária",
+            description: "A integração com o gateway de pagamento não está configurada. Entre em contato com o suporte.",
+            variant: "destructive",
+            duration: 6000
+          });
+          return;
+        }
+        throw new Error(data.error);
+      }
+      
+      if (!data?.payment_url && !data?.sandbox_url) {
         console.error('Resposta inesperada:', data);
         throw new Error("Não foi possível gerar o link de pagamento");
+      }
+      
+      // Determinar qual URL usar com base no ambiente
+      let paymentUrl;
+      if (data.environment === 'production') {
+        paymentUrl = data.payment_url || data.prod_url;
+      } else {
+        paymentUrl = data.sandbox_url;
+      }
+      
+      if (paymentUrl) {
+        window.location.href = paymentUrl;
+      } else {
+        throw new Error("URL de pagamento não disponível");
       }
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
@@ -261,6 +300,8 @@ const MyBookings = () => {
         description: error.message || "Ocorreu um erro ao processar o pagamento. Tente novamente.",
         variant: "destructive"
       });
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 

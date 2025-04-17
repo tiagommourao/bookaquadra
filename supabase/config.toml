@@ -9,4 +9,3 @@ verify_jwt = false
 
 [functions.create-payment]
 verify_jwt = true
-

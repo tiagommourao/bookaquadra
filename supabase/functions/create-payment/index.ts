@@ -71,11 +71,27 @@ serve(async (req) => {
       );
     }
     
+    // Verificar se já existe um pagamento para esta reserva
+    const { data: existingPayment, error: paymentCheckError } = await supabase
+      .from("payments")
+      .select("id, status")
+      .eq("booking_id", booking_id)
+      .maybeSingle();
+
+    if (paymentCheckError) {
+      console.error("Erro ao verificar pagamento existente:", paymentCheckError);
+    } else if (existingPayment && existingPayment.status === 'paid') {
+      return new Response(
+        JSON.stringify({ error: "Esta reserva já possui um pagamento confirmado" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     // Obter a integração ativa do Mercado Pago
-    // CORREÇÃO: Mudando de .single() para .maybeSingle() para evitar o erro quando não há registros
+    // Usamos .maybeSingle() para evitar erros quando não há registros
     const { data: integration, error: integrationError } = await supabase
       .from("integrations_mercadopago")
-      .select("access_token")
+      .select("access_token, environment")
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .maybeSingle();
@@ -92,7 +108,10 @@ serve(async (req) => {
     if (!integration?.access_token) {
       console.error("Integração não configurada ou inativa");
       return new Response(
-        JSON.stringify({ error: "Integração com MercadoPago não configurada ou inativa" }),
+        JSON.stringify({ 
+          error: "Integração com MercadoPago não configurada ou inativa", 
+          setup_required: true 
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -147,6 +166,15 @@ serve(async (req) => {
     const mpData = await mpResponse.json();
     console.log("Resposta do Mercado Pago:", JSON.stringify(mpData));
     
+    // Limpar pagamentos antigos (pendentes/expirados) para esta reserva
+    if (existingPayment) {
+      await supabase
+        .from("payments")
+        .update({ status: "cancelled" })
+        .eq("booking_id", booking_id)
+        .eq("status", "pending");
+    }
+    
     // Registrar o pagamento no banco de dados
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
@@ -171,13 +199,20 @@ serve(async (req) => {
       );
     }
     
+    // Determinar qual URL usar com base no ambiente
+    const paymentUrl = integration.environment === 'production' 
+      ? mpData.init_point 
+      : mpData.sandbox_init_point;
+    
     // Retornar URL de pagamento
     return new Response(
       JSON.stringify({
         success: true,
         payment_id: payment.id,
-        payment_url: mpData.init_point,
-        sandbox_url: mpData.sandbox_init_point
+        payment_url: paymentUrl,
+        sandbox_url: mpData.sandbox_init_point,
+        prod_url: mpData.init_point,
+        environment: integration.environment
       }),
       { 
         headers: { 
