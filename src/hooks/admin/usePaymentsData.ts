@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Payment, PaymentStatistics, PaymentStatusLog, PaymentStatus } from '@/types';
+import { Payment, PaymentStatistics, PaymentStatusLog, PaymentStatus } from '@/types/payment';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -164,7 +164,7 @@ export const useUpdatePaymentStatus = (paymentId: string) => {
     return data as PaymentStatusLog[];
   }, [paymentId]);
 
-  const { mutateAsync, isLoading, isSuccess } = useMutation({
+  const { mutateAsync, isPending, isSuccess } = useMutation({
     mutationFn: async ({ newStatus, reason }: { newStatus: PaymentStatus; reason: string }) => {
       if (!user) throw new Error('Usuário não autenticado');
 
@@ -192,7 +192,7 @@ export const useUpdatePaymentStatus = (paymentId: string) => {
 
   return {
     updateStatus,
-    isLoading,
+    isLoading: isPending, // Correção aqui, usando isPending em vez de isLoading
     isSuccess,
     fetchStatusLogs
   };

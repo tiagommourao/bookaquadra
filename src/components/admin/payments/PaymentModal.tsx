@@ -1,22 +1,17 @@
 
-import React, { useState } from 'react';
-import { Payment, PaymentStatus, PaymentStatusLog } from '@/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Payment, PaymentStatusLog, PaymentStatus } from '@/types/payment';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -24,12 +19,10 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '@/components/ui/tabs';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { toast } from 'sonner';
+} from "@/components/ui/tabs";
 import { useUpdatePaymentStatus } from '@/hooks/admin/usePaymentsData';
-import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Loader2, Copy, CheckCircle } from 'lucide-react';
 
 interface PaymentModalProps {
   payment: Payment;
@@ -38,31 +31,55 @@ interface PaymentModalProps {
   onStatusUpdate: () => void;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({
-  payment,
-  isOpen,
+export const PaymentModal: React.FC<PaymentModalProps> = ({ 
+  payment, 
+  isOpen, 
   onClose,
-  onStatusUpdate,
+  onStatusUpdate
 }) => {
-  const [newStatus, setNewStatus] = useState<PaymentStatus>(payment.status);
-  const [updateReason, setUpdateReason] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<PaymentStatus>(payment.status);
+  const [reason, setReason] = useState('');
   const [statusLogs, setStatusLogs] = useState<PaymentStatusLog[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
-  
-  const {
-    updateStatus,
-    isLoading,
-    isSuccess,
-    fetchStatusLogs
-  } = useUpdatePaymentStatus(payment.id);
 
-  React.useEffect(() => {
+  const { updateStatus, isLoading: isUpdating, fetchStatusLogs } = useUpdatePaymentStatus(payment.id);
+
+  useEffect(() => {
     if (isOpen && payment) {
-      fetchStatusLogs().then(logs => {
-        setStatusLogs(logs);
-      });
+      setSelectedStatus(payment.status);
+      loadStatusLogs();
     }
-  }, [isOpen, payment, fetchStatusLogs]);
+  }, [isOpen, payment]);
+
+  const loadStatusLogs = async () => {
+    setIsLoadingLogs(true);
+    try {
+      const logs = await fetchStatusLogs();
+      setStatusLogs(logs);
+    } catch (error) {
+      console.error('Error loading payment status logs:', error);
+      toast.error('Erro ao carregar histórico de status');
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!reason.trim()) {
+      toast.error('Por favor, forneça um motivo para a alteração de status');
+      return;
+    }
+
+    try {
+      await updateStatus(selectedStatus, reason);
+      toast.success('Status do pagamento atualizado com sucesso');
+      onStatusUpdate();
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast.error('Erro ao atualizar status do pagamento');
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -72,7 +89,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR');
+  };
+
+  const formatRelativeDate = (dateString: string) => {
+    return formatDistanceToNow(new Date(dateString), { 
+      addSuffix: true, 
+      locale: ptBR 
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -105,7 +130,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       case 'pix':
         return 'PIX';
       case 'bank_transfer':
-        return 'Transferência';
+        return 'Transferência Bancária';
       case 'cash':
         return 'Dinheiro';
       case 'other':
@@ -115,113 +140,130 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
-  const handleStatusUpdate = async () => {
-    if (!updateReason.trim() && newStatus !== payment.status) {
-      toast.error('É necessário informar um motivo para a alteração de status.');
-      return;
-    }
-
-    if (newStatus === payment.status) {
-      toast.info('Status não foi alterado.');
-      return;
-    }
-
-    try {
-      await updateStatus(newStatus, updateReason);
-      toast.success('Status do pagamento atualizado com sucesso!');
-      onStatusUpdate();
-    } catch (error) {
-      toast.error('Erro ao atualizar o status do pagamento.');
-      console.error('Erro ao atualizar status:', error);
-    }
-  };
-
-  const handleExportDetails = () => {
-    // Implementação futura para exportação dos detalhes do pagamento
-    toast.info('Exportação de detalhes será implementada em breve!');
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copiado para a área de transferência');
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Detalhes do Pagamento</DialogTitle>
-          <DialogDescription>
-            ID: {payment.id}
-          </DialogDescription>
+          <DialogTitle className="text-xl">
+            Detalhes do Pagamento 
+            <span className="ml-2 text-sm opacity-70">#{payment.id.slice(0, 8)}</span>
+          </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="details">Dados Básicos</TabsTrigger>
-            <TabsTrigger value="history">Histórico de Status</TabsTrigger>
-            <TabsTrigger value="technical">Dados Técnicos</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Detalhes</TabsTrigger>
+            <TabsTrigger value="history">
+              Histórico 
+              {statusLogs.length > 0 && <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 rounded-full">{statusLogs.length}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="raw">Raw Data</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="details" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+
+          <TabsContent value="details" className="space-y-4 pt-4">
+            {/* Informações básicas do pagamento */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Status</h4>
+                <h3 className="text-sm font-medium text-gray-500">Status</h3>
                 <div className="mt-1">{getStatusBadge(payment.status)}</div>
               </div>
+
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Valor</h4>
-                <p className="text-lg font-semibold">{formatCurrency(payment.amount)}</p>
+                <h3 className="text-sm font-medium text-gray-500">Valor</h3>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(payment.amount)}</p>
               </div>
+
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Data de Criação</h4>
-                <p>{formatDate(payment.created_at)}</p>
+                <h3 className="text-sm font-medium text-gray-500">Método de Pagamento</h3>
+                <p className="mt-1">{getPaymentMethodText(payment.payment_method)}</p>
               </div>
+
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Data de Vencimento</h4>
-                <p>
-                  {payment.expiration_date ? 
-                    formatDate(payment.expiration_date) : 
-                    <span className="text-gray-400">Não definida</span>}
-                </p>
+                <h3 className="text-sm font-medium text-gray-500">Data de Criação</h3>
+                <p className="mt-1">{formatDate(payment.created_at)}</p>
+                <p className="text-xs text-gray-500">({formatRelativeDate(payment.created_at)})</p>
               </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">Método de Pagamento</h4>
-                <p>{getPaymentMethodText(payment.payment_method)}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">Última Atualização</h4>
-                <p>{formatDate(payment.updated_at)}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">Usuário</h4>
-                <p>
-                  {payment.user_id ? (
+
+              {payment.expiration_date && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Data de Vencimento</h3>
+                  <p className="mt-1">{formatDate(payment.expiration_date)}</p>
+                </div>
+              )}
+
+              {payment.user_id && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Usuário</h3>
+                  <div className="mt-1 flex items-center">
                     <span className="text-blue-600 hover:underline cursor-pointer">
                       {payment.user_id}
                     </span>
-                  ) : (
-                    <span className="text-gray-400">Não associado</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">Reserva</h4>
-                <p>
-                  {payment.booking_id ? (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 ml-1"
+                      onClick={() => copyToClipboard(payment.user_id || '')}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {payment.booking_id && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Reserva</h3>
+                  <div className="mt-1 flex items-center">
                     <span className="text-blue-600 hover:underline cursor-pointer">
                       {payment.booking_id}
                     </span>
-                  ) : (
-                    <span className="text-gray-400">Não associada</span>
-                  )}
-                </p>
-              </div>
-            </div>
-            
-            <div className="border-t pt-4 mt-4">
-              <h4 className="font-medium mb-2">Atualizar Status</h4>
-              <div className="grid grid-cols-1 gap-4">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 ml-1"
+                      onClick={() => copyToClipboard(payment.booking_id || '')}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {payment.mercadopago_payment_id && (
                 <div>
-                  <p className="text-sm mb-2">Novo Status:</p>
-                  <Select value={newStatus} onValueChange={(value) => setNewStatus(value as PaymentStatus)}>
+                  <h3 className="text-sm font-medium text-gray-500">ID MercadoPago</h3>
+                  <div className="mt-1 flex items-center">
+                    <span>{payment.mercadopago_payment_id}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 ml-1"
+                      onClick={() => copyToClipboard(payment.mercadopago_payment_id || '')}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Formulário de atualização de status */}
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="font-medium mb-3">Atualizar Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Novo Status</label>
+                  <Select 
+                    value={selectedStatus} 
+                    onValueChange={(value) => setSelectedStatus(value as PaymentStatus)}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o novo status" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pending">Pendente</SelectItem>
@@ -233,135 +275,110 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <p className="text-sm mb-2">Motivo da Alteração:</p>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium mb-1 block">Motivo da Atualização</label>
                   <Textarea 
-                    placeholder="Informe o motivo da alteração de status"
-                    value={updateReason}
-                    onChange={(e) => setUpdateReason(e.target.value)}
+                    value={reason} 
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Informe o motivo para esta alteração de status..."
+                    rows={3}
                   />
                 </div>
               </div>
+
+              <div className="mt-4 flex justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={onClose} 
+                  className="mr-2"
+                  disabled={isUpdating}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleStatusUpdate}
+                  disabled={isUpdating || selectedStatus === payment.status}
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    'Atualizar Status'
+                  )}
+                </Button>
+              </div>
             </div>
           </TabsContent>
-          
-          <TabsContent value="history" className="space-y-4">
-            <div className="space-y-6">
-              <h3 className="font-medium">Histórico de Alterações de Status</h3>
-              
-              {statusLogs.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">
-                  Nenhum histórico de alteração de status encontrado.
-                </p>
-              ) : (
-                <div className="relative pl-6 border-l-2 border-gray-200 space-y-6">
+
+          <TabsContent value="history" className="space-y-4 pt-4">
+            {isLoadingLogs ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
+            ) : statusLogs.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Nenhuma alteração de status registrada.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h3 className="font-medium">Histórico de Status</h3>
+                
+                <div className="space-y-4">
                   {statusLogs.map((log) => (
-                    <div key={log.id} className="relative">
-                      <div className="absolute -left-[25px] h-6 w-6 rounded-full border-4 bg-white border-primary"></div>
-                      <div className="mb-1 text-sm text-gray-500">
-                        {formatDate(log.created_at)}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>De:</span> {getStatusBadge(log.previous_status)} 
-                        <span className="mx-2">→</span>
-                        <span>Para:</span> {getStatusBadge(log.new_status)}
+                    <div key={log.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                          <span className="font-medium">
+                            {getStatusBadge(log.previous_status)} → {getStatusBadge(log.new_status)}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {formatRelativeDate(log.created_at)}
+                        </span>
                       </div>
                       {log.reason && (
-                        <div className="mt-1 text-sm bg-gray-50 p-2 rounded border">
-                          <span className="font-medium">Motivo:</span> {log.reason}
-                        </div>
+                        <p className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                          {log.reason}
+                        </p>
                       )}
                       {log.created_by && (
-                        <div className="mt-1 text-sm text-gray-500">
+                        <p className="mt-2 text-xs text-gray-500">
                           Alterado por: {log.created_by}
-                        </div>
+                        </p>
                       )}
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </TabsContent>
-          
-          <TabsContent value="technical" className="space-y-4">
+
+          <TabsContent value="raw" className="pt-4">
             <div className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-2">ID MercadoPago</h4>
-                <p className="bg-gray-50 p-2 rounded border">
-                  {payment.mercadopago_payment_id || 'Não associado ao MercadoPago'}
-                </p>
+              <h3 className="font-medium">Dados Brutos</h3>
+              <div className="bg-gray-100 p-4 rounded-md overflow-x-auto">
+                <pre className="text-xs text-gray-800 whitespace-pre-wrap">
+                  {JSON.stringify(payment, null, 2)}
+                </pre>
               </div>
-              
-              <div>
-                <h4 className="font-medium mb-2">Dados Brutos da Resposta (JSON)</h4>
-                <div className="bg-gray-50 p-2 rounded border overflow-auto max-h-60">
-                  <pre className="text-xs">
-                    {payment.raw_response ? 
-                      JSON.stringify(payment.raw_response, null, 2) : 
-                      'Não há dados brutos disponíveis'}
-                  </pre>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Estes dados são úteis para suporte técnico e depuração.
-                </p>
-              </div>
-              
-              <div>
-                <h4 className="font-medium mb-2">IDs do Sistema</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-sm text-gray-500">ID do Pagamento:</p>
-                    <p className="font-mono text-xs">{payment.id}</p>
+
+              {payment.raw_response && (
+                <div className="space-y-2">
+                  <h3 className="font-medium">Resposta do MercadoPago</h3>
+                  <div className="bg-gray-100 p-4 rounded-md overflow-x-auto">
+                    <pre className="text-xs text-gray-800 whitespace-pre-wrap">
+                      {JSON.stringify(payment.raw_response, null, 2)}
+                    </pre>
                   </div>
-                  {payment.booking_id && (
-                    <div>
-                      <p className="text-sm text-gray-500">ID da Reserva:</p>
-                      <p className="font-mono text-xs">{payment.booking_id}</p>
-                    </div>
-                  )}
-                  {payment.user_id && (
-                    <div>
-                      <p className="text-sm text-gray-500">ID do Usuário:</p>
-                      <p className="font-mono text-xs">{payment.user_id}</p>
-                    </div>
-                  )}
                 </div>
-              </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
-
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            variant="outline"
-            onClick={handleExportDetails}
-            disabled={isLoading}
-          >
-            Exportar Detalhes
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            Fechar
-          </Button>
-          {(activeTab === 'details' && newStatus !== payment.status) && (
-            <Button 
-              onClick={handleStatusUpdate}
-              disabled={isLoading || !updateReason.trim()}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processando
-                </>
-              ) : (
-                'Atualizar Status'
-              )}
-            </Button>
-          )}
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

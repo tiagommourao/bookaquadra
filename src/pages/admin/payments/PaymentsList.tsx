@@ -7,7 +7,7 @@ import { PaymentModal } from '@/components/admin/payments/PaymentModal';
 import { PaymentFilters } from '@/components/admin/payments/PaymentFilters';
 import { PaymentStatCards } from '@/components/admin/payments/PaymentStatCards';
 import { usePaymentsData } from '@/hooks/admin/usePaymentsData';
-import { Payment } from '@/types';
+import { Payment } from '@/types/payment';
 import { Loader2 } from 'lucide-react';
 
 const PaymentsList: React.FC = () => {

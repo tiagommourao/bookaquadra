@@ -402,3 +402,6 @@ export type OnboardingStep =
 
 // Game type preferences
 export type GameTypePreference = 'individual' | 'doubles' | 'group';
+
+// Re-export os novos tipos de pagamento
+export * from './payment';

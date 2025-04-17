@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Payment } from '@/types';
+import { Payment } from '@/types/payment';
 import { 
   Table, 
   TableBody, 
