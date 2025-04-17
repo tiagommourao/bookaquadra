@@ -5,70 +5,15 @@ import { UserLayout } from '@/components/layouts/UserLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, addDays, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-// Mock data for courts
-const courts = [
-  { 
-    id: '1', 
-    name: 'Quadra Beach Tennis 01', 
-    type: 'beach-tennis',
-    description: 'Quadra oficial de Beach Tennis com areia especial',
-    imageUrl: 'https://images.unsplash.com/photo-1562552476-8ac59b2a2e46?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' 
-  },
-  { 
-    id: '2', 
-    name: 'Quadra Padel 01', 
-    type: 'padel',
-    description: 'Quadra de Padel com paredes de vidro e iluminação LED',
-    imageUrl: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' 
-  },
-  { 
-    id: '3', 
-    name: 'Quadra Tênis 01', 
-    type: 'tennis',
-    description: 'Quadra de saibro oficial para prática de tênis',
-    imageUrl: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' 
-  },
-  { 
-    id: '4', 
-    name: 'Quadra Vôlei', 
-    type: 'volleyball',
-    description: 'Quadra de vôlei com piso emborrachado especial',
-    imageUrl: 'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' 
-  },
-];
-
-// Mock data for available time slots
-const generateMockTimeSlots = (courtId: string, date: Date) => {
-  // In a real app, this would come from an API call based on courtId and date
-  const baseSlots = [
-    { id: `${courtId}-1`, startTime: '08:00', endTime: '09:00', price: 80, available: true },
-    { id: `${courtId}-2`, startTime: '09:00', endTime: '10:00', price: 80, available: true },
-    { id: `${courtId}-3`, startTime: '10:00', endTime: '11:00', price: 100, available: true },
-    { id: `${courtId}-4`, startTime: '11:00', endTime: '12:00', price: 100, available: false },
-    { id: `${courtId}-5`, startTime: '14:00', endTime: '15:00', price: 80, available: true },
-    { id: `${courtId}-6`, startTime: '15:00', endTime: '16:00', price: 80, available: true },
-    { id: `${courtId}-7`, startTime: '16:00', endTime: '17:00', price: 100, available: true },
-    { id: `${courtId}-8`, startTime: '17:00', endTime: '18:00', price: 120, available: false },
-    { id: `${courtId}-9`, startTime: '18:00', endTime: '19:00', price: 120, available: true },
-    { id: `${courtId}-10`, startTime: '19:00', endTime: '20:00', price: 120, available: true },
-    { id: `${courtId}-11`, startTime: '20:00', endTime: '21:00', price: 100, available: true },
-    { id: `${courtId}-12`, startTime: '21:00', endTime: '22:00', price: 100, available: true },
-  ];
-  
-  // Make some time slots unavailable based on day of week for variety
-  const dayOfWeek = date.getDay();
-  return baseSlots.map((slot, index) => {
-    if (dayOfWeek === 5 || dayOfWeek === 6) { // Friday and Saturday
-      // Make more slots unavailable on weekends
-      return { ...slot, available: index % 3 !== 0 ? slot.available : false };
-    }
-    return slot;
-  });
-};
+import { ChevronLeft, ChevronRight, AlertCircle, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useCourts } from '@/hooks/useCourts';
+import { useAvailableTimeSlots } from '@/hooks/useAvailability';
+import { useCreateBooking } from '@/hooks/useBookings';
+import { Court } from '@/types/court';
 
 const CourtReservation = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -76,11 +21,18 @@ const CourtReservation = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const navigate = useNavigate();
   
+  // Fetch courts
+  const { data: courts, isLoading: isLoadingCourts, error: courtsError } = useCourts();
+  
   // Get available time slots for the selected court and date
-  const availableTimeSlots = selectedCourt && selectedDate 
-    ? generateMockTimeSlots(selectedCourt, selectedDate)
-    : [];
-
+  const { data: availableTimeSlots, isLoading: isLoadingTimeSlots } = useAvailableTimeSlots(
+    selectedCourt, 
+    selectedDate || null
+  );
+  
+  // Get the mutation for creating a booking
+  const createBooking = useCreateBooking();
+  
   // Handle court selection
   const handleCourtSelect = (courtId: string) => {
     setSelectedCourt(courtId);
@@ -94,18 +46,100 @@ const CourtReservation = () => {
 
   // Handle reservation submission
   const handleReserve = () => {
-    if (selectedCourt && selectedDate && selectedTimeSlot) {
-      // In a real app, make an API call to create the reservation
-      console.log('Creating reservation', { 
-        courtId: selectedCourt,
-        date: selectedDate,
-        timeSlotId: selectedTimeSlot 
-      });
+    if (selectedCourt && selectedDate && selectedTimeSlot && availableTimeSlots) {
+      const selectedSlot = availableTimeSlots.find(slot => slot.id === selectedTimeSlot);
       
-      // Navigate to payment page (mock navigation)
-      navigate('/pagamento');
+      if (selectedSlot) {
+        createBooking.mutate({
+          court_id: selectedCourt,
+          booking_date: format(selectedDate, 'yyyy-MM-dd'),
+          start_time: selectedSlot.startTime,
+          end_time: selectedSlot.endTime,
+          amount: selectedSlot.price
+        }, {
+          onSuccess: (response) => {
+            // Se houver URL de pagamento, redirecionar para ela
+            if (response.payment_url) {
+              window.location.href = response.payment_url;
+            } else {
+              // Caso contrário, redirecionar para minhas reservas
+              navigate('/minhas-reservas');
+            }
+          }
+        });
+      }
     }
   };
+
+  const getCurrentCourt = (): Court | undefined => {
+    if (!selectedCourt || !courts) return undefined;
+    return courts.find(court => court.id === selectedCourt);
+  };
+
+  const getCourtTypeName = (typeId: string | undefined): string => {
+    if (!typeId) return '';
+    
+    // Mapeamento de tipos de quadra
+    const types: Record<string, string> = {
+      'beach-tennis': 'Beach Tennis',
+      'padel': 'Padel',
+      'tennis': 'Tênis',
+      'volleyball': 'Vôlei',
+      'futsal': 'Futsal',
+      'basketball': 'Basquete',
+      'pickleball': 'Pickleball'
+    };
+    
+    return types[typeId] || typeId;
+  };
+
+  const getCourtTypeStyle = (typeId: string | undefined): { bg: string, text: string } => {
+    if (!typeId) return { bg: 'bg-gray-100', text: 'text-gray-800' };
+    
+    // Estilos para cada tipo de quadra
+    const styles: Record<string, { bg: string, text: string }> = {
+      'beach-tennis': { bg: 'bg-amber-100', text: 'text-amber-800' },
+      'padel': { bg: 'bg-blue-100', text: 'text-blue-800' },
+      'tennis': { bg: 'bg-green-100', text: 'text-green-800' },
+      'volleyball': { bg: 'bg-purple-100', text: 'text-purple-800' },
+      'futsal': { bg: 'bg-red-100', text: 'text-red-800' },
+      'basketball': { bg: 'bg-orange-100', text: 'text-orange-800' },
+      'pickleball': { bg: 'bg-teal-100', text: 'text-teal-800' }
+    };
+    
+    return styles[typeId] || { bg: 'bg-gray-100', text: 'text-gray-800' };
+  };
+
+  // Render loading state for courts
+  const renderCourtsSkeleton = () => (
+    <div className="space-y-3">
+      {[1, 2, 3].map(i => (
+        <Card key={i} className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="flex flex-col sm:flex-row">
+              <div className="sm:w-1/3 h-32 sm:h-auto">
+                <Skeleton className="w-full h-full" />
+              </div>
+              <div className="p-4 flex-1">
+                <Skeleton className="h-6 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-full mb-4" />
+                <Skeleton className="h-6 w-1/4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  // Render loading state for time slots
+  const renderTimeSlotsSkeleton = () => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {[1, 2, 3, 4, 5, 6].map(i => (
+        <Skeleton key={i} className="h-14 w-full" />
+      ))}
+    </div>
+  );
 
   return (
     <UserLayout>
@@ -134,9 +168,10 @@ const CourtReservation = () => {
                   locale={ptBR}
                   disabled={(date) => {
                     // Disable past dates
-                    const now = new Date();
-                    now.setHours(0, 0, 0, 0);
-                    return date < now;
+                    const today = startOfToday();
+                    // Allow booking up to 30 days in advance by default
+                    const maxDate = addDays(today, 30);
+                    return date < today || date > maxDate;
                   }}
                 />
               </CardContent>
@@ -148,55 +183,81 @@ const CourtReservation = () => {
         <section className="p-4">
           <div className="max-w-lg mx-auto">
             <h2 className="text-lg font-medium mb-4">Escolha uma Quadra</h2>
-            <div className="space-y-3">
-              {courts.map((court) => (
-                <Card 
-                  key={court.id}
-                  className={`overflow-hidden cursor-pointer transition-all ${
-                    selectedCourt === court.id ? 'ring-2 ring-primary' : ''
-                  }`}
-                  onClick={() => handleCourtSelect(court.id)}
-                >
-                  <CardContent className="p-0">
-                    <div className="flex flex-col sm:flex-row">
-                      <div className="sm:w-1/3 h-32 sm:h-auto relative">
-                        <img 
-                          src={court.imageUrl} 
-                          alt={court.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="p-4 flex-1">
-                        <h3 className="font-medium text-lg">{court.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1">{court.description}</p>
-                        
-                        <div className="mt-2">
-                          <span 
-                            className={`inline-flex items-center px-2 py-1 text-xs rounded-full ${
-                              court.type === 'beach-tennis' 
-                                ? 'bg-amber-100 text-amber-800'
-                                : court.type === 'padel' 
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : court.type === 'tennis'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-purple-100 text-purple-800'
-                            }`}
-                          >
-                            {court.type === 'beach-tennis' 
-                              ? 'Beach Tennis'
-                              : court.type === 'padel'
-                                ? 'Padel'
-                                : court.type === 'tennis'
-                                  ? 'Tênis'
-                                  : 'Vôlei'}
-                          </span>
+            
+            {courtsError ? (
+              <Card>
+                <CardContent className="p-4 text-center text-destructive">
+                  <AlertCircle className="mx-auto h-8 w-8 mb-2" />
+                  <p>Erro ao carregar quadras. Por favor, tente novamente.</p>
+                </CardContent>
+              </Card>
+            ) : isLoadingCourts ? (
+              renderCourtsSkeleton()
+            ) : courts && courts.length > 0 ? (
+              <div className="space-y-3">
+                {courts.map((court) => (
+                  <Card 
+                    key={court.id}
+                    className={`overflow-hidden cursor-pointer transition-all ${
+                      selectedCourt === court.id ? 'ring-2 ring-primary' : ''
+                    }`}
+                    onClick={() => handleCourtSelect(court.id)}
+                  >
+                    <CardContent className="p-0">
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="sm:w-1/3 h-32 sm:h-auto relative">
+                          <img 
+                            src={court.image_url || '/placeholder.svg'} 
+                            alt={court.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="p-4 flex-1">
+                          <h3 className="font-medium text-lg">{court.name}</h3>
+                          <p className="text-sm text-gray-500 mt-1">{court.description}</p>
+                          
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span 
+                              className={`inline-flex items-center px-2 py-1 text-xs rounded-full ${
+                                getCourtTypeStyle(court.type_id).bg
+                              } ${
+                                getCourtTypeStyle(court.type_id).text
+                              }`}
+                            >
+                              {getCourtTypeName(court.type_id)}
+                            </span>
+                            
+                            {court.surface_type && (
+                              <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                                {court.surface_type}
+                              </span>
+                            )}
+                            
+                            {court.has_cover && (
+                              <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-blue-50 text-blue-700">
+                                Coberta
+                              </span>
+                            )}
+                            
+                            {court.has_lighting && (
+                              <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-yellow-50 text-yellow-700">
+                                Iluminação
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-4 text-center text-gray-500">
+                  <p>Nenhuma quadra disponível no momento.</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </section>
         
@@ -206,29 +267,48 @@ const CourtReservation = () => {
             <div className="max-w-lg mx-auto">
               <h2 className="text-lg font-medium mb-4">Escolha um Horário</h2>
               
-              {availableTimeSlots.length > 0 ? (
+              {isLoadingTimeSlots ? (
+                renderTimeSlotsSkeleton()
+              ) : availableTimeSlots && availableTimeSlots.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {availableTimeSlots.map((slot) => (
-                    <Button
-                      key={slot.id}
-                      variant={selectedTimeSlot === slot.id ? "default" : "outline"}
-                      className={`h-auto py-2 flex flex-col ${
-                        !slot.available ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                      disabled={!slot.available}
-                      onClick={() => handleTimeSlotSelect(slot.id)}
-                    >
-                      <span>{slot.startTime} - {slot.endTime}</span>
-                      <span className="text-xs mt-1">
-                        R$ {slot.price.toFixed(2)}
-                      </span>
-                    </Button>
+                    <TooltipProvider key={slot.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="relative">
+                            <Button
+                              variant={selectedTimeSlot === slot.id ? "default" : "outline"}
+                              className={`h-auto py-2 w-full flex flex-col ${
+                                !slot.available ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}
+                              disabled={!slot.available}
+                              onClick={() => handleTimeSlotSelect(slot.id)}
+                            >
+                              <span>{slot.startTime} - {slot.endTime}</span>
+                              <span className="text-xs mt-1">
+                                R$ {slot.price.toFixed(2)}
+                              </span>
+                            </Button>
+                            {!slot.available && slot.blockReason && (
+                              <span className="absolute top-0 right-0 -mt-1 -mr-1">
+                                <Info className="h-4 w-4 text-gray-400" />
+                              </span>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        {!slot.available && slot.blockReason && (
+                          <TooltipContent>
+                            <p>{slot.blockReason}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                   ))}
                 </div>
               ) : (
                 <Card>
                   <CardContent className="p-4 text-center text-gray-500">
-                    Nenhum horário disponível para esta data e quadra.
+                    <p>Nenhum horário disponível para esta data e quadra.</p>
                   </CardContent>
                 </Card>
               )}
@@ -237,7 +317,7 @@ const CourtReservation = () => {
         )}
         
         {/* Summary and Reserve Button */}
-        {selectedCourt && selectedTimeSlot && (
+        {selectedCourt && selectedTimeSlot && availableTimeSlots && (
           <section className="p-4 mb-4">
             <div className="max-w-lg mx-auto">
               <Card className="bg-accent">
@@ -250,7 +330,7 @@ const CourtReservation = () => {
                     </p>
                     <p>
                       <span className="font-medium">Quadra:</span>{' '}
-                      {courts.find(c => c.id === selectedCourt)?.name}
+                      {getCurrentCourt()?.name}
                     </p>
                     <p>
                       <span className="font-medium">Horário:</span>{' '}
@@ -267,8 +347,9 @@ const CourtReservation = () => {
                   <Button
                     className="w-full mt-4"
                     onClick={handleReserve}
+                    disabled={createBooking.isPending}
                   >
-                    Reservar e Pagar
+                    {createBooking.isPending ? 'Processando...' : 'Reservar e Pagar'}
                   </Button>
                 </CardContent>
               </Card>

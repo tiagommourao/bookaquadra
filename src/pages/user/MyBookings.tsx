@@ -1,115 +1,118 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserLayout } from '@/components/layouts/UserLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, MapPin, AlertCircle, CheckCircle2, Calendar as CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { Calendar, Clock, MapPin, AlertCircle, CheckCircle2, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BookingStatus, PaymentStatus } from '@/types';
-
-// Mock data for bookings
-const mockBookings = [
-  {
-    id: '1',
-    courtId: '1',
-    courtName: 'Quadra Beach Tennis 01',
-    courtType: 'beach-tennis',
-    date: new Date(2023, 5, 30, 14, 0),
-    startTime: '14:00',
-    endTime: '15:00',
-    price: 80,
-    status: 'confirmed' as BookingStatus,
-    paymentStatus: 'paid' as PaymentStatus,
-    createdAt: new Date(2023, 5, 28, 10, 30),
-  },
-  {
-    id: '2',
-    courtId: '2',
-    courtName: 'Quadra Padel 01',
-    courtType: 'padel',
-    date: new Date(2023, 5, 25, 16, 0),
-    startTime: '16:00',
-    endTime: '17:00',
-    price: 100,
-    status: 'confirmed' as BookingStatus,
-    paymentStatus: 'pending' as PaymentStatus,
-    createdAt: new Date(2023, 5, 20, 18, 45),
-  },
-  {
-    id: '3',
-    courtId: '3',
-    courtName: 'Quadra Tênis 01',
-    courtType: 'tennis',
-    date: new Date(2023, 5, 22, 9, 0),
-    startTime: '09:00',
-    endTime: '10:30',
-    price: 120,
-    status: 'cancelled' as BookingStatus,
-    paymentStatus: 'refunded' as PaymentStatus,
-    createdAt: new Date(2023, 5, 19, 12, 15),
-  },
-  {
-    id: '4',
-    courtId: '1',
-    courtName: 'Quadra Beach Tennis 01',
-    courtType: 'beach-tennis',
-    date: new Date(2023, 5, 20, 18, 0),
-    startTime: '18:00',
-    endTime: '19:00',
-    price: 100,
-    status: 'completed' as BookingStatus,
-    paymentStatus: 'paid' as PaymentStatus,
-    createdAt: new Date(2023, 5, 15, 9, 20),
-  },
-];
+import { useUserBookings, useCancelBooking } from '@/hooks/useBookings';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from '@/hooks/use-toast';
 
 const MyBookings = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [cancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  
+  // Fetch bookings from API
+  const { data: bookings, isLoading, error, refetch } = useUserBookings();
+  
+  // Cancel booking mutation
+  const cancelBooking = useCancelBooking();
+  
+  // Effect to refetch data when tab changes
+  useEffect(() => {
+    refetch();
+  }, [activeTab, refetch]);
   
   // Filter bookings based on active tab
-  const filteredBookings = mockBookings.filter((booking) => {
+  const filteredBookings = bookings?.filter((booking) => {
+    const bookingDate = parseISO(`${booking.booking_date}T${booking.start_time}`);
     const now = new Date();
     
     if (activeTab === 'upcoming') {
-      return booking.date > now && booking.status !== 'cancelled';
+      return bookingDate > now && booking.status !== 'cancelled';
     } else if (activeTab === 'past') {
-      return booking.date < now || booking.status === 'completed';
+      return bookingDate < now || booking.status === 'completed';
     } else {
       return booking.status === 'cancelled';
     }
-  });
+  }) || [];
 
   // Format date for display
-  const formatBookingDate = (date: Date) => {
-    return format(date, "EEEE, d 'de' MMMM", { locale: ptBR });
+  const formatBookingDate = (dateStr: string) => {
+    return format(parseISO(dateStr), "EEEE, d 'de' MMMM", { locale: ptBR });
   };
   
-  // Handle cancellation of a booking
-  const handleCancelBooking = (bookingId: string) => {
-    // In a real app, call an API to cancel the booking
-    console.log(`Cancelling booking ${bookingId}`);
-    // After API call, update the UI
-    // For now, we'll just log it
+  // Handle requesting cancellation of a booking
+  const handleRequestCancel = (bookingId: string) => {
+    setSelectedBookingId(bookingId);
+    setCancelConfirmationOpen(true);
+  };
+  
+  // Handle confirming cancellation
+  const handleConfirmCancel = async () => {
+    if (selectedBookingId) {
+      try {
+        await cancelBooking.mutateAsync(selectedBookingId);
+        setCancelConfirmationOpen(false);
+      } catch (error) {
+        console.error("Erro ao cancelar reserva:", error);
+        // Toast already shown by useCancelBooking hook
+      }
+    }
   };
   
   // Handle adding a booking to Google Calendar
   const handleAddToCalendar = (booking: any) => {
-    // In a real app, create a Google Calendar event
-    const event = {
-      title: `Reserva de quadra - ${booking.courtName}`,
-      description: `Reserva de quadra esportiva no BookaQuadra. Local: ${booking.courtName}`,
-      startTime: `${format(booking.date, 'yyyy-MM-dd')}T${booking.startTime}:00`,
-      endTime: `${format(booking.date, 'yyyy-MM-dd')}T${booking.endTime}:00`,
+    const court = booking.court?.name || "Quadra";
+    const startDateTime = `${booking.booking_date}T${booking.start_time}:00`;
+    const endDateTime = `${booking.booking_date}T${booking.end_time}:00`;
+    
+    // Format for Google Calendar URL
+    const eventDetails = {
+      text: `Reserva de quadra - ${court}`,
+      details: `Reserva de quadra esportiva no BookaQuadra.\nLocal: ${court}`,
+      location: court,
+      dates: `${startDateTime.replace(/-|:/g, '')}/${endDateTime.replace(/-|:/g, '')}`
     };
     
-    console.log('Adding to calendar', event);
-    // This would integrate with Google Calendar API
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(eventDetails.text)}&details=${encodeURIComponent(eventDetails.details)}&location=${encodeURIComponent(eventDetails.location)}&dates=${eventDetails.dates}`;
+    
+    // Open in new tab
+    window.open(googleCalendarUrl, '_blank');
+  };
+
+  // Get court type name
+  const getCourtTypeName = (typeId: string | null | undefined): string => {
+    if (!typeId) return '';
+    
+    // Mapeamento de tipos de quadra
+    const types: Record<string, string> = {
+      'beach-tennis': 'Beach Tennis',
+      'padel': 'Padel',
+      'tennis': 'Tênis',
+      'volleyball': 'Vôlei',
+      'futsal': 'Futsal',
+      'basketball': 'Basquete',
+      'pickleball': 'Pickleball'
+    };
+    
+    return types[typeId] || typeId;
   };
 
   // Render status badge based on booking status
-  const renderStatusBadge = (status: BookingStatus, paymentStatus: PaymentStatus) => {
+  const renderStatusBadge = (status: string, paymentStatus: string) => {
     if (status === 'cancelled') {
       return (
         <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full flex items-center">
@@ -131,11 +134,32 @@ const MyBookings = () => {
           Pagamento Pendente
         </span>
       );
-    } else {
+    } else if (paymentStatus === 'paid') {
       return (
         <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center">
           <CheckCircle2 className="h-3 w-3 mr-1" />
           Confirmado
+        </span>
+      );
+    } else if (paymentStatus === 'rejected' || paymentStatus === 'failed') {
+      return (
+        <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full flex items-center">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          Pagamento Recusado
+        </span>
+      );
+    } else if (paymentStatus === 'expired') {
+      return (
+        <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full flex items-center">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          Pagamento Expirado
+        </span>
+      );
+    } else {
+      return (
+        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center">
+          <Clock className="h-3 w-3 mr-1" />
+          Pendente
         </span>
       );
     }
@@ -143,8 +167,10 @@ const MyBookings = () => {
 
   // Render booking card
   const renderBookingCard = (booking: any) => {
-    const isPast = new Date(booking.date) < new Date();
+    const bookingDate = parseISO(`${booking.booking_date}T${booking.start_time}`);
+    const isPast = bookingDate < new Date();
     const canCancel = !isPast && booking.status !== 'cancelled' && booking.status !== 'completed';
+    const court = booking.court || {};
     
     return (
       <Card key={booking.id} className="mb-3">
@@ -152,24 +178,24 @@ const MyBookings = () => {
           <div className="p-4">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="font-medium">{booking.courtName}</h3>
+                <h3 className="font-medium">{court.name || "Quadra"}</h3>
                 <div className="flex items-center text-sm text-gray-500 mt-1">
                   <Calendar className="h-4 w-4 mr-1" />
-                  <span>{formatBookingDate(booking.date)}</span>
+                  <span>{formatBookingDate(booking.booking_date)}</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-500 mt-1">
                   <Clock className="h-4 w-4 mr-1" />
-                  <span>{booking.startTime} - {booking.endTime}</span>
+                  <span>{booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}</span>
                 </div>
               </div>
               <div>
-                {renderStatusBadge(booking.status, booking.paymentStatus)}
+                {renderStatusBadge(booking.status, booking.payment_status)}
               </div>
             </div>
             
             <div className="mt-4 pt-3 border-t flex flex-wrap justify-between items-center">
               <div className="text-sm">
-                <span className="font-medium">Valor:</span> R$ {booking.price.toFixed(2)}
+                <span className="font-medium">Valor:</span> R$ {Number(booking.amount).toFixed(2)}
               </div>
               <div className="flex space-x-2 mt-2 sm:mt-0">
                 {!isPast && booking.status === 'confirmed' && (
@@ -189,7 +215,7 @@ const MyBookings = () => {
                     size="sm" 
                     variant="destructive"
                     className="text-xs"
-                    onClick={() => handleCancelBooking(booking.id)}
+                    onClick={() => handleRequestCancel(booking.id)}
                   >
                     Cancelar
                   </Button>
@@ -224,47 +250,101 @@ const MyBookings = () => {
               <TabsTrigger value="cancelled">Canceladas</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="upcoming" className="mt-0">
-              {filteredBookings.length > 0 ? (
-                filteredBookings.map(renderBookingCard)
-              ) : (
-                <Card className="border-dashed">
-                  <CardContent className="p-6 text-center">
-                    <p className="text-gray-500 mb-4">Você não tem reservas futuras</p>
-                    <Button onClick={() => window.location.href = '/reservar'}>
-                      Fazer uma Reserva
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="past" className="mt-0">
-              {filteredBookings.length > 0 ? (
-                filteredBookings.map(renderBookingCard)
-              ) : (
-                <Card className="border-dashed">
-                  <CardContent className="p-6 text-center">
-                    <p className="text-gray-500">Você ainda não tem histórico de reservas</p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="cancelled" className="mt-0">
-              {filteredBookings.length > 0 ? (
-                filteredBookings.map(renderBookingCard)
-              ) : (
-                <Card className="border-dashed">
-                  <CardContent className="p-6 text-center">
-                    <p className="text-gray-500">Você não tem reservas canceladas</p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
+            {isLoading ? (
+              <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Carregando suas reservas...</span>
+              </div>
+            ) : error ? (
+              <Card className="border-dashed">
+                <CardContent className="p-6 text-center">
+                  <AlertCircle className="h-8 w-8 mx-auto text-destructive mb-2" />
+                  <p className="text-destructive mb-4">Erro ao carregar suas reservas</p>
+                  <Button onClick={() => refetch()}>
+                    Tentar Novamente
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <TabsContent value="upcoming" className="mt-0">
+                  {filteredBookings.length > 0 ? (
+                    filteredBookings.map(renderBookingCard)
+                  ) : (
+                    <Card className="border-dashed">
+                      <CardContent className="p-6 text-center">
+                        <p className="text-gray-500 mb-4">Você não tem reservas futuras</p>
+                        <Button onClick={() => window.location.href = '/reservar'}>
+                          Fazer uma Reserva
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="past" className="mt-0">
+                  {filteredBookings.length > 0 ? (
+                    filteredBookings.map(renderBookingCard)
+                  ) : (
+                    <Card className="border-dashed">
+                      <CardContent className="p-6 text-center">
+                        <p className="text-gray-500">Você ainda não tem histórico de reservas</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="cancelled" className="mt-0">
+                  {filteredBookings.length > 0 ? (
+                    filteredBookings.map(renderBookingCard)
+                  ) : (
+                    <Card className="border-dashed">
+                      <CardContent className="p-6 text-center">
+                        <p className="text-gray-500">Você não tem reservas canceladas</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              </>
+            )}
           </Tabs>
         </div>
       </section>
+      
+      {/* Confirmation Dialog for Cancellation */}
+      <Dialog open={cancelConfirmationOpen} onOpenChange={setCancelConfirmationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Cancelamento</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja cancelar esta reserva? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelConfirmationOpen(false)}
+              disabled={cancelBooking.isPending}
+            >
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancel}
+              disabled={cancelBooking.isPending}
+            >
+              {cancelBooking.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cancelando...
+                </>
+              ) : (
+                'Sim, Cancelar Reserva'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </UserLayout>
   );
 };
