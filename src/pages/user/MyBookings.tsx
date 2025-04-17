@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { UserLayout } from '@/components/layouts/UserLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, MapPin, AlertCircle, CheckCircle2, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, AlertCircle, CheckCircle2, Calendar as CalendarIcon, Loader2, CreditCard } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useUserBookings, useCancelBooking } from '@/hooks/useBookings';
@@ -18,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from '@/hooks/use-toast';
+import { Booking } from '@/types/booking';
 
 const MyBookings = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
@@ -170,6 +170,7 @@ const MyBookings = () => {
     const bookingDate = parseISO(`${booking.booking_date}T${booking.start_time}`);
     const isPast = bookingDate < new Date();
     const canCancel = !isPast && booking.status !== 'cancelled' && booking.status !== 'completed';
+    const canPay = booking.payment_status === 'pending' && !isPast && booking.status !== 'cancelled';
     const court = booking.court || {};
     
     return (
@@ -210,6 +211,17 @@ const MyBookings = () => {
                   </Button>
                 )}
                 
+                {canPay && (
+                  <Button 
+                    size="sm" 
+                    onClick={() => handlePayment(booking)}
+                    className="text-xs flex items-center"
+                  >
+                    <CreditCard className="h-3 w-3 mr-1" />
+                    Pagar
+                  </Button>
+                )}
+                
                 {canCancel && (
                   <Button 
                     size="sm" 
@@ -226,6 +238,34 @@ const MyBookings = () => {
         </CardContent>
       </Card>
     );
+  };
+
+  // Add the payment handler function
+  const handlePayment = async (booking: Booking) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-payment', {
+        body: { booking_id: booking.id }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.payment_url) {
+        window.location.href = data.payment_url;
+      } else {
+        toast({
+          title: "Erro ao gerar pagamento",
+          description: "Não foi possível gerar o link de pagamento. Tente novamente.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao processar pagamento:', error);
+      toast({
+        title: "Erro no pagamento",
+        description: "Ocorreu um erro ao processar o pagamento. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
