@@ -62,7 +62,7 @@ export const PaymentFilters: React.FC<PaymentFiltersProps> = ({ filters, onChang
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os status</SelectItem>
+              <SelectItem value="all">Todos os status</SelectItem>
               <SelectItem value="pending">Pendente</SelectItem>
               <SelectItem value="paid">Pago</SelectItem>
               <SelectItem value="rejected">Recusado</SelectItem>
@@ -83,7 +83,7 @@ export const PaymentFilters: React.FC<PaymentFiltersProps> = ({ filters, onChang
               <SelectValue placeholder="Todos os métodos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os métodos</SelectItem>
+              <SelectItem value="all">Todos os métodos</SelectItem>
               <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
               <SelectItem value="debit_card">Cartão de Débito</SelectItem>
               <SelectItem value="boleto">Boleto</SelectItem>

@@ -35,3 +35,9 @@ export interface PaymentStatistics {
   pendingAmount: number;
   cancelledAmount: number;
 }
+
+// Interface for test connection result in MercadoPago integration
+export interface TestConnectionResult {
+  success: boolean;
+  message: string;
+}

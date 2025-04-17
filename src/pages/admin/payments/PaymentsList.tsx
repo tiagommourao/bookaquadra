@@ -14,8 +14,8 @@ const PaymentsList: React.FC = () => {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState({
-    status: '',
-    paymentMethod: '',
+    status: 'all',  // Changed from empty string to 'all'
+    paymentMethod: 'all',  // Changed from empty string to 'all'
     startDate: '',
     endDate: '',
     minAmount: '',

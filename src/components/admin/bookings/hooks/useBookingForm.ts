@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format, differenceInHours, eachWeekOfInterval, startOfDay, endOfDay, addWeeks, addDays, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Booking } from '@/types';
-import { bookingSchema, BookingFormValues } from '../booking-schema';
+import { bookingFormSchema, BookingFormValues } from '../booking-schema';
 import { toast } from '@/hooks/use-toast';
 import { useBookingFormValues } from './useBookingFormValues';
 import { useBookingAvailability } from './useBookingAvailability';
@@ -20,7 +20,7 @@ export function useBookingForm({ booking, onClose }: {
   
   // Initialize form with default values
   const form = useForm<BookingFormValues>({
-    resolver: zodResolver(bookingSchema),
+    resolver: zodResolver(bookingFormSchema),
     defaultValues: {
       user_id: '',
       court_id: '',

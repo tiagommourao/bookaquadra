@@ -26,11 +26,11 @@ export const usePaymentsData = (filters: PaymentFilters) => {
       .order('created_at', { ascending: false });
 
     // Aplicar filtros
-    if (filters.status) {
+    if (filters.status && filters.status !== 'all') {
       query = query.eq('status', filters.status);
     }
 
-    if (filters.paymentMethod) {
+    if (filters.paymentMethod && filters.paymentMethod !== 'all') {
       query = query.eq('payment_method', filters.paymentMethod);
     }
 
