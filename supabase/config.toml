@@ -2,7 +2,7 @@
 project_id = "yvgdtiuhrticewtlutio"
 
 [functions.test-mercadopago]
-verify_jwt = true
+verify_jwt = false
 
 [functions.mercadopago-webhook]
 verify_jwt = false

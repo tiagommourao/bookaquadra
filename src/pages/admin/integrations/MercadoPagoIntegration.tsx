@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 
 const formSchema = z.object({
   public_key: z.string().min(1, {
@@ -38,6 +39,9 @@ const formSchema = z.object({
     message: "Ambiente é obrigatório.",
   }),
   webhook_url: z.string().optional(),
+  status: z.enum(["active", "inactive"], {
+    message: "Status é obrigatório.",
+  }),
 });
 
 const MercadoPagoIntegration: React.FC = () => {
@@ -52,6 +56,7 @@ const MercadoPagoIntegration: React.FC = () => {
       access_token: "",
       environment: "sandbox",
       webhook_url: "",
+      status: "inactive",
     },
   });
 
@@ -60,8 +65,10 @@ const MercadoPagoIntegration: React.FC = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('integrations_mercadopago')
-        .select('id, public_key, access_token, environment, webhook_url')
-        .single();
+        .select('id, public_key, access_token, environment, webhook_url, status')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         console.error('Erro ao buscar integração:', error);
@@ -84,31 +91,54 @@ const MercadoPagoIntegration: React.FC = () => {
           : "sandbox"
       );
       form.setValue("webhook_url", integrationData.webhook_url || "");
+      form.setValue("status", integrationData.status || "inactive");
     }
   }, [integrationData, form]);
 
   const updateIntegration = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
+      console.log("Salvando integração:", values);
+      
       if (!integrationId) {
-        throw new Error("ID de integração não encontrado.");
+        // Se não existe um ID, criar uma nova integração
+        const { data, error } = await supabase
+          .from('integrations_mercadopago')
+          .insert({
+            public_key: values.public_key,
+            access_token: values.access_token,
+            environment: values.environment,
+            webhook_url: values.webhook_url,
+            status: values.status,
+            name: 'Principal',
+          })
+          .select();
+
+        if (error) {
+          console.error('Erro ao criar integração:', error);
+          throw new Error("Erro ao criar a integração");
+        }
+
+        return { success: true, message: "Integração criada com sucesso!", data };
+      } else {
+        // Atualizar integração existente
+        const { error } = await supabase
+          .from('integrations_mercadopago')
+          .update({
+            public_key: values.public_key,
+            access_token: values.access_token,
+            environment: values.environment,
+            webhook_url: values.webhook_url,
+            status: values.status,
+          })
+          .eq('id', integrationId);
+
+        if (error) {
+          console.error('Erro ao atualizar integração:', error);
+          throw new Error("Erro ao atualizar a integração");
+        }
+
+        return { success: true, message: "Integração atualizada com sucesso!" };
       }
-
-      const { error } = await supabase
-        .from('integrations_mercadopago')
-        .update({
-          public_key: values.public_key,
-          access_token: values.access_token,
-          environment: values.environment,
-          webhook_url: values.webhook_url,
-        })
-        .eq('id', integrationId);
-
-      if (error) {
-        console.error('Erro ao atualizar integração:', error);
-        throw new Error("Erro ao atualizar a integração");
-      }
-
-      return { success: true, message: "Integração atualizada com sucesso!" };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mercadopago-integration'] });
@@ -128,13 +158,25 @@ const MercadoPagoIntegration: React.FC = () => {
 
   const testConnection = useMutation({
     mutationFn: async () => {
-      const { data: responseData, error } = await supabase
-        .rpc('test_mercadopago_integration', { integration_id: integrationId });
+      if (!integrationId) {
+        throw new Error("É necessário salvar a integração antes de testar a conexão.");
+      }
 
-      if (error) throw error;
+      console.log("Testando conexão para integrationId:", integrationId);
+      
+      const { data, error } = await supabase.functions.invoke('test-mercadopago', {
+        body: { integration_id: integrationId }
+      });
+
+      if (error) {
+        console.error("Erro na chamada da função test-mercadopago:", error);
+        throw error;
+      }
+      
+      console.log("Resposta da função test-mercadopago:", data);
       
       // Cast the response to the correct type
-      return responseData as unknown as TestConnectionResult;
+      return data as unknown as TestConnectionResult;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['mercadopago-integration'] });
@@ -142,7 +184,7 @@ const MercadoPagoIntegration: React.FC = () => {
       if (data.success) {
         toast({
           title: "Sucesso",
-          description: "Conexão bem-sucedida com MercadoPago!",
+          description: data.message || "Conexão bem-sucedida com MercadoPago!",
           variant: "default",
         });
       } else {
@@ -157,7 +199,7 @@ const MercadoPagoIntegration: React.FC = () => {
       console.error('Erro ao testar conexão:', error);
       toast({
         title: "Erro",
-        description: "Erro ao testar conexão com MercadoPago",
+        description: "Erro ao testar conexão com MercadoPago. Verifique os dados informados.",
         variant: "destructive",
       });
     }
@@ -173,6 +215,19 @@ const MercadoPagoIntegration: React.FC = () => {
     // Usamos o endpoint em Supabase Functions
     const webhookUrl = `${baseUrl}/api/mercadopago-webhook`;
     form.setValue("webhook_url", webhookUrl);
+  };
+
+  const handleCancel = () => {
+    // Recarregar os dados originais
+    if (integrationData) {
+      form.reset({
+        public_key: integrationData.public_key || "",
+        access_token: integrationData.access_token || "",
+        environment: integrationData.environment || "sandbox",
+        webhook_url: integrationData.webhook_url || "",
+        status: integrationData.status || "inactive",
+      });
+    }
   };
 
   if (isIntegrationLoading) {
@@ -226,6 +281,33 @@ const MercadoPagoIntegration: React.FC = () => {
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between space-y-0 rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base font-medium">
+                          Ativar integração
+                        </FormLabel>
+                        <FormDescription>
+                          {field.value === "active" 
+                            ? "A integração está ativa e processando pagamentos" 
+                            : "Ative para começar a receber pagamentos via MercadoPago"}
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value === "active"}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked ? "active" : "inactive");
+                          }}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
                 <FormField
                   control={form.control}
                   name="environment"
@@ -331,12 +413,18 @@ const MercadoPagoIntegration: React.FC = () => {
                 />
                 
                 <div className="flex items-center justify-end space-x-2">
-                  <Button variant="outline" type="button">Cancelar</Button>
+                  <Button 
+                    variant="outline" 
+                    type="button"
+                    onClick={handleCancel}
+                  >
+                    Cancelar
+                  </Button>
                   <Button type="submit" disabled={updateIntegration.isPending}>
                     {updateIntegration.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Atualizando...
+                        Salvando...
                       </>
                     ) : (
                       "Salvar"
@@ -349,7 +437,7 @@ const MercadoPagoIntegration: React.FC = () => {
         </Card>
 
         <div className="mt-6">
-          <Button onClick={() => testConnection.mutate()} disabled={testConnection.isPending}>
+          <Button onClick={() => testConnection.mutate()} disabled={testConnection.isPending || !integrationId}>
             {testConnection.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
