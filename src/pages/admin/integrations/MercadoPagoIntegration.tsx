@@ -13,20 +13,32 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 type MercadoPagoIntegrationResult = {
   success: boolean;
   message: string;
 };
 
+type MercadoPagoIntegration = {
+  id?: string;
+  name: string;
+  environment: string;
+  client_id?: string;
+  client_secret?: string;
+  access_token?: string;
+  public_key?: string;
+  created_by?: string;
+};
+
 const MercadoPagoIntegration: React.FC = () => {
-  const [integration, setIntegration] = useState<Partial<Tables['integrations_mercadopago']['Row']>>({
+  const [integration, setIntegration] = useState<MercadoPagoIntegration>({
     name: 'Principal',
     environment: 'sandbox',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [lastTestResult, setLastTestResult] = useState<MercadoPagoIntegrationResult | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchLatestIntegration();
@@ -45,7 +57,7 @@ const MercadoPagoIntegration: React.FC = () => {
     }
   };
 
-  const handleInputChange = (key: keyof Tables['integrations_mercadopago']['Row'], value: string) => {
+  const handleInputChange = (key: keyof MercadoPagoIntegration, value: string) => {
     setIntegration(prev => ({ ...prev, [key]: value }));
   };
 
@@ -56,7 +68,7 @@ const MercadoPagoIntegration: React.FC = () => {
         .from('integrations_mercadopago')
         .upsert({
           ...integration,
-          created_by: supabase.auth.user()?.id,
+          created_by: user?.id,
         })
         .select()
         .single();
@@ -183,7 +195,7 @@ const MercadoPagoIntegration: React.FC = () => {
             <Button 
               variant="outline" 
               onClick={handleTestConnection} 
-              disabled={isLoading}
+              disabled={isLoading || !integration.id}
             >
               {isLoading ? 'Testando...' : 'Testar Conexão'}
             </Button>
