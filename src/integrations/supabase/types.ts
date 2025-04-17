@@ -305,6 +305,98 @@ export type Database = {
         }
         Relationships: []
       }
+      integrations_mercadopago: {
+        Row: {
+          access_token: string | null
+          client_id: string | null
+          client_secret: string | null
+          created_at: string
+          created_by: string | null
+          environment: string
+          id: string
+          last_test_success: boolean | null
+          last_tested_at: string | null
+          name: string
+          public_key: string | null
+          status: string
+          test_result_message: string | null
+          updated_at: string
+          updated_by: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          last_test_success?: boolean | null
+          last_tested_at?: string | null
+          name?: string
+          public_key?: string | null
+          status?: string
+          test_result_message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          last_test_success?: boolean | null
+          last_tested_at?: string | null
+          name?: string
+          public_key?: string | null
+          status?: string
+          test_result_message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      integrations_mercadopago_logs: {
+        Row: {
+          action: string
+          created_at: string
+          created_by: string | null
+          details: Json | null
+          id: string
+          integration_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          created_by?: string | null
+          details?: Json | null
+          id?: string
+          integration_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          created_by?: string | null
+          details?: Json | null
+          id?: string
+          integration_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_mercadopago_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations_mercadopago"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       point_transactions: {
         Row: {
           created_at: string
@@ -986,6 +1078,10 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      test_mercadopago_integration: {
+        Args: { integration_id: string }
+        Returns: Json
       }
     }
     Enums: {

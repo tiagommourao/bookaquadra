@@ -37,10 +37,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Reservas', path: '/admin/reservas', icon: <Clock className="h-5 w-5" /> },
     { name: 'Usuários', path: '/admin/usuarios', icon: <UsersRound className="h-5 w-5" /> },
     { name: 'Pagamentos', path: '/admin/pagamentos', icon: <CreditCard className="h-5 w-5" /> },
+    { 
+      name: 'Integrações', 
+      path: '/admin/integracoes', 
+      icon: <ClipboardList className="h-5 w-5" />,
+      subItems: [
+        { name: 'Mercado Pago', path: '/admin/integracoes/mercadopago' }
+      ]
+    },
     { name: 'Personalização', path: '/admin/personalizacao', icon: <Settings className="h-5 w-5" /> },
-    { name: 'Integrações', path: '/admin/integracoes', icon: <ClipboardList className="h-5 w-5" /> },
     { name: 'Relatórios', path: '/admin/relatorios', icon: <PieChart className="h-5 w-5" /> },
   ];
+
+  const isActiveOrSubActive = (item: any) => {
+    if (location.pathname === item.path) return true;
+    if (item.subItems && item.subItems.some((sub: any) => location.pathname === sub.path)) return true;
+    return false;
+  };
 
   const handleLogout = async () => {
     try {
@@ -83,7 +96,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <nav className="flex-1 overflow-y-auto pt-5 pb-4">
             <ul className="space-y-1 px-2">
               {navItems.map((item) => {
-                const isActive = location.pathname === item.path;
+                const isActive = isActiveOrSubActive(item);
+                
                 return (
                   <li key={item.path}>
                     <Link
@@ -96,6 +110,27 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       <span className="mr-3">{item.icon}</span>
                       {!sidebarCollapsed && <span>{item.name}</span>}
                     </Link>
+                    
+                    {/* Submenus */}
+                    {!sidebarCollapsed && item.subItems && (
+                      <ul className="ml-10 mt-1 space-y-1">
+                        {item.subItems.map((subItem) => (
+                          <li key={subItem.path}>
+                            <Link
+                              to={subItem.path}
+                              className={cn(
+                                "flex items-center px-3 py-2 text-xs font-medium rounded-md",
+                                location.pathname === subItem.path 
+                                  ? "bg-accent text-primary" 
+                                  : "text-gray-600 hover:bg-gray-100"
+                              )}
+                            >
+                              {subItem.name}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 );
               })}

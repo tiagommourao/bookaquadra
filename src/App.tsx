@@ -24,6 +24,7 @@ import CourtsList from "./pages/admin/courts/CourtsList";
 import SchedulesList from "./pages/admin/schedules/SchedulesList";
 import BookingsList from "./pages/admin/bookings/BookingsList";
 import UsersList from "./pages/admin/users/UsersList";
+import MercadoPagoIntegration from "./pages/admin/integrations/MercadoPagoIntegration";
 
 import NotFound from "./pages/NotFound";
 
@@ -149,6 +150,13 @@ const App = () => (
               <Route path="/admin/usuarios" element={
                 <AdminProtectedRoute>
                   <UsersList />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Mercado Pago Integration */}
+              <Route path="/admin/integracoes/mercadopago" element={
+                <AdminProtectedRoute>
+                  <MercadoPagoIntegration />
                 </AdminProtectedRoute>
               } />
               
