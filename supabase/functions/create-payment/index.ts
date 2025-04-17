@@ -111,7 +111,7 @@ serve(async (req) => {
       console.error("Integração não configurada ou inativa");
       return new Response(
         JSON.stringify({ 
-          error: "Integração com MercadoPago não configurada ou inativa", 
+          error: "Integração com MercadoPago não configurada ou ativada", 
           setup_required: true 
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -184,6 +184,14 @@ serve(async (req) => {
           .eq("status", "pending");
       }
       
+      // Verificar quais são os valores válidos de status na tabela payments
+      const { data: allowedStatusValues, error: checkError } = await supabase
+        .from('pg_enum')
+        .select('*')
+        .eq('enumlabel', 'payment_status');
+      
+      console.log("Valores permitidos para status:", allowedStatusValues);
+
       // Registrar o pagamento no banco de dados
       const { data: payment, error: paymentError } = await supabase
         .from("payments")
@@ -191,7 +199,7 @@ serve(async (req) => {
           booking_id: booking.id,
           user_id: booking.user_id,
           mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
-          status: "pending",
+          status: "pending", // Usar um status válido conforme definido na enum
           amount: booking.amount,
           payment_method: null, // Será atualizado pelo webhook
           expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
@@ -202,8 +210,21 @@ serve(async (req) => {
       
       if (paymentError) {
         console.error("Erro ao registrar pagamento:", paymentError);
+        
+        // Se houver erro, vamos tentar descobrir qual é o problema com os valores de status permitidos
+        const { data: enumValues } = await supabase
+          .from('pg_type')
+          .select('typname')
+          .eq('typname', 'payment_status')
+          .limit(1);
+        
+        console.log("Tipo de dados para payment_status:", enumValues);
+        
         return new Response(
-          JSON.stringify({ error: "Erro ao registrar pagamento" }),
+          JSON.stringify({ 
+            error: "Erro ao registrar pagamento", 
+            details: paymentError.message 
+          }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -1,11 +1,14 @@
 
+# This file defines available functions and their permissions for your Supabase Edge Functions.
+# Learn more: https://supabase.com/docs/guides/functions/config
+
 project_id = "yvgdtiuhrticewtlutio"
 
-[functions.test-mercadopago]
+[functions.create-payment]
 verify_jwt = false
 
 [functions.mercadopago-webhook]
 verify_jwt = false
 
-[functions.create-payment]
+[functions.test-mercadopago]
 verify_jwt = true
