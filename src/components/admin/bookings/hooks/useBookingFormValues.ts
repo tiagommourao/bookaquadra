@@ -15,11 +15,11 @@ export function useBookingFormValues({
   // Set form values when editing a booking
   useEffect(() => {
     if (booking && form) {
-      // Converte a string da data para objeto Date, preservando o dia exato
+      // Convert date string to Date object, preserving the exact day
       let bookingDate: Date;
       
       if (typeof booking.booking_date === 'string') {
-        // Garante que a data seja processada corretamente sem ajuste de timezone
+        // Ensure the date is processed correctly without timezone adjustment
         bookingDate = parseISO(booking.booking_date);
       } else {
         bookingDate = booking.booking_date;
@@ -29,9 +29,9 @@ export function useBookingFormValues({
         user_id: booking.user_id,
         court_id: booking.court_id,
         booking_date: bookingDate,
-        // Mantém os horários de início e fim exatamente como foram salvos
-        start_time: booking.start_time,
-        end_time: booking.end_time,
+        // Make sure time values match the HH:MM format required by the form
+        start_time: booking.start_time.substring(0, 5), // Ensure format is HH:MM
+        end_time: booking.end_time.substring(0, 5),     // Ensure format is HH:MM
         amount: Number(booking.amount),
         status: booking.status,
         payment_status: booking.payment_status,
@@ -39,12 +39,12 @@ export function useBookingFormValues({
         is_monthly: booking.is_monthly || false,
       };
       
-      // Trata a data de fim da assinatura se existir
+      // Handle subscription end date if it exists
       if (booking.subscription_end_date) {
         let subscriptionEndDate: Date;
         
         if (typeof booking.subscription_end_date === 'string') {
-          // Converte a string para Date sem ajustes de timezone
+          // Convert string to Date without timezone adjustments
           subscriptionEndDate = parseISO(booking.subscription_end_date);
         } else {
           subscriptionEndDate = booking.subscription_end_date;
@@ -53,6 +53,7 @@ export function useBookingFormValues({
         formValues.subscription_end_date = subscriptionEndDate;
       }
       
+      console.log('Setting form values for booking edit:', formValues);
       form.reset(formValues);
     } else if (!booking) {
       form.reset({

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   onClose
 }) => {
   const { users, courts } = useBookingData();
+  
+  // Log booking data when opening for editing
+  useEffect(() => {
+    if (booking && isOpen) {
+      console.log('Opening booking for edit:', {
+        ...booking,
+        start_time_value: booking.start_time,
+        end_time_value: booking.end_time,
+        start_time_type: typeof booking.start_time,
+        end_time_type: typeof booking.end_time
+      });
+    }
+  }, [booking, isOpen]);
   
   const {
     form,

@@ -25,6 +25,17 @@ export const WeekCalendarView = ({
     }
     return booking.booking_date;
   };
+  
+  // Add debug handler for editing bookings
+  const onEditBooking = (booking: Booking, e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('Editing booking with times:', {
+      start_time: booking.start_time,
+      end_time: booking.end_time,
+      booking_date: booking.booking_date
+    });
+    handleEditBooking(booking);
+  };
 
   return (
     <div className="mb-6 overflow-x-auto">
@@ -84,10 +95,7 @@ export const WeekCalendarView = ({
                             booking.status === 'pending' ? 'bg-yellow-100' :
                             booking.status === 'cancelled' ? 'bg-red-100' : 'bg-gray-100'
                           }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditBooking(booking);
-                          }}
+                          onClick={(e) => onEditBooking(booking, e)}
                         >
                           <div className="font-medium truncate">
                             {booking.start_time.slice(0, 5)}-{booking.end_time.slice(0, 5)}
