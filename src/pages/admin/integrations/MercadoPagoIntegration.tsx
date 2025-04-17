@@ -1,214 +1,294 @@
 
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { AdminLayout } from '@/components/layouts/AdminLayout';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { toast } from '@/components/ui/sonner';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/components/ui/use-toast';
+import { AlertCircle, CheckCircle, Clock, History, RefreshCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { MercadoPagoIntegrationForm } from '@/components/admin/integrations/MercadoPagoIntegrationForm';
+import { MercadoPagoLogs } from '@/components/admin/integrations/MercadoPagoLogs';
+import { MercadoPagoDocumentation } from '@/components/admin/integrations/MercadoPagoDocumentation';
 
-type MercadoPagoIntegrationResult = {
-  success: boolean;
-  message: string;
-};
-
-type MercadoPagoIntegration = {
-  id?: string;
+// Tipos para integração com o Mercado Pago
+interface MercadoPagoIntegration {
+  id: string;
   name: string;
-  environment: string;
-  client_id?: string;
-  client_secret?: string;
-  access_token?: string;
-  public_key?: string;
-  created_by?: string;
-};
+  environment: 'sandbox' | 'production';
+  client_id: string | null;
+  client_secret: string | null;
+  access_token: string | null;
+  public_key: string | null;
+  webhook_url: string | null;
+  status: 'active' | 'inactive';
+  last_tested_at: string | null;
+  last_test_success: boolean | null;
+  test_result_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
-const MercadoPagoIntegration: React.FC = () => {
-  const [integration, setIntegration] = useState<MercadoPagoIntegration>({
-    name: 'Principal',
-    environment: 'sandbox',
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastTestResult, setLastTestResult] = useState<MercadoPagoIntegrationResult | null>(null);
-  const { user } = useAuth();
+const MercadoPagoIntegration = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('settings');
 
-  useEffect(() => {
-    fetchLatestIntegration();
-  }, []);
-
-  const fetchLatestIntegration = async () => {
-    const { data, error } = await supabase
-      .from('integrations_mercadopago')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (data) {
-      setIntegration(data);
-    }
-  };
-
-  const handleInputChange = (key: keyof MercadoPagoIntegration, value: string) => {
-    setIntegration(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handleSaveIntegration = async () => {
-    setIsLoading(true);
-    try {
+  // Buscar integrações existentes
+  const { data: integration, isLoading, error } = useQuery({
+    queryKey: ['mercadopago-integration'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('integrations_mercadopago')
-        .upsert({
-          ...integration,
-          created_by: user?.id,
-        })
-        .select()
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
 
-      if (error) throw error;
-      
-      toast.success('Integração salva com sucesso');
-      setIntegration(data);
-    } catch (error) {
-      toast.error('Erro ao salvar integração');
-      console.error(error);
-    }
-    setIsLoading(false);
-  };
-
-  const handleTestConnection = async () => {
-    setIsLoading(true);
-    try {
-      // Substituir por chamada real de teste de conexão
-      const { data, error } = await supabase.rpc('test_mercadopago_integration', { 
-        integration_id: integration.id 
-      });
-
-      if (error) throw error;
-
-      const result = data as MercadoPagoIntegrationResult;
-      setLastTestResult(result);
-
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
+      if (error && error.code !== 'PGRST116') {
+        throw error;
       }
-    } catch (error) {
-      toast.error('Erro ao testar conexão');
-      console.error(error);
+
+      return data as MercadoPagoIntegration | null;
     }
-    setIsLoading(false);
+  });
+
+  // Mutação para testar a conexão
+  const testConnectionMutation = useMutation({
+    mutationFn: async (integrationId: string) => {
+      const { data, error } = await supabase
+        .rpc('test_mercadopago_integration', { integration_id: integrationId });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['mercadopago-integration'] });
+      
+      if (data.success) {
+        toast({
+          title: "Conexão testada com sucesso",
+          description: "As credenciais do Mercado Pago estão funcionando corretamente.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Falha no teste de conexão",
+          description: data.message || "Verifique suas credenciais e tente novamente.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao testar conexão",
+        description: error.message || "Ocorreu um erro ao testar a conexão com o Mercado Pago.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Função para testar a conexão
+  const handleTestConnection = () => {
+    if (integration?.id) {
+      testConnectionMutation.mutate(integration.id);
+    }
   };
+
+  // Função para formatar data
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return 'Nunca';
+    return format(new Date(dateStr), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR });
+  };
+
+  // Renderizar status da integração
+  const renderStatus = () => {
+    if (!integration) {
+      return (
+        <Badge variant="outline" className="bg-gray-100 text-gray-500">
+          Não configurada
+        </Badge>
+      );
+    }
+
+    if (integration.status === 'active' && integration.last_test_success) {
+      return (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <CheckCircle className="w-3.5 h-3.5 mr-1" /> Ativa
+        </Badge>
+      );
+    }
+
+    if (integration.status === 'inactive' || !integration.last_test_success) {
+      return (
+        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+          <AlertCircle className="w-3.5 h-3.5 mr-1" /> Inativa
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="outline" className="bg-gray-100 text-gray-500">
+        <Clock className="w-3.5 h-3.5 mr-1" /> Pendente
+      </Badge>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="p-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center h-64">
+                <p>Carregando configurações do Mercado Pago...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="p-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center h-64">
+                <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+                <p className="text-lg font-medium">Erro ao carregar dados</p>
+                <p className="text-sm text-gray-500">
+                  {(error as any).message || "Ocorreu um erro ao carregar as configurações do Mercado Pago."}
+                </p>
+                <Button 
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ['mercadopago-integration'] })}
+                  variant="outline" 
+                  className="mt-4"
+                >
+                  <RefreshCcw className="w-4 h-4 mr-2" /> Tentar novamente
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Integração Mercado Pago</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Nome da Integração</Label>
-              <Input 
-                value={integration.name || ''} 
-                onChange={(e) => handleInputChange('name', e.target.value)} 
-                placeholder="Nome da integração"
-              />
-            </div>
-            <div>
-              <Label>Ambiente</Label>
-              <Select 
-                value={integration.environment || 'sandbox'}
-                onValueChange={(value) => handleInputChange('environment', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o ambiente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sandbox">Sandbox</SelectItem>
-                  <SelectItem value="production">Produção</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Campos de credenciais sensíveis */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Client ID</Label>
-              <Input 
-                type="password" 
-                value={integration.client_id || ''} 
-                onChange={(e) => handleInputChange('client_id', e.target.value)} 
-                placeholder="Client ID"
-              />
-            </div>
-            <div>
-              <Label>Client Secret</Label>
-              <Input 
-                type="password" 
-                value={integration.client_secret || ''} 
-                onChange={(e) => handleInputChange('client_secret', e.target.value)} 
-                placeholder="Client Secret"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Access Token</Label>
-              <Input 
-                type="password" 
-                value={integration.access_token || ''} 
-                onChange={(e) => handleInputChange('access_token', e.target.value)} 
-                placeholder="Access Token"
-              />
-            </div>
-            <div>
-              <Label>Public Key</Label>
-              <Input 
-                type="password" 
-                value={integration.public_key || ''} 
-                onChange={(e) => handleInputChange('public_key', e.target.value)} 
-                placeholder="Public Key"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between">
-            <Button 
-              onClick={handleSaveIntegration} 
-              disabled={isLoading}
-            >
-              {isLoading ? 'Salvando...' : 'Salvar Integração'}
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleTestConnection} 
-              disabled={isLoading || !integration.id}
-            >
-              {isLoading ? 'Testando...' : 'Testar Conexão'}
-            </Button>
-          </div>
-
-          {lastTestResult && (
-            <div className={`p-4 rounded ${lastTestResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
-              <p>{lastTestResult.message}</p>
-            </div>
-          )}
+    <AdminLayout>
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold mb-1">Integração Mercado Pago</h1>
+          <p className="text-gray-500">
+            Configure e gerencie as credenciais para integração com o Mercado Pago
+          </p>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Status da integração */}
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Status da integração</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Estado atual:</p>
+                {renderStatus()}
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Ambiente:</p>
+                <Badge variant={integration?.environment === 'production' ? 'default' : 'outline'}>
+                  {integration?.environment === 'production' ? 'Produção' : 'Sandbox'}
+                </Badge>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Último teste:</p>
+                <span className="text-sm font-medium flex items-center">
+                  {integration?.last_tested_at ? (
+                    <>
+                      {integration.last_test_success ? (
+                        <CheckCircle className="w-4 h-4 text-green-600 mr-1" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-500 mr-1" />
+                      )}
+                      {formatDate(integration.last_tested_at)}
+                    </>
+                  ) : (
+                    'Nunca testado'
+                  )}
+                </span>
+              </div>
+              
+              {integration?.id && (
+                <div className="ml-auto">
+                  <Button 
+                    onClick={handleTestConnection} 
+                    variant="outline"
+                    disabled={testConnectionMutation.isPending}
+                  >
+                    {testConnectionMutation.isPending ? (
+                      <>Testando...</>
+                    ) : (
+                      <>
+                        <RefreshCcw className="w-4 h-4 mr-2" /> Testar conexão
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            {integration?.test_result_message && (
+              <div className={`mt-4 p-3 rounded-md text-sm ${
+                integration.last_test_success 
+                  ? 'bg-green-50 text-green-700 border border-green-100' 
+                  : 'bg-red-50 text-red-700 border border-red-100'
+              }`}>
+                <p className="font-medium">
+                  {integration.last_test_success ? 'Sucesso:' : 'Erro:'} {integration.test_result_message}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="mb-2">
+            <TabsTrigger value="settings">Configurações</TabsTrigger>
+            <TabsTrigger value="logs">
+              <History className="w-4 h-4 mr-1" /> Histórico de alterações
+            </TabsTrigger>
+            <TabsTrigger value="docs">
+              Documentação
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="settings" className="space-y-4 mt-2">
+            <MercadoPagoIntegrationForm 
+              existingIntegration={integration} 
+            />
+          </TabsContent>
+
+          <TabsContent value="logs" className="space-y-4 mt-2">
+            <MercadoPagoLogs integrationId={integration?.id} />
+          </TabsContent>
+
+          <TabsContent value="docs" className="space-y-4 mt-2">
+            <MercadoPagoDocumentation />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </AdminLayout>
   );
 };
 
