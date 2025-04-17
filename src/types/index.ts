@@ -1,4 +1,3 @@
-
 // Core type definitions for BookaQuadra application
 
 // User role types
@@ -95,7 +94,58 @@ export interface ScheduleBlock {
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 // Payment status
-export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
+export type PaymentStatus = 
+  | 'pending' 
+  | 'paid'
+  | 'rejected'  
+  | 'expired'
+  | 'refunded'
+  | 'cancelled';
+
+export type PaymentMethod =
+  | 'credit_card'
+  | 'debit_card'
+  | 'boleto'
+  | 'pix'
+  | 'bank_transfer'
+  | 'cash'
+  | 'other';
+
+// Payment interface
+export interface Payment {
+  id: string;
+  booking_id?: string | null;
+  user_id?: string | null;
+  mercadopago_payment_id?: string | null;
+  status: PaymentStatus;
+  amount: number;
+  payment_method?: PaymentMethod | null;
+  expiration_date?: string | null;
+  created_at: string;
+  updated_at: string;
+  raw_response?: Record<string, any> | null;
+  admin_modified_by?: string | null;
+  admin_modification_reason?: string | null;
+}
+
+// Payment status log
+export type PaymentStatusLog = {
+  id: string;
+  payment_id: string;
+  previous_status: PaymentStatus;
+  new_status: PaymentStatus;
+  created_by?: string | null;
+  reason?: string | null;
+  created_at: string;
+};
+
+// Payment statistics
+export type PaymentStatistics = {
+  totalPayments: number;
+  paidAmount: number;
+  pendingAmount: number;
+  cancelledAmount: number;
+};
 
 // Booking interface
 export interface Booking {
