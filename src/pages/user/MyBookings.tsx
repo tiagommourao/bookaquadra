@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserLayout } from '@/components/layouts/UserLayout';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Calendar, Clock, MapPin, AlertCircle, CheckCircle2, Calendar as Calenda
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useUserBookings, useCancelBooking } from '@/hooks/useBookings';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Dialog,
   DialogContent,
