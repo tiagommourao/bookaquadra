@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -44,12 +43,14 @@ const formSchema = z.object({
   }),
 });
 
+type FormValues = z.infer<typeof formSchema>;
+
 const MercadoPagoIntegration: React.FC = () => {
   const [integrationId, setIntegrationId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       public_key: "",
@@ -84,23 +85,22 @@ const MercadoPagoIntegration: React.FC = () => {
       setIntegrationId(integrationData.id);
       form.setValue("public_key", integrationData.public_key || "");
       form.setValue("access_token", integrationData.access_token || "");
-      // Garantir que o valor seja do tipo esperado pelo enum
-      form.setValue("environment", 
-        (integrationData.environment === "sandbox" || integrationData.environment === "production") 
-          ? integrationData.environment 
-          : "sandbox"
-      );
+      
+      const environmentValue = integrationData.environment === "production" ? "production" : "sandbox";
+      form.setValue("environment", environmentValue);
+      
       form.setValue("webhook_url", integrationData.webhook_url || "");
-      form.setValue("status", integrationData.status || "inactive");
+      
+      const statusValue = integrationData.status === "active" ? "active" : "inactive";
+      form.setValue("status", statusValue);
     }
   }, [integrationData, form]);
 
   const updateIntegration = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>) => {
+    mutationFn: async (values: FormValues) => {
       console.log("Salvando integração:", values);
       
       if (!integrationId) {
-        // Se não existe um ID, criar uma nova integração
         const { data, error } = await supabase
           .from('integrations_mercadopago')
           .insert({
@@ -120,7 +120,6 @@ const MercadoPagoIntegration: React.FC = () => {
 
         return { success: true, message: "Integração criada com sucesso!", data };
       } else {
-        // Atualizar integração existente
         const { error } = await supabase
           .from('integrations_mercadopago')
           .update({
@@ -175,7 +174,6 @@ const MercadoPagoIntegration: React.FC = () => {
       
       console.log("Resposta da função test-mercadopago:", data);
       
-      // Cast the response to the correct type
       return data as unknown as TestConnectionResult;
     },
     onSuccess: (data) => {
@@ -205,27 +203,27 @@ const MercadoPagoIntegration: React.FC = () => {
     }
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = (values: FormValues) => {
     updateIntegration.mutate(values);
   }
 
   const generateWebhookUrl = () => {
-    // Gerar URL para o webhook do Mercado Pago
     const baseUrl = window.location.origin;
-    // Usamos o endpoint em Supabase Functions
     const webhookUrl = `${baseUrl}/api/mercadopago-webhook`;
     form.setValue("webhook_url", webhookUrl);
   };
 
   const handleCancel = () => {
-    // Recarregar os dados originais
     if (integrationData) {
+      const environmentValue = integrationData.environment === "production" ? "production" : "sandbox";
+      const statusValue = integrationData.status === "active" ? "active" : "inactive";
+      
       form.reset({
         public_key: integrationData.public_key || "",
         access_token: integrationData.access_token || "",
-        environment: integrationData.environment || "sandbox",
+        environment: environmentValue,
         webhook_url: integrationData.webhook_url || "",
-        status: integrationData.status || "inactive",
+        status: statusValue,
       });
     }
   };
@@ -404,8 +402,8 @@ const MercadoPagoIntegration: React.FC = () => {
                         </Button>
                       </div>
                       <FormDescription>
-                        Configure esta URL no painel do MercadoPago para receber notificações de pagamentos.
-                        Vá para Configurações {">"} Webhooks no painel do MercadoPago e adicione esta URL.
+                        Configure esta URL no painel do Mercado Pago para receber notificações de pagamentos.
+                        Vá para Configurações {">"} Webhooks no painel do Mercado Pago e adicione esta URL.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
