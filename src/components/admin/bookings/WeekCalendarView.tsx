@@ -73,10 +73,12 @@ export const WeekCalendarView = ({
                   start: dateRange.start,
                   end: dateRange.end
                 }).map((day) => {
+                  // Filtra reservas canceladas na visualização de semana
                   const bookingsAtHour = allBookings?.filter(b => {
                     const bookingDate = getBookingDate(b);
                     return isSameDay(bookingDate, day) && 
-                      b.start_time.startsWith(hourFormatted.slice(0, 2));
+                      b.start_time.startsWith(hourFormatted.slice(0, 2)) &&
+                      b.status !== 'cancelled'; // Não exibe reservas canceladas
                   }) || [];
                   
                   return (

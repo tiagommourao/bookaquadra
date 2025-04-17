@@ -1,4 +1,3 @@
-
 import { format, differenceInHours, isBefore, addHours, addDays, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -57,12 +56,13 @@ export const checkBookingConflict = async (
   try {
     const bookingDateStr = formatDateForDB(bookingDate);
     
+    // Modificado para não considerar reservas canceladas como conflitos
     const { data: existingBookings, error } = await supabase
       .from('bookings')
       .select('*')
       .eq('court_id', courtId)
       .eq('booking_date', bookingDateStr)
-      .neq('status', 'cancelled');
+      .neq('status', 'cancelled'); // Ignora reservas canceladas ao verificar conflitos
       
     if (error) {
       console.error('Error checking booking conflicts:', error);

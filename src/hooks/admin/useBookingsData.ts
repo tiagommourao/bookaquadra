@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -102,7 +103,8 @@ export function useBookingsData() {
     return booking.booking_date;
   };
 
-  const getBookingsForDay = (day: Date) => {
+  // Modificada para filtrar reservas canceladas no calendário, mas mostrá-las na lista de detalhes do dia
+  const getBookingsForDay = (day: Date, includeAllStatuses = false) => {
     if (!allBookings) return [];
     
     const startOfTargetDay = startOfDay(day);
@@ -111,7 +113,10 @@ export function useBookingsData() {
       const bookingDate = getBookingDate(booking);
       const bookingDayStart = startOfDay(bookingDate);
       
-      return bookingDayStart.getTime() === startOfTargetDay.getTime();
+      // Se includeAllStatuses for verdadeiro (para exibição detalhada), retorna todas
+      // Caso contrário, filtra as canceladas (para o calendário)
+      return bookingDayStart.getTime() === startOfTargetDay.getTime() && 
+             (includeAllStatuses || booking.status !== 'cancelled');
     });
   };
 
@@ -131,9 +136,11 @@ export function useBookingsData() {
       const rangeStart = startOfDay(dateRange.start);
       const rangeEnd = startOfDay(dateRange.end);
       
+      // Inclui apenas reservas não canceladas para estatísticas
       return (
         bookingDayStart.getTime() >= rangeStart.getTime() && 
-        bookingDayStart.getTime() <= rangeEnd.getTime()
+        bookingDayStart.getTime() <= rangeEnd.getTime() &&
+        booking.status !== 'cancelled'
       );
     });
 
@@ -163,11 +170,9 @@ export function useBookingsData() {
 
   const weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
+  // Mostra todas as reservas na tabela de detalhes, incluindo canceladas
   const selectedDayBookings = selectedDayDetails 
-    ? allBookings?.filter(b => {
-        const bookingDate = getBookingDate(b);
-        return isSameDay(bookingDate, selectedDayDetails);
-      }) || []
+    ? getBookingsForDay(selectedDayDetails, true) 
     : [];
 
   return {
@@ -195,3 +200,4 @@ export function useBookingsData() {
     selectedDayBookings
   };
 }
+

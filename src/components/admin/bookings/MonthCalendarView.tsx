@@ -7,7 +7,7 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/comp
 interface MonthCalendarViewProps {
   calendarDays: Date[];
   dateRange: { start: Date; end: Date };
-  getBookingsForDay: (day: Date) => (Booking & any)[];
+  getBookingsForDay: (day: Date, includeAllStatuses?: boolean) => (Booking & any)[];
   getCellColor: (bookings: (Booking & any)[]) => string;
   handleDayClick: (day: Date) => void;
   weekDays: string[];
@@ -34,7 +34,8 @@ export const MonthCalendarView = ({
       ))}
       
       {calendarDays.map((day) => {
-        const dayBookings = getBookingsForDay(day);
+        // Não inclui reservas canceladas na visualização do calendário
+        const dayBookings = getBookingsForDay(day, false);
         const revenue = dayBookings.reduce((sum, b) => sum + Number(b.amount), 0);
         
         return (
