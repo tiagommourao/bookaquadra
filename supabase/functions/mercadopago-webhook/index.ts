@@ -41,6 +41,12 @@ interface PaymentResponse {
   [key: string]: any; // Para outros campos que possam existir
 }
 
+// Função para validar status de pagamento
+function isValidPaymentStatus(status: string): boolean {
+  const validStatuses = ['pending', 'paid', 'rejected', 'expired', 'refunded', 'cancelled', 'failed'];
+  return validStatuses.includes(status);
+}
+
 // Map de status do Mercado Pago para o nosso sistema
 const statusMap: Record<string, string> = {
   pending: "pending",
@@ -140,8 +146,24 @@ serve(async (req) => {
       });
       
       // Mapear o status do Mercado Pago para o nosso sistema
-      const mappedStatus = statusMap[paymentData.status] || "pending";
-      console.log(`Status mapeado: ${paymentData.status} -> ${mappedStatus}`);
+      const mpStatus = paymentData.status || "pending";
+      const mappedStatus = statusMap[mpStatus] || "pending";
+      console.log(`Status mapeado: ${mpStatus} -> ${mappedStatus}`);
+
+      // Verificar se o status mapeado é válido
+      if (!isValidPaymentStatus(mappedStatus)) {
+        console.error(`Status mapeado '${mappedStatus}' não é um valor válido para o banco de dados`);
+        await supabase.from("integrations_mercadopago_logs").insert({
+          integration_id: integration.id,
+          action: "payment_status_invalid",
+          details: {
+            original_status: mpStatus,
+            mapped_status: mappedStatus,
+            payment_id: paymentId,
+          },
+        });
+        throw new Error(`Status de pagamento inválido: ${mappedStatus}`);
+      }
       
       // Buscar o pagamento correspondente pelo mercadopago_payment_id
       const { data: existingPayment, error: paymentError } = await supabase
@@ -159,20 +181,31 @@ serve(async (req) => {
         
         // Se o status mudou, atualizar o pagamento
         if (existingPayment.status !== mappedStatus) {
-          // Como pode haver problemas com status como enum, usamos rpc para garantir uma atualização segura
           try {
+            // Atualizar usando RPC para evitar problemas com tipos
             const { error: updateError } = await supabase
-              .from("payments")
-              .update({
-                status: mappedStatus,
-                updated_at: new Date().toISOString(),
-                raw_response: paymentData,
-              })
-              .eq("id", existingPayment.id);
+              .rpc('update_payment_status', {
+                p_payment_id: existingPayment.id,
+                p_status: mappedStatus,
+                p_raw_response: paymentData
+              });
             
             if (updateError) {
-              console.error("Erro ao atualizar pagamento:", updateError);
-              throw new Error(`Erro ao atualizar status do pagamento: ${updateError.message}`);
+              console.error("Erro ao chamar RPC update_payment_status:", updateError);
+              // Tentar atualização direta como fallback
+              const { error: directUpdateError } = await supabase
+                .from("payments")
+                .update({
+                  status: mappedStatus,
+                  updated_at: new Date().toISOString(),
+                  raw_response: paymentData,
+                })
+                .eq("id", existingPayment.id);
+              
+              if (directUpdateError) {
+                console.error("Erro ao atualizar pagamento:", directUpdateError);
+                throw new Error(`Erro ao atualizar status do pagamento: ${directUpdateError.message}`);
+              }
             }
           } catch (updateError) {
             console.error("Erro ao atualizar pagamento:", updateError);
@@ -229,23 +262,41 @@ serve(async (req) => {
             console.log(`Criando pagamento para reserva ID: ${booking.id}`);
             
             try {
+              // Usar RPC para criar pagamento evitando problemas de tipos
               const { error: insertError } = await supabase
-                .from("payments")
-                .insert({
+                .rpc('create_payment', {
                   booking_id: booking.id,
                   user_id: booking.user_id,
-                  amount: paymentData.transaction_amount,
-                  status: mappedStatus,
-                  payment_method: paymentData.payment_method_id,
                   mercadopago_payment_id: paymentId.toString(),
-                  raw_response: paymentData,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
+                  status: mappedStatus,
+                  amount: paymentData.transaction_amount,
+                  payment_method: paymentData.payment_method_id,
+                  expiration_date: null,
+                  raw_response: paymentData
                 });
               
               if (insertError) {
-                console.error("Erro ao inserir pagamento:", insertError);
-                throw new Error(`Erro ao criar registro de pagamento: ${insertError.message}`);
+                console.error("Erro ao chamar RPC create_payment:", insertError);
+                
+                // Tentar inserção direta como fallback
+                const { error: directInsertError } = await supabase
+                  .from("payments")
+                  .insert({
+                    booking_id: booking.id,
+                    user_id: booking.user_id,
+                    amount: paymentData.transaction_amount,
+                    status: mappedStatus,
+                    payment_method: paymentData.payment_method_id,
+                    mercadopago_payment_id: paymentId.toString(),
+                    raw_response: paymentData,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                  });
+                
+                if (directInsertError) {
+                  console.error("Erro ao inserir pagamento:", directInsertError);
+                  throw new Error(`Erro ao criar registro de pagamento: ${directInsertError.message}`);
+                }
               }
             } catch (insertError) {
               console.error("Erro ao inserir pagamento:", insertError);

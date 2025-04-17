@@ -9,6 +9,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Função auxiliar para verificar se um valor de status é válido
+function isValidPaymentStatus(status: string): boolean {
+  const validStatuses = ['pending', 'paid', 'rejected', 'expired', 'refunded', 'cancelled', 'failed'];
+  return validStatuses.includes(status);
+}
+
 serve(async (req) => {
   // É CRUCIAL tratar a requisição OPTIONS para CORS
   if (req.method === "OPTIONS") {
@@ -183,24 +189,37 @@ serve(async (req) => {
           .eq("status", "pending");
       }
       
-      // Registrar o pagamento no banco de dados
-      // Vamos primeiro verificar os valores aceitos para a coluna status
-      let statusValue = "pending";
-      
-      // Vamos verificar os valores válidos no banco de dados observando os registros existentes
-      const { data: statusCheck } = await supabase
+      // Verificar os valores permitidos para status de pagamento
+      // Primeiro, vamos buscar um valor válido que está na tabela
+      // antes de tentarmos inserir um novo registro
+      const { data: validStatusExample } = await supabase
         .from("payments")
         .select("status")
         .limit(1);
       
-      console.log("Status check result:", statusCheck);
+      // Se encontrarmos um exemplo válido, vamos registrar para debug
+      console.log("Status de pagamento válidos encontrados:", validStatusExample);
+      
+      // Determinar o status a ser usado na inserção
+      let statusToUse = "pending";
+      
+      // Checar se este é um valor válido com base na verificação anterior
+      if (!isValidPaymentStatus(statusToUse)) {
+        console.error(`Valor de status '${statusToUse}' não é válido para o esquema atual`);
+        return new Response(
+          JSON.stringify({ 
+            error: `Erro interno: valor de status inválido para o banco de dados`
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       
       // Registrar o pagamento no banco de dados
       const paymentData = {
         booking_id: booking.id,
         user_id: booking.user_id,
         mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
-        status: statusValue,
+        status: statusToUse,
         amount: booking.amount,
         payment_method: null, // Será atualizado pelo webhook
         expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
@@ -209,58 +228,34 @@ serve(async (req) => {
       
       console.log("Inserindo pagamento com dados:", JSON.stringify(paymentData));
       
+      // Tentar inserir usando RPC para evitar problemas com tipos/enums
       const { data: payment, error: paymentError } = await supabase
-        .from("payments")
-        .insert(paymentData)
-        .select()
+        .rpc('create_payment', paymentData)
         .single();
       
       if (paymentError) {
-        console.error("Erro ao registrar pagamento:", paymentError);
+        // Tentar o método tradicional de inserção como fallback
+        console.error("Erro ao chamar RPC create_payment:", paymentError);
+        console.log("Tentando inserção direta como fallback...");
         
-        // Tentar uma abordagem alternativa se o status for o problema
-        if (paymentError.code === "23514" && paymentError.message.includes("payments_status_check")) {
-          console.log("Tentando inserir com status como string em vez de enum");
-          
-          // Obter os valores aceitos do tipo enum
-          const { data: enumValues } = await supabase
-            .rpc('get_payment_status_values');
-            
-          console.log("Valores aceitos para status:", enumValues);
-          
-          // Tente novamente com um valor conhecido como válido
-          const fallbackPaymentData = {
-            ...paymentData,
-            status: "pending" // Garantir que é uma string
-          };
-          
-          const { data: fallbackPayment, error: fallbackError } = await supabase
-            .from("payments")
-            .insert(fallbackPaymentData)
-            .select()
-            .single();
-            
-          if (fallbackError) {
-            console.error("Erro na segunda tentativa de inserção:", fallbackError);
-            return new Response(
-              JSON.stringify({ 
-                error: "Erro ao registrar pagamento", 
-                details: fallbackError.message 
-              }),
-              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-          
-          payment = fallbackPayment;
-        } else {
+        const { data: directPayment, error: directPaymentError } = await supabase
+          .from("payments")
+          .insert([paymentData])
+          .select()
+          .single();
+        
+        if (directPaymentError) {
+          console.error("Erro ao registrar pagamento:", directPaymentError);
           return new Response(
             JSON.stringify({ 
               error: "Erro ao registrar pagamento", 
-              details: paymentError.message 
+              details: directPaymentError.message 
             }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        
+        payment = directPayment;
       }
       
       // Determinar qual URL usar com base no ambiente
@@ -272,7 +267,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          payment_id: payment.id,
+          payment_id: payment?.id,
           payment_url: paymentUrl,
           sandbox_url: mpData.sandbox_init_point,
           prod_url: mpData.init_point,
