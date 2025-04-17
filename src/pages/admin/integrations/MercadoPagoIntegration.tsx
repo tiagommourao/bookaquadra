@@ -77,7 +77,12 @@ const MercadoPagoIntegration: React.FC = () => {
       setIntegrationId(integrationData.id);
       form.setValue("public_key", integrationData.public_key || "");
       form.setValue("access_token", integrationData.access_token || "");
-      form.setValue("environment", integrationData.environment || "sandbox");
+      // Garantir que o valor seja do tipo esperado pelo enum
+      form.setValue("environment", 
+        (integrationData.environment === "sandbox" || integrationData.environment === "production") 
+          ? integrationData.environment 
+          : "sandbox"
+      );
       form.setValue("webhook_url", integrationData.webhook_url || "");
     }
   }, [integrationData, form]);
@@ -163,8 +168,10 @@ const MercadoPagoIntegration: React.FC = () => {
   }
 
   const generateWebhookUrl = () => {
+    // Gerar URL para o webhook do Mercado Pago
     const baseUrl = window.location.origin;
-    const webhookUrl = `${baseUrl}/api/webhook/mercadopago`;
+    // Usamos o endpoint em Supabase Functions
+    const webhookUrl = `${baseUrl}/api/mercadopago-webhook`;
     form.setValue("webhook_url", webhookUrl);
   };
 

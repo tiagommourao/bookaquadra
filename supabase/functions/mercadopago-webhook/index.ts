@@ -8,6 +8,52 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Definição de tipos para MercadoPago
+interface MercadoPagoNotification {
+  type: string;
+  data: {
+    id: string;
+  };
+  date_created: string;
+  application_id: string;
+  user_id: string;
+  version: number;
+  api_version: string;
+  action: string;
+  live_mode: boolean;
+}
+
+interface PaymentResponse {
+  id: number;
+  date_created: string;
+  date_approved: string;
+  date_last_updated: string;
+  money_release_date: string;
+  payment_method_id: string;
+  payment_type_id: string;
+  status: string;
+  status_detail: string;
+  currency_id: string;
+  description: string;
+  transaction_amount: number;
+  external_reference?: string;
+  additional_info?: any;
+  [key: string]: any; // Para outros campos que possam existir
+}
+
+// Map de status do Mercado Pago para o nosso sistema
+const statusMap: Record<string, string> = {
+  pending: "pending",
+  approved: "paid",
+  authorized: "pending",
+  in_process: "pending",
+  in_mediation: "pending",
+  rejected: "rejected",
+  cancelled: "cancelled",
+  refunded: "refunded",
+  charged_back: "cancelled",
+};
+
 // Função principal para processar as notificações do Mercado Pago
 serve(async (req) => {
   // Lidar com requisições OPTIONS (CORS)
@@ -44,54 +90,162 @@ serve(async (req) => {
       );
     }
 
-    // Extrair informações relevantes do webhook
-    const notificationType = payload.type;
-    
-    // Log da notificação
+    // Registrar o webhook recebido
     await supabase.from("integrations_mercadopago_logs").insert({
       integration_id: integration.id,
       action: "webhook_received",
       details: {
-        type: notificationType,
         data: payload,
       },
     });
 
     // Verificar o tipo de notificação
-    if (notificationType === "payment") {
-      // Buscar detalhes do pagamento usando o Access Token
+    if (payload.type === "payment") {
       const paymentId = payload.data?.id;
-      if (paymentId) {
-        const paymentResponse = await fetch(
-          `https://api.mercadopago.com/v1/payments/${paymentId}`,
-          {
-            headers: {
-              "Authorization": `Bearer ${integration.access_token}`,
-            },
-          }
-        );
+      
+      if (!paymentId) {
+        throw new Error("ID de pagamento não encontrado na notificação");
+      }
+      
+      console.log(`Processando notificação de pagamento ID: ${paymentId}`);
+      
+      // Buscar detalhes do pagamento usando o Access Token
+      const paymentResponse = await fetch(
+        `https://api.mercadopago.com/v1/payments/${paymentId}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${integration.access_token}`,
+          },
+        }
+      );
 
-        if (paymentResponse.ok) {
-          const paymentData = await paymentResponse.json();
-          console.log("Detalhes do pagamento:", JSON.stringify(paymentData));
+      if (!paymentResponse.ok) {
+        const errorText = await paymentResponse.text();
+        console.error(`Erro ao buscar pagamento ${paymentId}: ${errorText}`);
+        throw new Error(`Erro ao buscar detalhes do pagamento: ${paymentResponse.status}`);
+      }
+
+      const paymentData = await paymentResponse.json() as PaymentResponse;
+      console.log("Detalhes do pagamento:", JSON.stringify(paymentData));
+      
+      // Registrar os detalhes completos do pagamento
+      await supabase.from("integrations_mercadopago_logs").insert({
+        integration_id: integration.id,
+        action: "payment_details_retrieved",
+        details: {
+          payment_id: paymentId,
+          status: paymentData.status,
+          payment_data: paymentData,
+        },
+      });
+      
+      // Mapear o status do Mercado Pago para o nosso sistema
+      const mappedStatus = statusMap[paymentData.status] || "pending";
+      
+      // Buscar o pagamento correspondente pelo mercadopago_payment_id
+      const { data: existingPayment, error: paymentError } = await supabase
+        .from("payments")
+        .select("id, status")
+        .eq("mercadopago_payment_id", paymentId.toString())
+        .maybeSingle();
+      
+      if (paymentError) {
+        console.error("Erro ao buscar pagamento:", paymentError);
+      }
+      
+      if (existingPayment) {
+        console.log(`Atualizando pagamento existente ID: ${existingPayment.id} para status: ${mappedStatus}`);
+        
+        // Se o status mudou, atualizar o pagamento
+        if (existingPayment.status !== mappedStatus) {
+          const { error: updateError } = await supabase
+            .from("payments")
+            .update({
+              status: mappedStatus,
+              updated_at: new Date().toISOString(),
+              raw_response: paymentData,
+            })
+            .eq("id", existingPayment.id);
           
-          // Registrar os detalhes do pagamento
-          await supabase.from("integrations_mercadopago_logs").insert({
-            integration_id: integration.id,
-            action: "payment_details_retrieved",
-            details: {
-              payment_id: paymentId,
-              status: paymentData.status,
-              payment_data: paymentData,
-            },
-          });
-
-          // Aqui seria implementada a lógica para atualizar reservas com base no pagamento
-          // Esta é apenas uma implementação básica que será expandida posteriormente
-        } else {
-          console.error("Erro ao buscar detalhes do pagamento:", await paymentResponse.text());
+          if (updateError) {
+            console.error("Erro ao atualizar pagamento:", updateError);
+            throw new Error(`Erro ao atualizar status do pagamento: ${updateError.message}`);
+          }
+          
+          // Se o pagamento foi aprovado, atualizar o status da reserva se existir
+          if (mappedStatus === "paid" && paymentData.external_reference) {
+            // Verificar se external_reference é um ID de booking
+            const { data: booking, error: bookingError } = await supabase
+              .from("bookings")
+              .select("id, payment_status")
+              .eq("id", paymentData.external_reference)
+              .maybeSingle();
+            
+            if (!bookingError && booking) {
+              console.log(`Atualizando reserva ID: ${booking.id} para status: paid`);
+              
+              await supabase
+                .from("bookings")
+                .update({
+                  payment_status: "paid",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", booking.id);
+            }
+          }
+        }
+      } else {
+        // O pagamento ainda não existe no nosso sistema
+        // Isso pode acontecer se o pagamento foi criado diretamente no Mercado Pago
+        console.log(`Pagamento ID: ${paymentId} não encontrado no sistema`);
+        
+        // Se tiver external_reference, podemos tentar associar a um booking
+        if (paymentData.external_reference) {
+          const { data: booking, error: bookingError } = await supabase
+            .from("bookings")
+            .select("id, user_id, amount")
+            .eq("id", paymentData.external_reference)
+            .maybeSingle();
+          
+          if (!bookingError && booking) {
+            // Criar um novo registro de pagamento
+            console.log(`Criando pagamento para reserva ID: ${booking.id}`);
+            
+            const { error: insertError } = await supabase
+              .from("payments")
+              .insert({
+                booking_id: booking.id,
+                user_id: booking.user_id,
+                amount: paymentData.transaction_amount,
+                status: mappedStatus,
+                payment_method: paymentData.payment_method_id,
+                mercadopago_payment_id: paymentId.toString(),
+                raw_response: paymentData,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+            
+            if (insertError) {
+              console.error("Erro ao inserir pagamento:", insertError);
+              throw new Error(`Erro ao criar registro de pagamento: ${insertError.message}`);
+            }
+            
+            // Atualizar o status da reserva
+            if (mappedStatus === "paid") {
+              await supabase
+                .from("bookings")
+                .update({
+                  payment_status: "paid",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", booking.id);
+            }
+          }
         }
       }
+    } else {
+      // Lidar com outros tipos de notificação
+      console.log(`Notificação tipo: ${payload.type} - não requer processamento especial`);
     }
 
     return new Response(
