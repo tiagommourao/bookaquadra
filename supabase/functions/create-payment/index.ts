@@ -184,42 +184,28 @@ serve(async (req) => {
           .eq("status", "pending");
       }
       
-      // Verificar quais são os valores válidos de status na tabela payments
-      const { data: allowedStatusValues, error: checkError } = await supabase
-        .from('pg_enum')
-        .select('*')
-        .eq('enumlabel', 'payment_status');
-      
-      console.log("Valores permitidos para status:", allowedStatusValues);
-
       // Registrar o pagamento no banco de dados
+      const paymentData = {
+        booking_id: booking.id,
+        user_id: booking.user_id,
+        mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
+        status: "pending",
+        amount: booking.amount,
+        payment_method: null, // Será atualizado pelo webhook
+        expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
+        raw_response: mpData
+      };
+      
+      console.log("Inserindo pagamento com dados:", JSON.stringify(paymentData));
+      
       const { data: payment, error: paymentError } = await supabase
         .from("payments")
-        .insert({
-          booking_id: booking.id,
-          user_id: booking.user_id,
-          mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
-          status: "pending", // Usar um status válido conforme definido na enum
-          amount: booking.amount,
-          payment_method: null, // Será atualizado pelo webhook
-          expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
-          raw_response: mpData
-        })
+        .insert(paymentData)
         .select()
         .single();
       
       if (paymentError) {
         console.error("Erro ao registrar pagamento:", paymentError);
-        
-        // Se houver erro, vamos tentar descobrir qual é o problema com os valores de status permitidos
-        const { data: enumValues } = await supabase
-          .from('pg_type')
-          .select('typname')
-          .eq('typname', 'payment_status')
-          .limit(1);
-        
-        console.log("Tipo de dados para payment_status:", enumValues);
-        
         return new Response(
           JSON.stringify({ 
             error: "Erro ao registrar pagamento", 

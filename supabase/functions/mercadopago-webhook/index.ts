@@ -141,6 +141,7 @@ serve(async (req) => {
       
       // Mapear o status do Mercado Pago para o nosso sistema
       const mappedStatus = statusMap[paymentData.status] || "pending";
+      console.log(`Status mapeado: ${paymentData.status} -> ${mappedStatus}`);
       
       // Buscar o pagamento correspondente pelo mercadopago_payment_id
       const { data: existingPayment, error: paymentError } = await supabase
