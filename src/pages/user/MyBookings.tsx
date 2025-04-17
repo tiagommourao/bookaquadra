@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { UserLayout } from '@/components/layouts/UserLayout';
 import { Button } from '@/components/ui/button';
@@ -26,18 +25,13 @@ const MyBookings = () => {
   const [cancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   
-  // Fetch bookings from API
   const { data: bookings, isLoading, error, refetch } = useUserBookings();
-  
-  // Cancel booking mutation
   const cancelBooking = useCancelBooking();
   
-  // Effect to refetch data when tab changes
   useEffect(() => {
     refetch();
   }, [activeTab, refetch]);
   
-  // Filter bookings based on active tab
   const filteredBookings = bookings?.filter((booking) => {
     const bookingDate = parseISO(`${booking.booking_date}T${booking.start_time}`);
     const now = new Date();
@@ -51,18 +45,15 @@ const MyBookings = () => {
     }
   }) || [];
 
-  // Format date for display
   const formatBookingDate = (dateStr: string) => {
     return format(parseISO(dateStr), "EEEE, d 'de' MMMM", { locale: ptBR });
   };
   
-  // Handle requesting cancellation of a booking
   const handleRequestCancel = (bookingId: string) => {
     setSelectedBookingId(bookingId);
     setCancelConfirmationOpen(true);
   };
   
-  // Handle confirming cancellation
   const handleConfirmCancel = async () => {
     if (selectedBookingId) {
       try {
@@ -75,13 +66,11 @@ const MyBookings = () => {
     }
   };
   
-  // Handle adding a booking to Google Calendar
   const handleAddToCalendar = (booking: any) => {
     const court = booking.court?.name || "Quadra";
     const startDateTime = `${booking.booking_date}T${booking.start_time}:00`;
     const endDateTime = `${booking.booking_date}T${booking.end_time}:00`;
     
-    // Format for Google Calendar URL
     const eventDetails = {
       text: `Reserva de quadra - ${court}`,
       details: `Reserva de quadra esportiva no BookaQuadra.\nLocal: ${court}`,
@@ -91,15 +80,12 @@ const MyBookings = () => {
     
     const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(eventDetails.text)}&details=${encodeURIComponent(eventDetails.details)}&location=${encodeURIComponent(eventDetails.location)}&dates=${eventDetails.dates}`;
     
-    // Open in new tab
     window.open(googleCalendarUrl, '_blank');
   };
 
-  // Get court type name
   const getCourtTypeName = (typeId: string | null | undefined): string => {
     if (!typeId) return '';
     
-    // Mapeamento de tipos de quadra
     const types: Record<string, string> = {
       'beach-tennis': 'Beach Tennis',
       'padel': 'Padel',
@@ -113,7 +99,6 @@ const MyBookings = () => {
     return types[typeId] || typeId;
   };
 
-  // Render status badge based on booking status
   const renderStatusBadge = (status: string, paymentStatus: string) => {
     if (status === 'cancelled') {
       return (
@@ -167,7 +152,6 @@ const MyBookings = () => {
     }
   };
 
-  // Render booking card
   const renderBookingCard = (booking: any) => {
     const bookingDate = parseISO(`${booking.booking_date}T${booking.start_time}`);
     const isPast = bookingDate < new Date();
@@ -242,29 +226,35 @@ const MyBookings = () => {
     );
   };
 
-  // Add the payment handler function
   const handlePayment = async (booking: Booking) => {
     try {
+      toast({
+        title: "Processando pagamento",
+        description: "Aguarde enquanto preparamos seu pagamento...",
+      });
+      
       const { data, error } = await supabase.functions.invoke('create-payment', {
         body: { booking_id: booking.id }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na função create-payment:', error);
+        throw new Error(error.message || "Erro ao processar pagamento");
+      }
       
       if (data?.payment_url) {
         window.location.href = data.payment_url;
+      } else if (data?.sandbox_url && process.env.NODE_ENV !== 'production') {
+        window.location.href = data.sandbox_url;
       } else {
-        toast({
-          title: "Erro ao gerar pagamento",
-          description: "Não foi possível gerar o link de pagamento. Tente novamente.",
-          variant: "destructive"
-        });
+        console.error('Resposta inesperada:', data);
+        throw new Error("Não foi possível gerar o link de pagamento");
       }
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
       toast({
         title: "Erro no pagamento",
-        description: "Ocorreu um erro ao processar o pagamento. Tente novamente.",
+        description: error.message || "Ocorreu um erro ao processar o pagamento. Tente novamente.",
         variant: "destructive"
       });
     }
@@ -272,7 +262,6 @@ const MyBookings = () => {
 
   return (
     <UserLayout>
-      {/* Header */}
       <section className="bg-primary text-primary-foreground p-6">
         <div className="max-w-lg mx-auto">
           <h1 className="text-2xl font-bold">Minhas Reservas</h1>
@@ -282,7 +271,6 @@ const MyBookings = () => {
         </div>
       </section>
       
-      {/* Tabs and Bookings */}
       <section className="p-4 pb-20">
         <div className="max-w-lg mx-auto">
           <Tabs defaultValue="upcoming" onValueChange={setActiveTab}>
@@ -353,7 +341,6 @@ const MyBookings = () => {
         </div>
       </section>
       
-      {/* Confirmation Dialog for Cancellation */}
       <Dialog open={cancelConfirmationOpen} onOpenChange={setCancelConfirmationOpen}>
         <DialogContent>
           <DialogHeader>
