@@ -71,7 +71,8 @@ const MercadoPagoIntegration = () => {
         .rpc('test_mercadopago_integration', { integration_id: integrationId });
 
       if (error) throw error;
-      return data as TestConnectionResult;
+      // Convertemos para unknown primeiro, depois para o tipo específico
+      return data as unknown as TestConnectionResult;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['mercadopago-integration'] });
