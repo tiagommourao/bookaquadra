@@ -52,19 +52,28 @@ serve(async (req) => {
     }
     
     // Obter a integração ativa do Mercado Pago
+    // CORREÇÃO: Mudando de .single() para .maybeSingle() para evitar o erro quando não há registros
     const { data: integration, error: integrationError } = await supabase
       .from("integrations_mercadopago")
       .select("access_token")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+      .maybeSingle();
     
-    if (integrationError || !integration?.access_token) {
+    // Verificar se há uma integração ativa configurada
+    if (integrationError) {
       console.error("Erro ao buscar integração:", integrationError);
       return new Response(
-        JSON.stringify({ error: "Integração com MercadoPago não configurada" }),
+        JSON.stringify({ error: "Erro ao buscar integração com MercadoPago" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (!integration?.access_token) {
+      console.error("Integração não configurada ou inativa");
+      return new Response(
+        JSON.stringify({ error: "Integração com MercadoPago não configurada ou inativa" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     

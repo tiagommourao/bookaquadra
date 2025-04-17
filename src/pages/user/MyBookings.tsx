@@ -233,6 +233,8 @@ const MyBookings = () => {
         description: "Aguarde enquanto preparamos seu pagamento...",
       });
       
+      console.log("Enviando requisição de pagamento para booking_id:", booking.id);
+      
       const { data, error } = await supabase.functions.invoke('create-payment', {
         body: { booking_id: booking.id }
       });
@@ -241,6 +243,8 @@ const MyBookings = () => {
         console.error('Erro na função create-payment:', error);
         throw new Error(error.message || "Erro ao processar pagamento");
       }
+      
+      console.log("Resposta da função create-payment:", data);
       
       if (data?.payment_url) {
         window.location.href = data.payment_url;
