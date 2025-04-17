@@ -1,7 +1,7 @@
 
 // Definição dos tipos relacionados a pagamentos
 
-export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'expired' | 'refunded' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'expired' | 'refunded' | 'cancelled' | 'failed';
 
 export interface Payment {
   id: string;

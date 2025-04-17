@@ -3,7 +3,8 @@ import React from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { isWeekend } from 'date-fns';
-import { Booking, BookingStatus, PaymentStatus } from '@/types';
+import { Booking, BookingStatus } from '@/types';
+import { PaymentStatus } from '@/types/payment';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Edit } from 'lucide-react';
@@ -43,7 +44,10 @@ export const BookingDetailsTable = ({
       case 'paid': return 'default';
       case 'pending': return 'secondary';
       case 'failed': return 'destructive';
+      case 'rejected': return 'destructive';
       case 'refunded': return 'outline';
+      case 'cancelled': return 'destructive';
+      case 'expired': return 'outline';
       default: return 'default';
     }
   };
@@ -63,7 +67,10 @@ export const BookingDetailsTable = ({
       case 'paid': return 'Pago';
       case 'pending': return 'Pendente';
       case 'failed': return 'Falhou';
+      case 'rejected': return 'Recusado';
       case 'refunded': return 'Reembolsado';
+      case 'cancelled': return 'Cancelado';
+      case 'expired': return 'Expirado';
       default: return status;
     }
   };

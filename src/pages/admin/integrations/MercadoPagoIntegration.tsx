@@ -34,6 +34,12 @@ interface MercadoPagoIntegration {
   updated_at: string;
 }
 
+// Interface para o resultado do teste de conexão
+interface TestConnectionResult {
+  success: boolean;
+  message: string;
+}
+
 const MercadoPagoIntegration = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,7 +71,7 @@ const MercadoPagoIntegration = () => {
         .rpc('test_mercadopago_integration', { integration_id: integrationId });
 
       if (error) throw error;
-      return data;
+      return data as TestConnectionResult;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['mercadopago-integration'] });

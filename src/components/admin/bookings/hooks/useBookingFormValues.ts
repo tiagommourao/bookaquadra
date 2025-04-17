@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { parseISO } from 'date-fns';
 import { Booking } from '@/types';
+import { PaymentStatus } from '@/types/payment';
 import { BookingFormValues } from '../booking-schema';
 
 export function useBookingFormValues({ 
@@ -34,7 +35,7 @@ export function useBookingFormValues({
         end_time: booking.end_time.substring(0, 5),     // Ensure format is HH:MM
         amount: Number(booking.amount),
         status: booking.status,
-        payment_status: booking.payment_status,
+        payment_status: booking.payment_status as PaymentStatus,
         notes: booking.notes || '',
         is_monthly: booking.is_monthly || false,
       };
