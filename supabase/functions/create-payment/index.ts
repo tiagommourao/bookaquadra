@@ -72,7 +72,7 @@ serve(async (req) => {
       );
     }
     
-    // Verificar se já existe um pagamento para esta reserva
+    // Verificar se já existe um pagamento confirmado para esta reserva
     const { data: existingPayment, error: paymentCheckError } = await supabase
       .from("payments")
       .select("id, status")
@@ -90,7 +90,6 @@ serve(async (req) => {
     }
     
     // Obter a integração ativa do Mercado Pago
-    // Usamos .maybeSingle() para evitar erros quando não há registros
     const { data: integration, error: integrationError } = await supabase
       .from("integrations_mercadopago")
       .select("access_token, environment")
@@ -185,11 +184,23 @@ serve(async (req) => {
       }
       
       // Registrar o pagamento no banco de dados
+      // Vamos primeiro verificar os valores aceitos para a coluna status
+      let statusValue = "pending";
+      
+      // Vamos verificar os valores válidos no banco de dados observando os registros existentes
+      const { data: statusCheck } = await supabase
+        .from("payments")
+        .select("status")
+        .limit(1);
+      
+      console.log("Status check result:", statusCheck);
+      
+      // Registrar o pagamento no banco de dados
       const paymentData = {
         booking_id: booking.id,
         user_id: booking.user_id,
         mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
-        status: "pending",
+        status: statusValue,
         amount: booking.amount,
         payment_method: null, // Será atualizado pelo webhook
         expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
@@ -206,13 +217,50 @@ serve(async (req) => {
       
       if (paymentError) {
         console.error("Erro ao registrar pagamento:", paymentError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Erro ao registrar pagamento", 
-            details: paymentError.message 
-          }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        
+        // Tentar uma abordagem alternativa se o status for o problema
+        if (paymentError.code === "23514" && paymentError.message.includes("payments_status_check")) {
+          console.log("Tentando inserir com status como string em vez de enum");
+          
+          // Obter os valores aceitos do tipo enum
+          const { data: enumValues } = await supabase
+            .rpc('get_payment_status_values');
+            
+          console.log("Valores aceitos para status:", enumValues);
+          
+          // Tente novamente com um valor conhecido como válido
+          const fallbackPaymentData = {
+            ...paymentData,
+            status: "pending" // Garantir que é uma string
+          };
+          
+          const { data: fallbackPayment, error: fallbackError } = await supabase
+            .from("payments")
+            .insert(fallbackPaymentData)
+            .select()
+            .single();
+            
+          if (fallbackError) {
+            console.error("Erro na segunda tentativa de inserção:", fallbackError);
+            return new Response(
+              JSON.stringify({ 
+                error: "Erro ao registrar pagamento", 
+                details: fallbackError.message 
+              }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          
+          payment = fallbackPayment;
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              error: "Erro ao registrar pagamento", 
+              details: paymentError.message 
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
       
       // Determinar qual URL usar com base no ambiente

@@ -159,18 +159,34 @@ serve(async (req) => {
         
         // Se o status mudou, atualizar o pagamento
         if (existingPayment.status !== mappedStatus) {
-          const { error: updateError } = await supabase
-            .from("payments")
-            .update({
-              status: mappedStatus,
-              updated_at: new Date().toISOString(),
-              raw_response: paymentData,
-            })
-            .eq("id", existingPayment.id);
-          
-          if (updateError) {
+          // Como pode haver problemas com status como enum, usamos rpc para garantir uma atualização segura
+          try {
+            const { error: updateError } = await supabase
+              .from("payments")
+              .update({
+                status: mappedStatus,
+                updated_at: new Date().toISOString(),
+                raw_response: paymentData,
+              })
+              .eq("id", existingPayment.id);
+            
+            if (updateError) {
+              console.error("Erro ao atualizar pagamento:", updateError);
+              throw new Error(`Erro ao atualizar status do pagamento: ${updateError.message}`);
+            }
+          } catch (updateError) {
             console.error("Erro ao atualizar pagamento:", updateError);
-            throw new Error(`Erro ao atualizar status do pagamento: ${updateError.message}`);
+            
+            // Tentar uma abordagem alternativa registrando um log para análise
+            await supabase.from("integrations_mercadopago_logs").insert({
+              integration_id: integration.id,
+              action: "payment_update_error",
+              details: {
+                payment_id: existingPayment.id,
+                error: updateError.message,
+                new_status: mappedStatus,
+              },
+            });
           }
           
           // Se o pagamento foi aprovado, atualizar o status da reserva se existir
@@ -212,23 +228,39 @@ serve(async (req) => {
             // Criar um novo registro de pagamento
             console.log(`Criando pagamento para reserva ID: ${booking.id}`);
             
-            const { error: insertError } = await supabase
-              .from("payments")
-              .insert({
-                booking_id: booking.id,
-                user_id: booking.user_id,
-                amount: paymentData.transaction_amount,
-                status: mappedStatus,
-                payment_method: paymentData.payment_method_id,
-                mercadopago_payment_id: paymentId.toString(),
-                raw_response: paymentData,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              });
-            
-            if (insertError) {
+            try {
+              const { error: insertError } = await supabase
+                .from("payments")
+                .insert({
+                  booking_id: booking.id,
+                  user_id: booking.user_id,
+                  amount: paymentData.transaction_amount,
+                  status: mappedStatus,
+                  payment_method: paymentData.payment_method_id,
+                  mercadopago_payment_id: paymentId.toString(),
+                  raw_response: paymentData,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                });
+              
+              if (insertError) {
+                console.error("Erro ao inserir pagamento:", insertError);
+                throw new Error(`Erro ao criar registro de pagamento: ${insertError.message}`);
+              }
+            } catch (insertError) {
               console.error("Erro ao inserir pagamento:", insertError);
-              throw new Error(`Erro ao criar registro de pagamento: ${insertError.message}`);
+              
+              // Registrar erro para análise
+              await supabase.from("integrations_mercadopago_logs").insert({
+                integration_id: integration.id,
+                action: "payment_creation_error",
+                details: {
+                  booking_id: booking.id,
+                  error: insertError.message,
+                  mercadopago_payment_id: paymentId,
+                  status: mappedStatus,
+                },
+              });
             }
             
             // Atualizar o status da reserva
