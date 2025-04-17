@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,7 @@ const MercadoPagoIntegration: React.FC = () => {
   useEffect(() => {
     const fetchIntegration = async () => {
       const { data, error } = await supabase
-        .from('mercadopago_integrations')
+        .from('integrations_mercadopago')
         .select('id, public_key, access_token')
         .single();
 
@@ -72,7 +73,7 @@ const MercadoPagoIntegration: React.FC = () => {
     queryKey: ['mercadopago-integration'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('mercadopago_integrations')
+        .from('integrations_mercadopago')
         .select('id, public_key, access_token')
         .single();
 
@@ -92,7 +93,7 @@ const MercadoPagoIntegration: React.FC = () => {
       }
 
       const { error } = await supabase
-        .from('mercadopago_integrations')
+        .from('integrations_mercadopago')
         .update({
           public_key: values.public_key,
           access_token: values.access_token,
@@ -122,27 +123,41 @@ const MercadoPagoIntegration: React.FC = () => {
     },
   });
 
-  // Only updating the test connection function to use our interface properly
+  // Updated the test connection function to properly handle the response type
   const testConnection = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase
+      const { data: responseData, error } = await supabase
         .rpc('test_mercadopago_integration', { integration_id: integrationId });
 
       if (error) throw error;
-      return data as unknown as TestConnectionResult;
+      
+      // Cast the response to the correct type
+      return responseData as unknown as TestConnectionResult;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['mercadopago-integration'] });
       
       if (data.success) {
-        toast.success('Conexão bem-sucedida com MercadoPago!');
+        toast({
+          title: "Sucesso",
+          description: "Conexão bem-sucedida com MercadoPago!",
+          variant: "default",
+        });
       } else {
-        toast.error(`Erro na conexão: ${data.message}`);
+        toast({
+          title: "Erro na conexão",
+          description: data.message || "Erro ao testar a conexão",
+          variant: "destructive",
+        });
       }
     },
     onError: (error) => {
       console.error('Erro ao testar conexão:', error);
-      toast.error('Erro ao testar conexão com MercadoPago');
+      toast({
+        title: "Erro",
+        description: "Erro ao testar conexão com MercadoPago",
+        variant: "destructive",
+      });
     }
   });
 
