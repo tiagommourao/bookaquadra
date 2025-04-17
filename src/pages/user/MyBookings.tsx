@@ -27,6 +27,7 @@ const MyBookings = () => {
   const [cancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentErrorMsg, setPaymentErrorMsg] = useState<string | null>(null);
   
   const { data: bookings, isLoading, error, refetch } = useUserBookings();
   const cancelBooking = useCancelBooking();
@@ -242,6 +243,7 @@ const MyBookings = () => {
   const handlePayment = async (booking: Booking) => {
     try {
       setIsProcessingPayment(true);
+      setPaymentErrorMsg(null);
       
       toast({
         title: "Processando pagamento",
@@ -264,9 +266,10 @@ const MyBookings = () => {
       // Verificar erros específicos
       if (data?.error) {
         if (data?.setup_required) {
+          setPaymentErrorMsg("A integração com o gateway de pagamento não está configurada ou ativada. Entre em contato com o suporte.");
           toast({
             title: "Configuração necessária",
-            description: "A integração com o gateway de pagamento não está configurada. Entre em contato com o suporte.",
+            description: "A integração com o gateway de pagamento não está configurada ou ativada. Entre em contato com o suporte.",
             variant: "destructive",
             duration: 6000
           });
@@ -295,6 +298,7 @@ const MyBookings = () => {
       }
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
+      setPaymentErrorMsg(error.message || "Ocorreu um erro ao processar o pagamento. Tente novamente.");
       toast({
         title: "Erro no pagamento",
         description: error.message || "Ocorreu um erro ao processar o pagamento. Tente novamente.",
@@ -318,6 +322,14 @@ const MyBookings = () => {
       
       <section className="p-4 pb-20">
         <div className="max-w-lg mx-auto">
+          {paymentErrorMsg && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Erro no processamento do pagamento</AlertTitle>
+              <AlertDescription>{paymentErrorMsg}</AlertDescription>
+            </Alert>
+          )}
+          
           <Tabs defaultValue="upcoming" onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-3 mb-4">
               <TabsTrigger value="upcoming">Próximas</TabsTrigger>

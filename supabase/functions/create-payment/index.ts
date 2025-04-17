@@ -20,8 +20,8 @@ serve(async (req) => {
   
   try {
     // Configuração do cliente Supabase
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error("Configurações do Supabase ausentes");
@@ -48,6 +48,7 @@ serve(async (req) => {
     const { booking_id } = requestBody;
     
     if (!booking_id) {
+      console.error("ID da reserva não fornecido");
       return new Response(
         JSON.stringify({ error: "ID da reserva não fornecido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -81,6 +82,7 @@ serve(async (req) => {
     if (paymentCheckError) {
       console.error("Erro ao verificar pagamento existente:", paymentCheckError);
     } else if (existingPayment && existingPayment.status === 'paid') {
+      console.error("Esta reserva já possui um pagamento confirmado");
       return new Response(
         JSON.stringify({ error: "Esta reserva já possui um pagamento confirmado" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -105,7 +107,7 @@ serve(async (req) => {
       );
     }
     
-    if (!integration?.access_token) {
+    if (!integration || !integration.access_token) {
       console.error("Integração não configurada ou inativa");
       return new Response(
         JSON.stringify({ 
@@ -145,83 +147,99 @@ serve(async (req) => {
     
     // Fazer requisição para API do Mercado Pago
     console.log("Enviando preferência para Mercado Pago:", JSON.stringify(preference));
-    const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${integration.access_token}`
-      },
-      body: JSON.stringify(preference)
-    });
     
-    if (!mpResponse.ok) {
-      const errorText = await mpResponse.text();
-      console.error("Erro na resposta do Mercado Pago:", errorText);
-      return new Response(
-        JSON.stringify({ error: "Erro ao gerar pagamento no Mercado Pago" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    const mpData = await mpResponse.json();
-    console.log("Resposta do Mercado Pago:", JSON.stringify(mpData));
-    
-    // Limpar pagamentos antigos (pendentes/expirados) para esta reserva
-    if (existingPayment) {
-      await supabase
-        .from("payments")
-        .update({ status: "cancelled" })
-        .eq("booking_id", booking_id)
-        .eq("status", "pending");
-    }
-    
-    // Registrar o pagamento no banco de dados
-    const { data: payment, error: paymentError } = await supabase
-      .from("payments")
-      .insert({
-        booking_id: booking.id,
-        user_id: booking.user_id,
-        mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
-        status: "pending",
-        amount: booking.amount,
-        payment_method: null, // Será atualizado pelo webhook
-        expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
-        raw_response: mpData
-      })
-      .select()
-      .single();
-    
-    if (paymentError) {
-      console.error("Erro ao registrar pagamento:", paymentError);
-      return new Response(
-        JSON.stringify({ error: "Erro ao registrar pagamento" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    // Determinar qual URL usar com base no ambiente
-    const paymentUrl = integration.environment === 'production' 
-      ? mpData.init_point 
-      : mpData.sandbox_init_point;
-    
-    // Retornar URL de pagamento
-    return new Response(
-      JSON.stringify({
-        success: true,
-        payment_id: payment.id,
-        payment_url: paymentUrl,
-        sandbox_url: mpData.sandbox_init_point,
-        prod_url: mpData.init_point,
-        environment: integration.environment
-      }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        } 
+    try {
+      const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${integration.access_token}`
+        },
+        body: JSON.stringify(preference)
+      });
+      
+      // Verificar se a resposta do MercadoPago é bem-sucedida
+      if (!mpResponse.ok) {
+        const errorText = await mpResponse.text();
+        console.error("Erro na resposta do Mercado Pago:", errorText, "Status:", mpResponse.status);
+        
+        return new Response(
+          JSON.stringify({ 
+            error: `Erro ao gerar pagamento no Mercado Pago: ${mpResponse.statusText}`,
+            details: errorText
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-    );
-    
+      
+      const mpData = await mpResponse.json();
+      console.log("Resposta do Mercado Pago:", JSON.stringify(mpData));
+      
+      // Limpar pagamentos antigos (pendentes/expirados) para esta reserva
+      if (existingPayment) {
+        await supabase
+          .from("payments")
+          .update({ status: "cancelled" })
+          .eq("booking_id", booking_id)
+          .eq("status", "pending");
+      }
+      
+      // Registrar o pagamento no banco de dados
+      const { data: payment, error: paymentError } = await supabase
+        .from("payments")
+        .insert({
+          booking_id: booking.id,
+          user_id: booking.user_id,
+          mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
+          status: "pending",
+          amount: booking.amount,
+          payment_method: null, // Será atualizado pelo webhook
+          expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
+          raw_response: mpData
+        })
+        .select()
+        .single();
+      
+      if (paymentError) {
+        console.error("Erro ao registrar pagamento:", paymentError);
+        return new Response(
+          JSON.stringify({ error: "Erro ao registrar pagamento" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Determinar qual URL usar com base no ambiente
+      const paymentUrl = integration.environment === 'production' 
+        ? mpData.init_point 
+        : mpData.sandbox_init_point;
+      
+      // Retornar URL de pagamento
+      return new Response(
+        JSON.stringify({
+          success: true,
+          payment_id: payment.id,
+          payment_url: paymentUrl,
+          sandbox_url: mpData.sandbox_init_point,
+          prod_url: mpData.init_point,
+          environment: integration.environment
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json" 
+          } 
+        }
+      );
+    } catch (mpError) {
+      console.error("Erro ao se comunicar com o Mercado Pago:", mpError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Erro ao se comunicar com o gateway de pagamento",
+          details: mpError.message
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   } catch (error) {
     console.error("Erro geral:", error);
     return new Response(
