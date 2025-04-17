@@ -22,10 +22,30 @@ serve(async (req) => {
     // Configuração do cliente Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Configurações do Supabase ausentes");
+      return new Response(
+        JSON.stringify({ error: "Erro de configuração do servidor" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     // Obter o ID da reserva do corpo da requisição
-    const { booking_id } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (error) {
+      console.error("Erro ao analisar o corpo da requisição:", error);
+      return new Response(
+        JSON.stringify({ error: "Formato de requisição inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { booking_id } = requestBody;
     
     if (!booking_id) {
       return new Response(
