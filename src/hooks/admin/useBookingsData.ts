@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,7 +61,6 @@ export function useBookingsData() {
     }
   });
 
-  // Query for bookings
   const { data: allBookings, isLoading, error, refetch } = useQuery({
     queryKey: ['bookings', dateRange.start, dateRange.end, selectedCourt, selectedStatus],
     queryFn: async () => {
@@ -97,21 +95,22 @@ export function useBookingsData() {
     }
   });
 
-  // Correção da função getBookingsForDay para lidar corretamente com comparações de data
+  const getBookingDate = (booking: Booking): Date => {
+    if (typeof booking.booking_date === 'string') {
+      return parseISO(booking.booking_date);
+    }
+    return booking.booking_date;
+  };
+
   const getBookingsForDay = (day: Date) => {
     if (!allBookings) return [];
     
-    // Definindo o início do dia para comparação (meia-noite)
     const startOfTargetDay = startOfDay(day);
     
     return allBookings.filter(booking => {
-      // Convertendo string em objeto Date e normalizando para o início do dia
-      // usando parseISO para garantir interpretação correta da data
-      const bookingDateStr = booking.booking_date;
-      const bookingDate = parseISO(bookingDateStr);
+      const bookingDate = getBookingDate(booking);
       const bookingDayStart = startOfDay(bookingDate);
       
-      // Comparando apenas as datas (dia/mês/ano), ignorando horas/minutos/segundos
       return bookingDayStart.getTime() === startOfTargetDay.getTime();
     });
   };
@@ -126,9 +125,8 @@ export function useBookingsData() {
       };
     }
 
-    // Ajustando também o cálculo de estatísticas para usar a mesma lógica de comparação de datas
     const periodBookings = allBookings.filter(booking => {
-      const bookingDate = parseISO(booking.booking_date);
+      const bookingDate = getBookingDate(booking);
       const bookingDayStart = startOfDay(bookingDate);
       const rangeStart = startOfDay(dateRange.start);
       const rangeEnd = startOfDay(dateRange.end);
@@ -167,7 +165,7 @@ export function useBookingsData() {
 
   const selectedDayBookings = selectedDayDetails 
     ? allBookings?.filter(b => {
-        const bookingDate = parseISO(b.booking_date);
+        const bookingDate = getBookingDate(b);
         return isSameDay(bookingDate, selectedDayDetails);
       }) || []
     : [];

@@ -18,6 +18,14 @@ export const WeekCalendarView = ({
   handleDayClick,
   handleEditBooking
 }: WeekCalendarViewProps) => {
+  // Helper function to safely convert booking_date to Date
+  const getBookingDate = (booking: Booking): Date => {
+    if (typeof booking.booking_date === 'string') {
+      return parseISO(booking.booking_date);
+    }
+    return booking.booking_date;
+  };
+
   return (
     <div className="mb-6 overflow-x-auto">
       <table className="min-w-full border-collapse">
@@ -55,7 +63,7 @@ export const WeekCalendarView = ({
                   end: dateRange.end
                 }).map((day) => {
                   const bookingsAtHour = allBookings?.filter(b => {
-                    const bookingDate = parseISO(b.booking_date);
+                    const bookingDate = getBookingDate(b);
                     return isSameDay(bookingDate, day) && 
                       b.start_time.startsWith(hourFormatted.slice(0, 2));
                   }) || [];
