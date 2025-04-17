@@ -15,8 +15,10 @@ import {
   isSameDay,
   isWeekend,
   startOfWeek,
-  endOfWeek
+  endOfWeek,
+  parseISO
 } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Booking, BookingStatus, Court } from '@/types';
 
 export function useBookingsData() {
@@ -95,12 +97,22 @@ export function useBookingsData() {
     }
   });
 
+  // Correção da função getBookingsForDay para lidar corretamente com comparações de data
   const getBookingsForDay = (day: Date) => {
     if (!allBookings) return [];
     
+    // Definindo o início do dia para comparação (meia-noite)
+    const startOfTargetDay = startOfDay(day);
+    
     return allBookings.filter(booking => {
-      const bookingDate = new Date(booking.booking_date);
-      return isSameDay(bookingDate, day);
+      // Convertendo string em objeto Date e normalizando para o início do dia
+      // usando parseISO para garantir interpretação correta da data
+      const bookingDateStr = booking.booking_date;
+      const bookingDate = parseISO(bookingDateStr);
+      const bookingDayStart = startOfDay(bookingDate);
+      
+      // Comparando apenas as datas (dia/mês/ano), ignorando horas/minutos/segundos
+      return bookingDayStart.getTime() === startOfTargetDay.getTime();
     });
   };
 
@@ -114,9 +126,17 @@ export function useBookingsData() {
       };
     }
 
+    // Ajustando também o cálculo de estatísticas para usar a mesma lógica de comparação de datas
     const periodBookings = allBookings.filter(booking => {
-      const bookingDate = new Date(booking.booking_date);
-      return bookingDate >= dateRange.start && bookingDate <= dateRange.end;
+      const bookingDate = parseISO(booking.booking_date);
+      const bookingDayStart = startOfDay(bookingDate);
+      const rangeStart = startOfDay(dateRange.start);
+      const rangeEnd = startOfDay(dateRange.end);
+      
+      return (
+        bookingDayStart.getTime() >= rangeStart.getTime() && 
+        bookingDayStart.getTime() <= rangeEnd.getTime()
+      );
     });
 
     return {
@@ -147,7 +167,7 @@ export function useBookingsData() {
 
   const selectedDayBookings = selectedDayDetails 
     ? allBookings?.filter(b => {
-        const bookingDate = new Date(b.booking_date);
+        const bookingDate = parseISO(b.booking_date);
         return isSameDay(bookingDate, selectedDayDetails);
       }) || []
     : [];

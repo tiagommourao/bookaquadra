@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { eachDayOfInterval, format, isToday, isSameDay, isWeekend } from 'date-fns';
+import { eachDayOfInterval, format, isToday, isSameDay, isWeekend, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Booking } from '@/types';
 import { Edit } from 'lucide-react';
@@ -55,7 +55,7 @@ export const WeekCalendarView = ({
                   end: dateRange.end
                 }).map((day) => {
                   const bookingsAtHour = allBookings?.filter(b => {
-                    const bookingDate = new Date(b.booking_date);
+                    const bookingDate = parseISO(b.booking_date);
                     return isSameDay(bookingDate, day) && 
                       b.start_time.startsWith(hourFormatted.slice(0, 2));
                   }) || [];

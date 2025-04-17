@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { format, getDay, isToday, isWeekend } from 'date-fns';
+import { format, getDay, isToday, isWeekend, parseISO } from 'date-fns';
 import { Booking } from '@/types';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
