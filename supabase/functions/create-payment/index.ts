@@ -2,9 +2,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Configuração CORS - elemento crítico para resolver o problema
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // Aceita requisições de qualquer origem
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -16,7 +15,6 @@ function isValidPaymentStatus(status: string): boolean {
 }
 
 serve(async (req) => {
-  // É CRUCIAL tratar a requisição OPTIONS para CORS
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -25,7 +23,6 @@ serve(async (req) => {
   }
   
   try {
-    // Configuração do cliente Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
@@ -39,7 +36,6 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Obter o ID da reserva do corpo da requisição
     let requestBody;
     try {
       requestBody = await req.json();
@@ -63,7 +59,6 @@ serve(async (req) => {
     
     console.log(`Processando pagamento para reserva ID: ${booking_id}`);
     
-    // Buscar detalhes da reserva
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select("*, court:courts(name)")
@@ -78,7 +73,6 @@ serve(async (req) => {
       );
     }
     
-    // Verificar se já existe um pagamento confirmado para esta reserva
     const { data: existingPayment, error: paymentCheckError } = await supabase
       .from("payments")
       .select("id, status")
@@ -95,7 +89,6 @@ serve(async (req) => {
       );
     }
     
-    // Obter a integração ativa do Mercado Pago
     const { data: integration, error: integrationError } = await supabase
       .from("integrations_mercadopago")
       .select("access_token, environment")
@@ -103,7 +96,6 @@ serve(async (req) => {
       .order("created_at", { ascending: false })
       .maybeSingle();
     
-    // Verificar se há uma integração ativa configurada
     if (integrationError) {
       console.error("Erro ao buscar integração:", integrationError);
       return new Response(
@@ -123,14 +115,11 @@ serve(async (req) => {
       );
     }
     
-    // Nome da quadra e descrição para o pagamento
     const courtName = booking.court?.name || "Quadra";
     
-    // Data e hora formatadas para exibição
     const bookingDate = new Date(booking.booking_date);
     const formattedDate = `${bookingDate.getDate()}/${bookingDate.getMonth() + 1}/${bookingDate.getFullYear()}`;
     
-    // Criar preferência de pagamento no Mercado Pago
     const preference = {
       items: [
         {
@@ -150,7 +139,6 @@ serve(async (req) => {
       notification_url: `${supabaseUrl}/functions/v1/mercadopago-webhook`
     };
     
-    // Fazer requisição para API do Mercado Pago
     console.log("Enviando preferência para Mercado Pago:", JSON.stringify(preference));
     
     try {
@@ -163,7 +151,6 @@ serve(async (req) => {
         body: JSON.stringify(preference)
       });
       
-      // Verificar se a resposta do MercadoPago é bem-sucedida
       if (!mpResponse.ok) {
         const errorText = await mpResponse.text();
         console.error("Erro na resposta do Mercado Pago:", errorText, "Status:", mpResponse.status);
@@ -180,7 +167,6 @@ serve(async (req) => {
       const mpData = await mpResponse.json();
       console.log("Resposta do Mercado Pago:", JSON.stringify(mpData));
       
-      // Limpar pagamentos antigos (pendentes/expirados) para esta reserva
       if (existingPayment) {
         await supabase
           .from("payments")
@@ -189,21 +175,9 @@ serve(async (req) => {
           .eq("status", "pending");
       }
       
-      // Verificar os valores permitidos para status de pagamento
-      // Primeiro, vamos buscar um valor válido que está na tabela
-      // antes de tentarmos inserir um novo registro
-      const { data: validStatusExample } = await supabase
-        .from("payments")
-        .select("status")
-        .limit(1);
+      const statusToUse = "pending";
+      console.log(`Usando status de pagamento: ${statusToUse}`);
       
-      // Se encontrarmos um exemplo válido, vamos registrar para debug
-      console.log("Status de pagamento válidos encontrados:", validStatusExample);
-      
-      // Determinar o status a ser usado na inserção
-      let statusToUse = "pending";
-      
-      // Checar se este é um valor válido com base na verificação anterior
       if (!isValidPaymentStatus(statusToUse)) {
         console.error(`Valor de status '${statusToUse}' não é válido para o esquema atual`);
         return new Response(
@@ -214,56 +188,40 @@ serve(async (req) => {
         );
       }
       
-      // Registrar o pagamento no banco de dados
       const paymentData = {
         booking_id: booking.id,
         user_id: booking.user_id,
-        mercadopago_payment_id: null, // Será atualizado pelo webhook quando houver pagamento
+        mercadopago_payment_id: null,
         status: statusToUse,
         amount: booking.amount,
-        payment_method: null, // Será atualizado pelo webhook
-        expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h para expirar
+        payment_method: null,
+        expiration_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         raw_response: mpData
       };
       
       console.log("Inserindo pagamento com dados:", JSON.stringify(paymentData));
       
-      // Tentar inserir usando RPC para evitar problemas com tipos/enums
       const { data: payment, error: paymentError } = await supabase
-        .rpc('create_payment', paymentData)
+        .from("payments")
+        .insert([paymentData])
+        .select()
         .single();
       
       if (paymentError) {
-        // Tentar o método tradicional de inserção como fallback
-        console.error("Erro ao chamar RPC create_payment:", paymentError);
-        console.log("Tentando inserção direta como fallback...");
-        
-        const { data: directPayment, error: directPaymentError } = await supabase
-          .from("payments")
-          .insert([paymentData])
-          .select()
-          .single();
-        
-        if (directPaymentError) {
-          console.error("Erro ao registrar pagamento:", directPaymentError);
-          return new Response(
-            JSON.stringify({ 
-              error: "Erro ao registrar pagamento", 
-              details: directPaymentError.message 
-            }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        payment = directPayment;
+        console.error("Erro ao registrar pagamento:", paymentError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Erro ao registrar pagamento", 
+            details: paymentError.message 
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       
-      // Determinar qual URL usar com base no ambiente
       const paymentUrl = integration.environment === 'production' 
         ? mpData.init_point 
         : mpData.sandbox_init_point;
       
-      // Retornar URL de pagamento
       return new Response(
         JSON.stringify({
           success: true,
