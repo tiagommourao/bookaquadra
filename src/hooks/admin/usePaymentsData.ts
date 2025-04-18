@@ -21,7 +21,7 @@ export const usePaymentsData = (filters: PaymentFilters) => {
 
   const fetchPayments = useCallback(async () => {
     let query = supabase
-      .from('payments')
+      .from('payment_details_view')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -51,10 +51,10 @@ export const usePaymentsData = (filters: PaymentFilters) => {
     }
 
     if (filters.search) {
-      query = query.or(`id.ilike.%${filters.search}%,mercadopago_payment_id.ilike.%${filters.search}%`);
+      query = query.or(`id.ilike.%${filters.search}%,mercadopago_payment_id.ilike.%${filters.search}%,first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%`);
     }
 
-    const { data, error } = await query.returns<Payment[]>();
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching payments:', error);

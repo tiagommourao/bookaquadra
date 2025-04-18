@@ -430,6 +430,20 @@ export type Database = {
             foreignKeyName: "payment_status_logs_payment_id_fkey"
             columns: ["payment_id"]
             isOneToOne: false
+            referencedRelation: "payment_details_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_status_logs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payment_history_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_status_logs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
             referencedRelation: "payments"
             referencedColumns: ["id"]
           },
@@ -1166,7 +1180,70 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      payment_details_view: {
+        Row: {
+          admin_modification_reason: string | null
+          admin_modified_by: string | null
+          amount: number | null
+          booking_date: string | null
+          booking_id: string | null
+          court_name: string | null
+          created_at: string | null
+          end_time: string | null
+          expiration_date: string | null
+          first_name: string | null
+          id: string | null
+          last_name: string | null
+          mercadopago_payment_id: string | null
+          payment_method: string | null
+          raw_response: Json | null
+          start_time: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_history_view: {
+        Row: {
+          admin_modification_reason: string | null
+          admin_modified_by: string | null
+          amount: number | null
+          booking_date: string | null
+          booking_id: string | null
+          court_name: string | null
+          created_at: string | null
+          end_time: string | null
+          expiration_date: string | null
+          first_name: string | null
+          id: string | null
+          last_name: string | null
+          mercadopago_payment_id: string | null
+          payment_method: string | null
+          raw_response: Json | null
+          start_time: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       is_admin: {

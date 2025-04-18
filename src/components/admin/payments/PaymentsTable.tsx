@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Payment } from '@/types/payment';
 import { 
@@ -88,12 +87,11 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ID</TableHead>
               <TableHead>Data</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Método</TableHead>
-              <TableHead>Usuário</TableHead>
+              <TableHead>Cliente</TableHead>
               <TableHead>Reserva</TableHead>
               <TableHead>ID MercadoPago</TableHead>
             </TableRow>
@@ -101,7 +99,7 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
           <TableBody>
             {payments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   Nenhum pagamento encontrado.
                 </TableCell>
               </TableRow>
@@ -112,7 +110,6 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
                   className="cursor-pointer hover:bg-gray-50"
                   onClick={() => onPaymentClick(payment)}
                 >
-                  <TableCell className="font-medium">{payment.id.slice(0, 8)}...</TableCell>
                   <TableCell>{formatDate(payment.created_at)}</TableCell>
                   <TableCell className="text-right font-medium">
                     {formatCurrency(payment.amount)}
@@ -120,18 +117,18 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
                   <TableCell>{getStatusBadge(payment.status)}</TableCell>
                   <TableCell>{getPaymentMethodText(payment.payment_method)}</TableCell>
                   <TableCell>
-                    {payment.user_id ? (
-                      <span className="text-blue-600 hover:underline">
-                        {payment.user_id.slice(0, 8)}...
+                    {payment.first_name && payment.last_name ? (
+                      <span className="text-blue-600">
+                        {payment.first_name} {payment.last_name}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    {payment.booking_id ? (
-                      <span className="text-blue-600 hover:underline">
-                        {payment.booking_id.slice(0, 8)}...
+                    {payment.court_name && payment.booking_date ? (
+                      <span className="text-gray-700">
+                        {payment.court_name} - {formatDateShort(payment.booking_date)} {payment.start_time}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
