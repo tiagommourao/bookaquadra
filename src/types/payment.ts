@@ -17,6 +17,14 @@ export interface Payment {
   raw_response?: any;
   admin_modified_by?: string | null;
   admin_modification_reason?: string | null;
+  
+  // Campos adicionais da view payment_details_view
+  first_name?: string | null;
+  last_name?: string | null;
+  booking_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  court_name?: string | null;
 }
 
 export interface PaymentStatusLog {

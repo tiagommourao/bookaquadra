@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Payment } from '@/types/payment';
 import { 
@@ -17,7 +18,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { Badge } from '@/components/ui/badge';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface PaymentsTableProps {
@@ -39,6 +40,12 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
+  };
+
+  const formatDateShort = (dateString: string | null | undefined) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return format(date, 'dd/MM/yyyy', { locale: ptBR });
   };
 
   const getStatusBadge = (status: string) => {

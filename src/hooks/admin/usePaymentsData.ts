@@ -64,10 +64,10 @@ export const usePaymentsData = (filters: PaymentFilters) => {
 
     // Calcular estatísticas
     if (data) {
-      calculateStatistics(data);
+      calculateStatistics(data as Payment[]);
     }
 
-    return data || [];
+    return data as Payment[] || [];
   }, [filters]);
 
   const calculateStatistics = (payments: Payment[]) => {
@@ -80,7 +80,7 @@ export const usePaymentsData = (filters: PaymentFilters) => {
         .filter(p => p.status === 'pending')
         .reduce((sum, payment) => sum + Number(payment.amount), 0),
       cancelledAmount: payments
-        .filter(p => ['cancelled', 'rejected', 'expired'].includes(p.status))
+        .filter(p => ['cancelled', 'rejected', 'expired'].includes(p.status as string))
         .reduce((sum, payment) => sum + Number(payment.amount), 0),
     };
 
@@ -112,7 +112,13 @@ export const usePaymentsData = (filters: PaymentFilters) => {
         'N/A',
       'ID do Usuário': payment.user_id || 'N/A',
       'ID da Reserva': payment.booking_id || 'N/A',
-      'ID MercadoPago': payment.mercadopago_payment_id || 'N/A'
+      'ID MercadoPago': payment.mercadopago_payment_id || 'N/A',
+      'Cliente': payment.first_name && payment.last_name ? 
+        `${payment.first_name} ${payment.last_name}` : 'N/A',
+      'Quadra': payment.court_name || 'N/A',
+      'Data da Reserva': payment.booking_date ? 
+        new Date(payment.booking_date).toLocaleDateString('pt-BR') : 'N/A',
+      'Horário': payment.start_time || 'N/A'
     }));
 
     // Converter para CSV/Excel (implementação básica para CSV)
@@ -192,7 +198,7 @@ export const useUpdatePaymentStatus = (paymentId: string) => {
 
   return {
     updateStatus,
-    isLoading: isPending, // Correção aqui, usando isPending em vez de isLoading
+    isLoading: isPending,
     isSuccess,
     fetchStatusLogs
   };
