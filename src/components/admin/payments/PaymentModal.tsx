@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Payment, PaymentStatusLog, PaymentStatus } from '@/types/payment';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -91,6 +91,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('pt-BR');
+  };
+
+  const formatDateWithoutTime = (dateString: string) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return format(date, 'dd/MM/yyyy', { locale: ptBR });
   };
 
   const formatRelativeDate = (dateString: string) => {
@@ -196,13 +202,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               )}
 
-              {payment.user_id && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Usuário</h3>
-                  <div className="mt-1 flex items-center">
-                    <span className="text-blue-600 hover:underline cursor-pointer">
-                      {payment.user_id}
-                    </span>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Usuário</h3>
+                <div className="mt-1">
+                  {payment.first_name && payment.last_name ? (
+                    <p className="text-blue-600">
+                      {payment.first_name} {payment.last_name}
+                    </p>
+                  ) : (
+                    <p className="text-gray-500">Usuário não encontrado</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    ID: {payment.user_id}
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -211,39 +222,47 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
-                  </div>
+                  </p>
                 </div>
-              )}
+              </div>
 
-              {payment.booking_id && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Reserva</h3>
-                  <div className="mt-1 flex items-center">
-                    <span className="text-blue-600 hover:underline cursor-pointer">
-                      {payment.booking_id}
-                    </span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 ml-1"
-                      onClick={() => copyToClipboard(payment.booking_id || '')}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Reserva</h3>
+                <div className="mt-1">
+                  {payment.court_name && payment.booking_date ? (
+                    <>
+                      <p className="text-blue-600">
+                        {payment.court_name} - {formatDateWithoutTime(payment.booking_date)}
+                        {payment.start_time && ` ${payment.start_time}`}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        ID: {payment.booking_id}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 ml-1"
+                          onClick={() => copyToClipboard(payment.booking_id || '')}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-gray-500">Reserva não encontrada</p>
+                  )}
                 </div>
-              )}
+              </div>
 
               {payment.mercadopago_payment_id && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">ID MercadoPago</h3>
                   <div className="mt-1 flex items-center">
-                    <span>{payment.mercadopago_payment_id}</span>
+                    <span className="text-blue-600">{payment.mercadopago_payment_id}</span>
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="h-6 w-6 ml-1"
-                      onClick={() => copyToClipboard(payment.mercadopago_payment_id || '')}
+                      onClick={() => copyToClipboard(payment.mercadopago_payment_id)}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -359,7 +378,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
           <TabsContent value="raw" className="pt-4">
             <div className="space-y-4">
-              <h3 className="font-medium">Dados Brutos</h3>
+              <h3 className="font-medium">Dados do Pagamento</h3>
               <div className="bg-gray-100 p-4 rounded-md overflow-x-auto">
                 <pre className="text-xs text-gray-800 whitespace-pre-wrap">
                   {JSON.stringify(payment, null, 2)}
