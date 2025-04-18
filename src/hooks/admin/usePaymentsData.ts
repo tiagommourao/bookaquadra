@@ -219,14 +219,23 @@ export const useUpdatePaymentStatus = (paymentId: string) => {
 
   // Buscar detalhes de um pagamento específico
   const fetchPaymentDetails = useCallback(async (id: string) => {
+    console.log('Fetching payment details for:', id);
+    
     const { data, error } = await supabase
       .from('payment_details_view')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle(); // Usamos maybeSingle() ao invés de single() para evitar erros quando não encontrar
     
     if (error) {
       console.error('Error fetching payment details:', error);
+      toast.error('Erro ao carregar detalhes do pagamento');
+      return null;
+    }
+    
+    if (!data) {
+      console.warn('No payment found with id:', id);
+      toast.error('Pagamento não encontrado');
       return null;
     }
     

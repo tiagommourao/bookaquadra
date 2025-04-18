@@ -86,6 +86,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setIsLoadingPayments(true);
     try {
       const payments = await fetchRelatedPayments(payment.booking_id);
+      console.log('Related payments loaded:', payments.length);
       setRelatedPayments(payments);
     } catch (error) {
       console.error('Error loading related payments:', error);
@@ -102,13 +103,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     
     setIsLoadingPayments(true);
     try {
+      console.log('Fetching payment details for ID:', paymentId);
       const paymentDetails = await fetchPaymentDetails(paymentId);
+      
       if (paymentDetails) {
+        console.log('Payment details loaded successfully:', paymentDetails.id);
         setSelectedPayment(paymentDetails);
         // Se estamos na aba de histórico, mudar para raw data para mostrar os detalhes
         if (activeTab === 'history') {
           setActiveTab('raw');
         }
+      } else {
+        console.error('Failed to load payment details, paymentDetails is null');
+        toast.error('Não foi possível carregar os detalhes do pagamento');
       }
     } catch (error) {
       console.error('Error fetching payment details:', error);
@@ -204,7 +211,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       case 'other':
         return 'Outro';
       default:
-        return 'Não informado';
+        return method || 'Não informado';
     }
   };
 
