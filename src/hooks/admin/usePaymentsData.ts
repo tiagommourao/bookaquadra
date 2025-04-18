@@ -156,36 +156,93 @@ export const useUpdatePaymentStatus = (paymentId: string) => {
   const { user } = useAuth();
 
   const fetchStatusLogs = useCallback(async () => {
-    const { data, error } = await supabase
+    // First try to get any status logs recorded in the payment_status_logs table
+    const { data: statusLogs, error: logsError } = await supabase
       .from('payment_status_logs')
       .select('*')
       .eq('payment_id', paymentId)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching payment status logs:', error);
-      return [];
+    if (logsError) {
+      console.error('Error fetching payment status logs:', logsError);
+      throw logsError;
     }
 
-    return data as PaymentStatusLog[];
+    // If no status logs were found, we need to fetch the payment details to create an initial log
+    if (!statusLogs || statusLogs.length === 0) {
+      const { data: payment, error: paymentError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('id', paymentId)
+        .single();
+
+      if (paymentError) {
+        console.error('Error fetching payment details:', paymentError);
+        return [];
+      }
+
+      if (payment) {
+        // Create a synthetic initial log entry based on the payment record
+        return [{
+          id: 'initial',
+          payment_id: payment.id,
+          previous_status: 'pending', // Assume initial status was pending
+          new_status: payment.status,
+          created_at: payment.created_at,
+          created_by: payment.admin_modified_by || null,
+          reason: 'Status inicial do pagamento'
+        }] as PaymentStatusLog[];
+      }
+    }
+
+    return statusLogs as PaymentStatusLog[] || [];
   }, [paymentId]);
 
   const { mutateAsync, isPending, isSuccess } = useMutation({
     mutationFn: async ({ newStatus, reason }: { newStatus: PaymentStatus; reason: string }) => {
       if (!user) throw new Error('Usuário não autenticado');
 
-      // Atualizar o status do pagamento
-      const { error: updateError } = await supabase
+      // Get the current payment status first
+      const { data: currentPayment, error: fetchError } = await supabase
         .from('payments')
-        .update({
-          status: newStatus,
-          admin_modified_by: user.id,
-          admin_modification_reason: reason,
-        })
-        .eq('id', paymentId);
+        .select('status')
+        .eq('id', paymentId)
+        .single();
 
-      if (updateError) {
-        throw updateError;
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      // Only update if the status is actually changing
+      if (currentPayment.status !== newStatus) {
+        // Atualizar o status do pagamento
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({
+            status: newStatus,
+            admin_modified_by: user.id,
+            admin_modification_reason: reason,
+          })
+          .eq('id', paymentId);
+
+        if (updateError) {
+          throw updateError;
+        }
+      } else {
+        // If status isn't changing, just add a log entry manually
+        const { error: logError } = await supabase
+          .from('payment_status_logs')
+          .insert({
+            payment_id: paymentId,
+            previous_status: currentPayment.status,
+            new_status: newStatus,
+            created_by: user.id,
+            reason: reason
+          });
+
+        if (logError) {
+          throw logError;
+        }
       }
 
       return { success: true };

@@ -74,6 +74,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     try {
       await updateStatus(selectedStatus, reason);
       toast.success('Status do pagamento atualizado com sucesso');
+      loadStatusLogs(); // Reload logs after status update
       onStatusUpdate();
     } catch (error) {
       console.error('Error updating payment status:', error);
