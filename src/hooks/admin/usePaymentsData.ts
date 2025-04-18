@@ -155,6 +155,7 @@ export const usePaymentsData = (filters: PaymentFilters) => {
 export const useUpdatePaymentStatus = (paymentId: string) => {
   const { user } = useAuth();
 
+  // Buscar histórico de status de um pagamento específico
   const fetchStatusLogs = useCallback(async () => {
     // First try to get any status logs recorded in the payment_status_logs table
     const { data: statusLogs, error: logsError } = await supabase
@@ -197,6 +198,40 @@ export const useUpdatePaymentStatus = (paymentId: string) => {
 
     return statusLogs as PaymentStatusLog[] || [];
   }, [paymentId]);
+
+  // Buscar todas as tentativas de pagamento relacionadas a uma reserva
+  const fetchRelatedPayments = useCallback(async (bookingId: string | null) => {
+    if (!bookingId) return [];
+    
+    const { data, error } = await supabase
+      .from('payment_history_view')
+      .select('*')
+      .eq('booking_id', bookingId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching related payments:', error);
+      return [];
+    }
+    
+    return data as Payment[];
+  }, []);
+
+  // Buscar detalhes de um pagamento específico
+  const fetchPaymentDetails = useCallback(async (id: string) => {
+    const { data, error } = await supabase
+      .from('payment_details_view')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching payment details:', error);
+      return null;
+    }
+    
+    return data as Payment;
+  }, []);
 
   const { mutateAsync, isPending, isSuccess } = useMutation({
     mutationFn: async ({ newStatus, reason }: { newStatus: PaymentStatus; reason: string }) => {
@@ -257,6 +292,8 @@ export const useUpdatePaymentStatus = (paymentId: string) => {
     updateStatus,
     isLoading: isPending,
     isSuccess,
-    fetchStatusLogs
+    fetchStatusLogs,
+    fetchRelatedPayments,
+    fetchPaymentDetails
   };
 };

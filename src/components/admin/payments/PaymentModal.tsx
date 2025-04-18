@@ -23,6 +23,7 @@ import {
 import { useUpdatePaymentStatus } from '@/hooks/admin/usePaymentsData';
 import { toast } from 'sonner';
 import { Loader2, Copy, CheckCircle } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface PaymentModalProps {
   payment: Payment;
@@ -40,18 +41,31 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<PaymentStatus>(payment.status);
   const [reason, setReason] = useState('');
   const [statusLogs, setStatusLogs] = useState<PaymentStatusLog[]>([]);
+  const [relatedPayments, setRelatedPayments] = useState<Payment[]>([]);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
 
-  const { updateStatus, isLoading: isUpdating, fetchStatusLogs } = useUpdatePaymentStatus(payment.id);
+  const { 
+    updateStatus, 
+    isLoading: isUpdating, 
+    fetchStatusLogs, 
+    fetchRelatedPayments, 
+    fetchPaymentDetails 
+  } = useUpdatePaymentStatus(payment.id);
 
+  // Carregar o pagamento selecionado inicialmente
   useEffect(() => {
     if (isOpen && payment) {
       setSelectedStatus(payment.status);
+      setSelectedPayment(payment);
       loadStatusLogs();
+      loadRelatedPayments();
     }
   }, [isOpen, payment]);
 
+  // Carregar histórico de status do pagamento atual
   const loadStatusLogs = async () => {
     setIsLoadingLogs(true);
     try {
@@ -62,6 +76,45 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       toast.error('Erro ao carregar histórico de status');
     } finally {
       setIsLoadingLogs(false);
+    }
+  };
+
+  // Carregar todos os pagamentos relacionados à mesma reserva
+  const loadRelatedPayments = async () => {
+    if (!payment.booking_id) return;
+    
+    setIsLoadingPayments(true);
+    try {
+      const payments = await fetchRelatedPayments(payment.booking_id);
+      setRelatedPayments(payments);
+    } catch (error) {
+      console.error('Error loading related payments:', error);
+      toast.error('Erro ao carregar tentativas de pagamento');
+    } finally {
+      setIsLoadingPayments(false);
+    }
+  };
+
+  // Selecionar um pagamento específico
+  const handleSelectPayment = async (paymentId: string) => {
+    // Se o pagamento já está selecionado, não faz nada
+    if (selectedPayment?.id === paymentId) return;
+    
+    setIsLoadingPayments(true);
+    try {
+      const paymentDetails = await fetchPaymentDetails(paymentId);
+      if (paymentDetails) {
+        setSelectedPayment(paymentDetails);
+        // Se estamos na aba de histórico, mudar para raw data para mostrar os detalhes
+        if (activeTab === 'history') {
+          setActiveTab('raw');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching payment details:', error);
+      toast.error('Erro ao carregar detalhes do pagamento');
+    } finally {
+      setIsLoadingPayments(false);
     }
   };
 
@@ -140,6 +193,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         return 'Transferência Bancária';
       case 'cash':
         return 'Dinheiro';
+      case 'visa':
+        return 'Visa';
+      case 'mastercard':
+        return 'MasterCard';
+      case 'amex':
+        return 'American Express';
+      case 'bolbradesco':
+        return 'Boleto Bradesco';
       case 'other':
         return 'Outro';
       default:
@@ -158,7 +219,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <DialogHeader>
           <DialogTitle className="text-xl">
             Detalhes do Pagamento 
-            <span className="ml-2 text-sm opacity-70">#{payment.id.slice(0, 8)}</span>
+            <span className="ml-2 text-sm opacity-70">#{selectedPayment?.id.slice(0, 8) || payment.id.slice(0, 8)}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -167,7 +228,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <TabsTrigger value="details">Detalhes</TabsTrigger>
             <TabsTrigger value="history">
               Histórico 
-              {statusLogs.length > 0 && <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 rounded-full">{statusLogs.length}</span>}
+              {relatedPayments.length > 0 && <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 rounded-full">{relatedPayments.length}</span>}
             </TabsTrigger>
             <TabsTrigger value="raw">Raw Data</TabsTrigger>
           </TabsList>
@@ -334,45 +395,96 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </TabsContent>
 
           <TabsContent value="history" className="space-y-4 pt-4">
-            {isLoadingLogs ? (
+            {isLoadingPayments ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
-            ) : statusLogs.length === 0 ? (
+            ) : relatedPayments.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                Nenhuma alteração de status registrada.
+                Nenhuma tentativa de pagamento encontrada para esta reserva.
               </div>
             ) : (
               <div className="space-y-4">
-                <h3 className="font-medium">Histórico de Status</h3>
+                <h3 className="font-medium">Histórico de Tentativas de Pagamento</h3>
                 
-                <div className="space-y-4">
-                  {statusLogs.map((log) => (
-                    <div key={log.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                          <span className="font-medium">
-                            {getStatusBadge(log.previous_status)} → {getStatusBadge(log.new_status)}
-                          </span>
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {formatRelativeDate(log.created_at)}
-                        </span>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Método</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {relatedPayments.map((payment) => (
+                      <TableRow 
+                        key={payment.id} 
+                        className={selectedPayment?.id === payment.id ? "bg-muted" : undefined}
+                      >
+                        <TableCell className="font-mono text-xs">{payment.id.slice(0, 8)}</TableCell>
+                        <TableCell>{getStatusBadge(payment.status)}</TableCell>
+                        <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                        <TableCell>{getPaymentMethodText(payment.payment_method)}</TableCell>
+                        <TableCell className="text-sm">{formatRelativeDate(payment.created_at)}</TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleSelectPayment(payment.id)}
+                          >
+                            Detalhes
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                
+                {/* Status logs section */}
+                {selectedPayment && activeTab === 'history' && (
+                  <div className="mt-8">
+                    <h4 className="font-medium mb-3">Histórico de Status</h4>
+                    
+                    {isLoadingLogs ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
                       </div>
-                      {log.reason && (
-                        <p className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                          {log.reason}
-                        </p>
-                      )}
-                      {log.created_by && (
-                        <p className="mt-2 text-xs text-gray-500">
-                          Alterado por: {log.created_by}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ) : statusLogs.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">Sem histórico de status para este pagamento</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {statusLogs.map((log) => (
+                          <div key={log.id} className="border rounded-lg p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                                <span className="font-medium">
+                                  {getStatusBadge(log.previous_status)} → {getStatusBadge(log.new_status)}
+                                </span>
+                              </div>
+                              <span className="text-sm text-gray-500">
+                                {formatRelativeDate(log.created_at)}
+                              </span>
+                            </div>
+                            {log.reason && (
+                              <p className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                                {log.reason}
+                              </p>
+                            )}
+                            {log.created_by && (
+                              <p className="mt-2 text-xs text-gray-500">
+                                Alterado por: {log.created_by}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -382,16 +494,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <h3 className="font-medium">Dados do Pagamento</h3>
               <div className="bg-gray-100 p-4 rounded-md overflow-x-auto">
                 <pre className="text-xs text-gray-800 whitespace-pre-wrap">
-                  {JSON.stringify(payment, null, 2)}
+                  {JSON.stringify(selectedPayment || payment, null, 2)}
                 </pre>
               </div>
 
-              {payment.raw_response && (
+              {(selectedPayment?.raw_response || payment.raw_response) && (
                 <div className="space-y-2">
                   <h3 className="font-medium">Resposta do MercadoPago</h3>
                   <div className="bg-gray-100 p-4 rounded-md overflow-x-auto">
                     <pre className="text-xs text-gray-800 whitespace-pre-wrap">
-                      {JSON.stringify(payment.raw_response, null, 2)}
+                      {JSON.stringify((selectedPayment?.raw_response || payment.raw_response), null, 2)}
                     </pre>
                   </div>
                 </div>
