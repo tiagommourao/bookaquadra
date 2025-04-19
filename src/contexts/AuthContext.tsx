@@ -1,205 +1,212 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User, UserRole, Profile } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
-import { User, AuthError, AuthResponse } from '@supabase/supabase-js';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
-// Interface estendida para incluir propriedades adicionais ao User
-export interface ExtendedUser extends User {
-  name?: string;
-  avatarUrl?: string;
-}
+import { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
-  user: ExtendedUser | null;
+  user: User | null;
+  profile: Profile | null;
+  session: Session | null;
   isAuthenticated: boolean;
-  isAdmin: boolean;
   isLoading: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  error: AuthError | null;
-  refreshUser: () => Promise<void>; // Nova função para atualizar dados do usuário
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<ExtendedUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<AuthError | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Verificar se o usuário é admin usando a função check_user_role
-  const checkAdminRole = async (userId: string) => {
-    try {
-      const { data, error: roleError } = await supabase.rpc('check_user_role', {
-        user_id: userId
-      });
-      
-      if (roleError) {
-        console.error('Erro ao verificar role:', roleError);
-        return false;
-      }
-      
-      return data === 'admin';
-    } catch (err) {
-      console.error('Erro ao verificar admin:', err);
-      return false;
-    }
+  // Função para converter do formato do Supabase para o formato User do nosso app
+  const formatUser = (session: Session | null): User | null => {
+    if (!session?.user) return null;
+    
+    return {
+      id: session.user.id,
+      name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuário',
+      email: session.user.email || '',
+      role: session.user.app_metadata?.role || 'user',
+      avatarUrl: session.user.user_metadata?.avatar_url,
+      createdAt: new Date(session.user.created_at),
+    };
   };
 
-  // Função para buscar dados adicionais do perfil do usuário
-  const fetchUserProfile = async (userId: string) => {
+  // Função para buscar perfil do usuário
+  const fetchProfile = async (userId: string) => {
     try {
-      const { data: profile, error: profileError } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name, avatar_url')
+        .select('*')
         .eq('id', userId)
         .single();
       
-      if (profileError) {
-        console.error('Erro ao buscar perfil:', profileError);
-        return null;
-      }
+      if (error) throw error;
       
-      return profile;
-    } catch (err) {
-      console.error('Erro ao buscar perfil:', err);
-      return null;
-    }
-  };
-
-  // Função para enriquecer o objeto de usuário com dados adicionais
-  const enrichUserWithProfile = async (baseUser: User): Promise<ExtendedUser> => {
-    const profile = await fetchUserProfile(baseUser.id);
-    
-    const extendedUser: ExtendedUser = {
-      ...baseUser,
-      name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : '',
-      avatarUrl: profile?.avatar_url || '',
-    };
-    
-    return extendedUser;
-  };
-
-  // Nova função para atualizar dados do usuário
-  const refreshUser = async () => {
-    if (!user) return;
-    
-    try {
-      setIsLoading(true);
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
-      if (currentUser) {
-        const enrichedUser = await enrichUserWithProfile(currentUser);
-        setUser(enrichedUser);
-        
-        const isUserAdmin = await checkAdminRole(currentUser.id);
-        setIsAdmin(isUserAdmin);
+      if (data) {
+        const profileData: Profile = {
+          ...data,
+          created_at: new Date(data.created_at),
+          updated_at: new Date(data.updated_at)
+        };
+        setProfile(profileData);
       }
     } catch (error) {
-      console.error('Erro ao atualizar usuário:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Erro ao carregar perfil do usuário:', error);
     }
   };
 
+  // Verificar status da autenticação ao montar o componente
   useEffect(() => {
-    const initAuth = async () => {
+    const initialize = async () => {
+      setIsLoading(true);
+      
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        // Primeiro configurar o listener para mudanças no estado de auth
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (event, currentSession) => {
+            setSession(currentSession);
+            setUser(formatUser(currentSession));
+            
+            if (currentSession?.user) {
+              // Usar setTimeout para evitar deadlocks e garantir que os demais estados sejam atualizados primeiro
+              setTimeout(() => {
+                fetchProfile(currentSession.user.id);
+              }, 0);
+            } else {
+              setProfile(null);
+            }
+          }
+        );
         
-        if (authUser) {
-          const enrichedUser = await enrichUserWithProfile(authUser);
-          setUser(enrichedUser);
-          
-          const isUserAdmin = await checkAdminRole(authUser.id);
-          setIsAdmin(isUserAdmin);
-        } else {
-          setUser(null);
-          setIsAdmin(false);
+        // Então verificar se já existe uma sessão ativa
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        setSession(currentSession);
+        setUser(formatUser(currentSession));
+        
+        if (currentSession?.user) {
+          await fetchProfile(currentSession.user.id);
         }
+        
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (error) {
-        console.error('Erro na inicialização da auth:', error);
+        console.error('Erro ao inicializar autenticação:', error);
       } finally {
         setIsLoading(false);
       }
     };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Evento de autenticação:', event);
-      
-      if (session?.user) {
-        const enrichedUser = await enrichUserWithProfile(session.user);
-        setUser(enrichedUser);
-        
-        const isUserAdmin = await checkAdminRole(session.user.id);
-        setIsAdmin(isUserAdmin);
-      } else {
-        setUser(null);
-        setIsAdmin(false);
-      }
-      
-      setIsLoading(false);
-    });
-
-    initAuth();
-    return () => subscription.unsubscribe();
+    
+    initialize();
   }, []);
 
+  // Verificar se o usuário atual é admin
+  // Modificado para verificar corretamente o papel do usuário
+  const isAdmin = user?.role === 'admin' || 
+    (session?.user?.app_metadata?.role === 'admin') || 
+    (session?.user?.email === 'admin@example.com'); // Para fins de desenvolvimento - remover em produção
+
+  // Login com email e senha
   const login = async (email: string, password: string) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const { error }: AuthResponse = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
-
-      if (error) {
-        setError(error);
-        toast.error('Erro ao fazer login: ' + error.message);
-      } else {
-        setError(null);
-        toast.success('Login realizado com sucesso!');
-        navigate('/');
-      }
-    } catch (err) {
-      console.error('Erro no login:', err);
-      toast.error('Ocorreu um erro inesperado');
+      
+      if (error) throw error;
+      
+      // onAuthStateChange vai atualizar o estado
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Erro ao realizar login');
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = async () => {
+  // Login com Google
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      await supabase.auth.signOut();
-      setUser(null);
-      setIsAdmin(false);
-      navigate('/login');
-      toast.success('Logout realizado com sucesso!');
-    } catch (error) {
-      console.error('Erro no logout:', error);
-      toast.error('Erro ao fazer logout');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Redirecionamento acontece, então não atualizamos o estado aqui
+    } catch (error: any) {
+      console.error('Google login error:', error);
+      toast.error(error.message || 'Erro ao realizar login com Google');
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  // Logout
+  const logout = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // onAuthStateChange vai atualizar o estado
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      toast.error(error.message || 'Erro ao realizar logout');
+      throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Função para atualizar dados do usuário e perfil
+  const refreshUser = async () => {
+    if (!session?.user) return;
+    
+    try {
+      const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+      setSession(refreshedSession);
+      setUser(formatUser(refreshedSession));
+      
+      if (refreshedSession?.user) {
+        await fetchProfile(refreshedSession.user.id);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar dados do usuário:', error);
     }
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated: !!user,
-      isAdmin,
-      isLoading,
-      login,
-      logout,
-      error,
-      refreshUser
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        session,
+        isAuthenticated: !!user,
+        isLoading,
+        isAdmin,
+        login,
+        loginWithGoogle,
+        logout,
+        refreshUser
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -208,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

@@ -3,12 +3,6 @@
 // User role types
 export type UserRole = 'user' | 'admin';
 
-// Importar o tipo ExtendedUser do AuthContext
-import { ExtendedUser } from '@/contexts/AuthContext';
-
-// Re-exportar ExtendedUser
-export type { ExtendedUser };
-
 // User type
 export interface User {
   id: string;
@@ -408,33 +402,6 @@ export type OnboardingStep =
 
 // Game type preferences
 export type GameTypePreference = 'individual' | 'doubles' | 'group';
-
-// Admin User type for the admin panel
-export interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  city?: string;
-  neighborhood?: string;
-  level: string;
-  points: number;
-  sports: Array<{
-    name: string;
-    level: string;
-  }>;
-  status: 'active' | 'blocked' | 'suspended';
-  isAdmin: boolean;
-  createdAt: string;
-  lastLogin: string | null;
-  avatarUrl: string | null;
-  badges: Array<{
-    name: string;
-    icon: string;
-  }>;
-  preferences?: Record<string, any>;
-  profileProgress: number;
-}
 
 // Re-export os novos tipos de pagamento
 export * from './payment';

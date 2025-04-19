@@ -1,25 +1,113 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { 
   Search, FilterIcon, Download, Mail, ShieldAlert, Shield, 
-  MoreHorizontal, UserCog, UserX, Eye, Edit, AlertCircle
+  MoreHorizontal, UserCog, UserX, Eye, Edit 
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { UserLevel } from '@/components/gamification/UserLevel';
 import { AdminUsersFilter } from '@/components/admin/users/AdminUsersFilter';
 import { AdminUserDetails } from '@/components/admin/users/AdminUserDetails';
+import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AdminUserData } from '@/types/admin';
-import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+
+// Mock data - would be replaced with real data from API
+const MOCK_USERS = [
+  {
+    id: '1',
+    name: 'Maria Silva',
+    email: 'maria@example.com',
+    phone: '(11) 98765-4321',
+    city: 'São Paulo',
+    neighborhood: 'Moema',
+    level: 'gold',
+    points: 970,
+    sports: ['padel', 'tennis'],
+    status: 'active',
+    isAdmin: false,
+    createdAt: '2023-10-15T14:30:00Z',
+    lastLogin: '2024-04-15T09:45:00Z',
+    avatarUrl: null,
+    badges: ['fairplay', 'streak10', 'seasonal'],
+  },
+  {
+    id: '2',
+    name: 'João Costa',
+    email: 'joao@example.com',
+    phone: '(11) 91234-5678',
+    city: 'São Paulo',
+    neighborhood: 'Pinheiros',
+    level: 'silver',
+    points: 790,
+    sports: ['beach', 'padel'],
+    status: 'blocked',
+    isAdmin: false,
+    createdAt: '2023-11-05T10:15:00Z',
+    lastLogin: '2024-03-20T16:30:00Z',
+    avatarUrl: null,
+    badges: ['streak10', 'explorer'],
+  },
+  {
+    id: '3',
+    name: 'Ana Ferreira',
+    email: 'ana@example.com',
+    phone: '(11) 97654-3210',
+    city: 'São Paulo',
+    neighborhood: 'Vila Madalena',
+    level: 'legend',
+    points: 1650,
+    sports: ['tennis', 'beach', 'padel'],
+    status: 'active',
+    isAdmin: true,
+    createdAt: '2023-09-10T09:00:00Z',
+    lastLogin: '2024-04-16T08:10:00Z',
+    avatarUrl: null,
+    badges: ['fairplay', 'streak10', 'explorer', 'teacher', 'community'],
+  },
+  {
+    id: '4',
+    name: 'Carlos Oliveira',
+    email: 'carlos@example.com',
+    phone: '(11) 95555-4444',
+    city: 'Santos',
+    neighborhood: 'Gonzaga',
+    level: 'bronze',
+    points: 320,
+    sports: ['beach'],
+    status: 'suspended',
+    isAdmin: false,
+    createdAt: '2024-01-20T15:45:00Z',
+    lastLogin: '2024-02-10T19:20:00Z',
+    avatarUrl: null,
+    badges: ['explorer'],
+  },
+  {
+    id: '5',
+    name: 'Patricia Mendes',
+    email: 'patricia@example.com',
+    phone: '(11) 93333-2222',
+    city: 'São Paulo',
+    neighborhood: 'Jardim Paulista',
+    level: 'gold',
+    points: 1100,
+    sports: ['tennis', 'padel'],
+    status: 'active',
+    isAdmin: false,
+    createdAt: '2023-08-15T11:30:00Z',
+    lastLogin: '2024-04-14T14:35:00Z',
+    avatarUrl: null,
+    badges: ['fairplay', 'streak10', 'community'],
+  },
+];
 
 const UsersList = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,21 +115,9 @@ const UsersList = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const { users, isLoading, error, setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsersData();
-  const { user, isAdmin } = useAuth();
 
-  useEffect(() => {
-    console.log("UsersList - Estado atual:", {
-      isAdmin,
-      currentUser: user?.email,
-      loadingUsers: isLoading,
-      usersCount: users?.length,
-      error
-    });
-  }, [isAdmin, user, isLoading, users, error]);
-
+  // Format date in a user-friendly way
   const formatDate = (dateString: string) => {
-    if (!dateString) return '';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
@@ -50,8 +126,8 @@ const UsersList = () => {
     }).format(date);
   };
 
+  // Format time in a user-friendly way
   const formatDateTime = (dateString: string) => {
-    if (!dateString) return '';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
@@ -62,69 +138,41 @@ const UsersList = () => {
     }).format(date);
   };
 
-  const filteredUsers = React.useMemo(() => {
-    return (users || []).filter(user => {
-      const matchesSearch = 
-        (user.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || 
-        (user.email?.toLowerCase() || '').includes(searchQuery.toLowerCase());
-      
-      const matchesStatus = 
-        selectedStatus === 'all' || 
-        (selectedStatus === 'active' && user.status === 'active') ||
-        (selectedStatus === 'blocked' && user.status === 'blocked') ||
-        (selectedStatus === 'suspended' && user.status === 'suspended') ||
-        (selectedStatus === 'admin' && user.isAdmin);
-      
-      return matchesSearch && matchesStatus;
-    });
-  }, [users, searchQuery, selectedStatus]);
+  // Filter users based on search query and status filter
+  const filteredUsers = MOCK_USERS.filter(user => {
+    const matchesSearch = 
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = 
+      selectedStatus === 'all' || 
+      (selectedStatus === 'active' && user.status === 'active') ||
+      (selectedStatus === 'blocked' && user.status === 'blocked') ||
+      (selectedStatus === 'suspended' && user.status === 'suspended') ||
+      (selectedStatus === 'admin' && user.isAdmin);
+    
+    return matchesSearch && matchesStatus;
+  });
 
+  // Toggle selection of a user for batch operations
   const toggleUserSelection = (userId: string) => {
-    if (!userId) {
-      console.error("ID de usuário inválido recebido em toggleUserSelection");
-      return;
-    }
-    
-    setSelectedUsers(prevSelected => {
-      if (prevSelected.includes(userId)) {
-        return prevSelected.filter(id => id !== userId);
-      }
-      return [...prevSelected, userId];
-    });
+    setSelectedUsers(prev => 
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
   };
 
+  // Toggle selection of all visible users
   const toggleSelectAll = () => {
-    if (!filteredUsers || filteredUsers.length === 0) {
-      console.log("Nenhum usuário filtrado disponível para seleção");
-      return;
-    }
-    
-    const availableIds = filteredUsers
-      .map(user => user.id)
-      .filter(Boolean) as string[];
-    
-    if (availableIds.length === 0) {
-      console.error("Nenhum ID de usuário válido disponível para seleção");
-      return;
-    }
-    
-    const allSelected = availableIds.every(id => selectedUsers.includes(id));
-    
-    if (allSelected) {
-      setSelectedUsers(prev => prev.filter(id => !availableIds.includes(id)));
+    if (selectedUsers.length === filteredUsers.length) {
+      setSelectedUsers([]);
     } else {
-      setSelectedUsers(prev => {
-        const newSelection = [...prev];
-        availableIds.forEach(id => {
-          if (!prev.includes(id)) {
-            newSelection.push(id);
-          }
-        });
-        return newSelection;
-      });
+      setSelectedUsers(filteredUsers.map(user => user.id));
     }
   };
 
+  // Get status badge style based on user status
   const getStatusBadge = (status: string, isAdmin: boolean) => {
     if (isAdmin) {
       return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">Admin</Badge>;
@@ -142,104 +190,28 @@ const UsersList = () => {
     }
   };
 
-  const getSportBadge = (sport: { name: string; level: string }) => {
-    switch (sport.name?.toLowerCase()) {
-      case 'tênis':
-      case 'tenis':
-        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-green-50 text-green-700 mr-1">🎾 Tênis ({sport.level})</Badge>;
+  // Get sports badges
+  const getSportsBadge = (sport: string) => {
+    switch (sport) {
+      case 'tennis':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 mr-1">🎾 Tênis</Badge>;
       case 'padel':
-        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-blue-50 text-blue-700 mr-1">🏓 Padel ({sport.level})</Badge>;
-      case 'beach tennis':
-        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-orange-50 text-orange-700 mr-1">🏝️ Beach ({sport.level})</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 mr-1">🏓 Padel</Badge>;
+      case 'beach':
+        return <Badge variant="outline" className="bg-orange-50 text-orange-700 mr-1">🏝️ Beach</Badge>;
       default:
-        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-gray-50 text-gray-700 mr-1">{sport.name} ({sport.level})</Badge>;
+        return <Badge variant="outline" className="bg-gray-50 text-gray-700 mr-1">{sport}</Badge>;
     }
   };
 
+  // Show user details panel
   const showUserDetails = (userId: string) => {
     setSelectedUser(userId);
   };
 
+  // Close user details panel
   const closeUserDetails = () => {
     setSelectedUser(null);
-  };
-
-  const handleBulkActions = async (action: 'promote' | 'block') => {
-    if (selectedUsers.length === 0) {
-      toast.error("Nenhum usuário selecionado");
-      return;
-    }
-
-    try {
-      if (action === 'promote') {
-        for (const userId of selectedUsers) {
-          if (!userId) continue;
-          await setAsAdmin.mutateAsync(userId);
-        }
-        toast.success(`${selectedUsers.length} usuário(s) promovido(s) a admin com sucesso`);
-      } else if (action === 'block') {
-        for (const userId of selectedUsers) {
-          if (!userId) continue;
-          await blockUser.mutateAsync({ userId, reason: 'Bloqueio em massa via painel administrativo' });
-        }
-        toast.success(`${selectedUsers.length} usuário(s) bloqueado(s) com sucesso`);
-      }
-      
-      setSelectedUsers([]);
-    } catch (error: any) {
-      console.error(`Erro na operação em massa (${action}):`, error);
-      toast.error(`Erro ao processar ação em massa: ${error.message || 'Falha na operação'}`);
-    }
-  };
-
-  const handleSetAdmin = async (userId: string) => {
-    try {
-      await setAsAdmin.mutateAsync(userId);
-    } catch (error: any) {
-      console.error("Erro ao promover usuário:", error);
-      toast.error("Houve um erro ao promover o usuário. Tente novamente.");
-    }
-  };
-
-  const handleRemoveAdmin = async (userId: string) => {
-    try {
-      await removeAdminRole.mutateAsync(userId);
-    } catch (error: any) {
-      console.error("Erro ao remover admin:", error);
-      toast.error("Houve um erro ao remover privilégios de admin. Tente novamente.");
-    }
-  };
-
-  const handleBlockUser = async (userId: string, reason: string = 'Bloqueio administrativo') => {
-    try {
-      await blockUser.mutateAsync({ userId, reason });
-    } catch (error: any) {
-      console.error("Erro ao bloquear usuário:", error);
-      toast.error("Houve um erro ao bloquear o usuário. Tente novamente.");
-    }
-  };
-
-  const handleUnblockUser = async (userId: string) => {
-    try {
-      await unblockUser.mutateAsync(userId);
-    } catch (error: any) {
-      console.error("Erro ao desbloquear usuário:", error);
-      toast.error("Houve um erro ao desbloquear o usuário. Tente novamente.");
-    }
-  };
-
-  const renderErrorState = () => {
-    if (!error) return null;
-    
-    return (
-      <Alert variant="destructive" className="mt-4">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Erro ao carregar usuários</AlertTitle>
-        <AlertDescription>
-          {error instanceof Error ? error.message : 'Ocorreu um erro ao carregar os dados dos usuários. Por favor, tente novamente.'}
-        </AlertDescription>
-      </Alert>
-    );
   };
 
   return (
@@ -252,8 +224,6 @@ const UsersList = () => {
           </Button>
         </div>
         
-        {renderErrorState()}
-
         <Card>
           <CardHeader>
             <CardTitle>Lista de Usuários</CardTitle>
@@ -263,6 +233,7 @@ const UsersList = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col space-y-4">
+              {/* Search and filter controls */}
               <div className="flex flex-wrap gap-4 justify-between items-center">
                 <div className="flex items-center gap-2 flex-grow max-w-md">
                   <div className="relative flex-grow">
@@ -296,12 +267,38 @@ const UsersList = () => {
               </div>
 
               {isFilterOpen && (
-                <AdminUsersFilter 
-                  onClose={() => setIsFilterOpen(false)}
-                  onApply={() => setIsFilterOpen(false)}
-                />
+                <Card className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Modalidades</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="cursor-pointer">🎾 Tênis</Badge>
+                        <Badge variant="outline" className="cursor-pointer">🏓 Padel</Badge>
+                        <Badge variant="outline" className="cursor-pointer">🏝️ Beach Tennis</Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Níveis</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="cursor-pointer">Bronze</Badge>
+                        <Badge variant="outline" className="cursor-pointer">Silver</Badge>
+                        <Badge variant="outline" className="cursor-pointer">Gold</Badge>
+                        <Badge variant="outline" className="cursor-pointer">Legend</Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Data de cadastro</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="cursor-pointer">Últimos 7 dias</Badge>
+                        <Badge variant="outline" className="cursor-pointer">Este mês</Badge>
+                        <Badge variant="outline" className="cursor-pointer">Este ano</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               )}
 
+              {/* Batch actions */}
               {selectedUsers.length > 0 && (
                 <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
                   <span className="text-sm font-medium">{selectedUsers.length} usuários selecionados</span>
@@ -309,24 +306,16 @@ const UsersList = () => {
                   <Button size="sm" variant="outline">
                     <Mail className="mr-2 h-4 w-4" /> Enviar Mensagem
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleBulkActions('promote')}
-                  >
+                  <Button size="sm" variant="outline">
                     <Shield className="mr-2 h-4 w-4" /> Promover a Admin
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleBulkActions('block')}
-                  >
+                  <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
                     <UserX className="mr-2 h-4 w-4" /> Bloquear
                   </Button>
                 </div>
               )}
 
+              {/* Users table */}
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -335,12 +324,7 @@ const UsersList = () => {
                         <div className="flex items-center">
                           <input
                             type="checkbox"
-                            checked={
-                              filteredUsers.length > 0 && 
-                              filteredUsers.every(user => 
-                                user.id && selectedUsers.includes(user.id)
-                              )
-                            }
+                            checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
                             onChange={toggleSelectAll}
                             className="rounded border-gray-300 text-primary focus:ring-primary"
                           />
@@ -357,161 +341,98 @@ const UsersList = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                            <span>Carregando usuários...</span>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.includes(user.id)}
+                            onChange={() => toggleUserSelection(user.id)}
+                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <AvatarFrame
+                              src={user.avatarUrl || undefined}
+                              fallback={user.name.charAt(0)}
+                              frameType={user.level as any}
+                              size="sm"
+                            />
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-xs text-muted-foreground">{user.city}/{user.neighborhood}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="text-sm">{user.email}</div>
+                            <div className="text-xs text-muted-foreground">{user.phone}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <UserLevel level={user.level as any} points={user.points} showDetails />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {user.sports.map(sport => getSportsBadge(sport))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(user.status, user.isAdmin)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm whitespace-nowrap">
+                            {formatDate(user.createdAt)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm whitespace-nowrap">
+                            {formatDateTime(user.lastLogin)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-1">
+                            <Button variant="ghost" size="icon" onClick={() => showUserDetails(user.id)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="cursor-pointer">
+                                  <Edit className="h-4 w-4 mr-2" /> Editar
+                                </DropdownMenuItem>
+                                {user.isAdmin ? (
+                                  <DropdownMenuItem className="cursor-pointer text-amber-600">
+                                    <UserCog className="h-4 w-4 mr-2" /> Remover Admin
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="cursor-pointer text-blue-600">
+                                    <Shield className="h-4 w-4 mr-2" /> Promover a Admin
+                                  </DropdownMenuItem>
+                                )}
+                                {user.status === 'blocked' ? (
+                                  <DropdownMenuItem className="cursor-pointer text-green-600">
+                                    <Shield className="h-4 w-4 mr-2" /> Desbloquear
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="cursor-pointer text-destructive">
+                                    <ShieldAlert className="h-4 w-4 mr-2" /> Bloquear
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
-                    ) : error ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-destructive">
-                          Erro ao carregar dados. Verifique suas permissões de administrador.
-                        </TableCell>
-                      </TableRow>
-                    ) : filteredUsers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">Nenhum usuário encontrado</TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>
-                            <input
-                              type="checkbox"
-                              checked={user.id ? selectedUsers.includes(user.id) : false}
-                              onChange={() => user.id && toggleUserSelection(user.id)}
-                              className="rounded border-gray-300 text-primary focus:ring-primary"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-3">
-                              <AvatarFrame
-                                src={user.avatarUrl || undefined}
-                                fallback={user.name?.charAt(0) || '?'}
-                                frameType={user.level as any}
-                                size="sm"
-                              />
-                              <div>
-                                <div className="font-medium">{user.name || 'Sem nome'}</div>
-                                <div className="text-xs text-muted-foreground">{user.city}/{user.neighborhood}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="text-sm">{user.email}</div>
-                              <div className="text-xs text-muted-foreground">{user.phone}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <UserLevel level={user.level as any} points={user.points} showDetails />
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {user.sports && user.sports.length > 0 ? 
-                                user.sports.map((sport, idx) => (
-                                  <Badge 
-                                    key={`${idx}-${sport.name}-${sport.level}`}
-                                    variant="outline" 
-                                    className="bg-green-50 text-green-700 mr-1"
-                                  >
-                                    {sport.name} ({sport.level})
-                                  </Badge>
-                                )) : 
-                                <span className="text-xs text-muted-foreground">Nenhum esporte</span>
-                              }
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant="outline" 
-                              className={
-                                user.isAdmin 
-                                  ? "bg-blue-100 text-blue-800 border-blue-200"
-                                  : user.status === 'active'
-                                  ? "bg-green-100 text-green-800 border-green-200"
-                                  : user.status === 'blocked'
-                                  ? "bg-red-100 text-red-800 border-red-200"
-                                  : "bg-amber-100 text-amber-800 border-amber-200"
-                              }
-                            >
-                              {user.isAdmin ? 'Admin' : 
-                               user.status === 'active' ? 'Ativo' :
-                               user.status === 'blocked' ? 'Bloqueado' :
-                               user.status === 'suspended' ? 'Suspenso' : 'Desconhecido'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm whitespace-nowrap">
-                              {formatDate(user.createdAt)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm whitespace-nowrap">
-                              {user.lastLogin ? formatDateTime(user.lastLogin) : 'Nunca'}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <Button variant="ghost" size="icon" onClick={() => user.id && setSelectedUser(user.id)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem className="cursor-pointer">
-                                    <Edit className="h-4 w-4 mr-2" /> Editar
-                                  </DropdownMenuItem>
-                                  {user.isAdmin ? (
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer text-amber-600"
-                                      onClick={() => user.id && removeAdminRole.mutateAsync(user.id)}
-                                    >
-                                      <UserCog className="h-4 w-4 mr-2" /> Remover Admin
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer text-blue-600"
-                                      onClick={() => user.id && setAsAdmin.mutateAsync(user.id)}
-                                    >
-                                      <Shield className="h-4 w-4 mr-2" /> Promover a Admin
-                                    </DropdownMenuItem>
-                                  )}
-                                  {user.status === 'blocked' ? (
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer text-green-600"
-                                      onClick={() => user.id && unblockUser.mutateAsync(user.id)}
-                                    >
-                                      <Shield className="h-4 w-4 mr-2" /> Desbloquear
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer text-destructive"
-                                      onClick={() => user.id && blockUser.mutateAsync({
-                                        userId: user.id,
-                                        reason: 'Bloqueio via painel administrativo'
-                                      })}
-                                    >
-                                      <ShieldAlert className="h-4 w-4 mr-2" /> Bloquear
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                    ))}
                   </TableBody>
                 </Table>
               </div>
@@ -519,11 +440,12 @@ const UsersList = () => {
           </CardContent>
         </Card>
 
+        {/* User details component (shown when a user is selected) */}
         {selectedUser && (
           <AdminUserDetails 
             userId={selectedUser} 
-            onClose={() => setSelectedUser(null)} 
-            userData={filteredUsers.find(user => user.id === selectedUser) as AdminUserData}
+            onClose={closeUserDetails} 
+            userData={MOCK_USERS.find(user => user.id === selectedUser)!}
           />
         )}
       </div>
