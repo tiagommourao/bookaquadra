@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AdminUser } from '@/types';
-import { AuthUserView } from '@/types/auth';
 
 export function useAdminUsersData() {
   const queryClient = useQueryClient();
@@ -41,12 +40,10 @@ export function useAdminUsersData() {
           return [];
         }
 
-        // Buscar dados de autenticação através da view segura
-        // Vamos usar uma consulta SQL direta para evitar problemas de tipagem
+        // Buscar dados diretamente usando a função RPC
         const { data: authUsersData, error: authError } = await supabase
-          .from('auth_users_view')
-          .select('id, email, last_sign_in_at');
-
+          .rpc('get_auth_users');
+        
         if (authError) {
           console.error("Erro ao buscar dados de autenticação:", authError);
           throw authError;
