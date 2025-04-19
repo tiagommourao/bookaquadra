@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -38,13 +37,10 @@ export function useAdminUsersData() {
           throw profilesError;
         }
 
-        // Para obter emails, precisamos usar uma abordagem diferente
-        // Como não podemos usar auth.admin diretamente no cliente, faremos uma solicitação
-        // para uma view ou função que tenha as permissões adequadas
+        // Buscar dados de autenticação através da view segura
         const { data: authUsers, error: authError } = await supabase
           .from('auth_users_view')
-          .select('id, email, last_sign_in_at')
-          .throwOnError();
+          .select('*');
 
         if (authError) {
           console.error("Erro ao buscar dados de autenticação:", authError);
@@ -150,12 +146,11 @@ export function useAdminUsersData() {
 
         // Transformar os dados para o formato AdminUser
         return (profiles || []).map(profile => {
-          const email = emailMap.get(profile.id) || '';
-          const lastLogin = lastLoginMap.get(profile.id);
+          const authUser = authUsers?.find(au => au.id === profile.id);
           return {
             id: profile.id,
             name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário',
-            email: email,
+            email: authUser?.email || '',
             phone: profile.phone || '',
             city: profile.city || '',
             neighborhood: profile.neighborhood || '',
@@ -165,7 +160,7 @@ export function useAdminUsersData() {
             status: profile.is_active ? 'active' : 'blocked',
             isAdmin: adminMap.get(profile.id) || false,
             createdAt: profile.created_at,
-            lastLogin: lastLogin,
+            lastLogin: authUser?.last_sign_in_at,
             avatarUrl: profile.avatar_url,
             badges: achievementsMap.get(profile.id) || [],
             preferences: profile.preferences || {},

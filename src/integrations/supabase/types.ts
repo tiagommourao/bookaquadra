@@ -1204,6 +1204,14 @@ export type Database = {
       }
     }
     Views: {
+      auth_users_view: {
+        Row: {
+          email: string | null
+          id: string | null
+          last_sign_in_at: string | null
+        }
+        Relationships: []
+      }
       payment_details_view: {
         Row: {
           admin_modification_reason: string | null
@@ -1270,6 +1278,14 @@ export type Database = {
       }
     }
     Functions: {
+      get_auth_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string
+          last_sign_in_at: string
+        }[]
+      }
       is_admin: {
         Args: Record<PropertyKey, never> | { user_id: string }
         Returns: boolean
