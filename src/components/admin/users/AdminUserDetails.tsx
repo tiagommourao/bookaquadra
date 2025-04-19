@@ -1,113 +1,19 @@
 import React, { useState } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { AvatarFrame } from '@/components/gamification/AvatarFrame';
-import { UserLevel } from '@/components/gamification/UserLevel';
-import { 
-  X, 
-  Edit, 
-  Mail, 
-  UserCog, 
-  Key, 
-  ShieldAlert, 
-  Shield, 
-  Calendar,
-  Clock,
-  MapPin,
-  Phone,
-  Pencil,
-  Star,
-  Trophy,
-  PanelRight,
-  Heart,
-  Award,
-} from 'lucide-react';
-import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
-
-interface UserBadge {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  earnedAt: string;
-}
-
-interface UserBooking {
-  id: string;
-  date: string;
-  time: string;
-  court: string;
-  status: string;
-}
-
-interface UserAchievement {
-  id: string;
-  name: string;
-  description: string;
-  date: string;
-  icon: string;
-}
-
-interface UserRecognition {
-  id: string;
-  fromUser: string;
-  type: string;
-  comment?: string;
-  date: string;
-}
-
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  city: string;
-  neighborhood: string;
-  level: string;
-  points: number;
-  sports: string[];
-  status: string;
-  isAdmin: boolean;
-  createdAt: string;
-  lastLogin: string;
-  avatarUrl: string | null;
-  badges: Array<{
-    name: string;
-    icon: string;
-  }>;
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Edit, Mail, UserCog, Key, ShieldAlert, Shield, Calendar, Clock, X } from 'lucide-react';
+import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
+import { UserProfileSection } from './details/UserProfileSection';
+import { UserContactInfo } from './details/UserContactInfo';
+import { AdminNoteSection } from './details/AdminNoteSection';
+import { AdminUserData } from '@/types/admin';
 
 interface AdminUserDetailsProps {
   userId: string;
   onClose: () => void;
-  userData: UserData;
+  userData: AdminUserData;
 }
 
 export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetailsProps) => {
@@ -116,16 +22,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   const [blockReason, setBlockReason] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [isAdminNoteVisible, setIsAdminNoteVisible] = useState(false);
-  const { setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsersData();
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
-  };
+  const { setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsers();
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -136,58 +33,6 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
       hour: '2-digit',
       minute: '2-digit',
     }).format(date);
-  };
-
-  const getSportLabel = (sport: string) => {
-    switch (sport) {
-      case 'tennis':
-        return '🎾 Tênis';
-      case 'padel':
-        return '🏓 Padel';
-      case 'beach':
-        return '🏝️ Beach Tennis';
-      default:
-        return sport;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'Ativo';
-      case 'blocked':
-        return 'Bloqueado';
-      case 'suspended':
-        return 'Suspenso';
-      default:
-        return status;
-    }
-  };
-
-  const getBookingStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <Badge variant="outline" className="bg-green-50 text-green-700">Concluída</Badge>;
-      case 'upcoming':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700">Agendada</Badge>;
-      case 'cancelled':
-        return <Badge variant="outline" className="bg-red-50 text-red-700">Cancelada</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const getRecognitionTypeLabel = (type: string) => {
-    switch (type) {
-      case 'fairplay':
-        return '🤝 Fair Play';
-      case 'skills':
-        return '🎯 Habilidade';
-      case 'teamwork':
-        return '👥 Trabalho em Equipe';
-      default:
-        return type;
-    }
   };
 
   const handleSetAdmin = async () => {
@@ -204,13 +49,8 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
     setBlockReason('');
   };
 
-  const handleUnblockUser = async () => {
-    await unblockUser.mutateAsync(userId);
-  };
-
   return (
     <>
-      {/* Block User Dialog */}
       <Dialog open={isBlockDialogOpen} onOpenChange={setIsBlockDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -241,7 +81,6 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
         </DialogContent>
       </Dialog>
 
-      {/* Main User Details Card */}
       <Card className="overflow-hidden">
         <CardHeader className="bg-muted/50 border-b">
           <div className="flex justify-between items-start">
@@ -263,122 +102,17 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
         </CardHeader>
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Left column - Basic Info */}
             <div className="space-y-6">
-              <div className="flex items-center space-x-4">
-                <AvatarFrame
-                  src={userData.avatarUrl || undefined}
-                  fallback={userData.name.charAt(0)}
-                  frameType={userData.level as any}
-                  size="lg"
-                />
-                <div>
-                  <h3 className="text-xl font-semibold">{userData.name}</h3>
-                  <div className="flex items-center mt-1 space-x-2">
-                    <UserLevel level={userData.level as any} points={userData.points} showDetails />
-                    {userData.status !== 'active' && (
-                      <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                        {getStatusLabel(userData.status)}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="text-md font-semibold flex items-center gap-1">
-                  <Mail className="h-4 w-4" /> Informações de Contato
-                </h4>
-                
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">E-mail</Label>
-                    {isEditMode ? (
-                      <Input defaultValue={userData.email} />
-                    ) : (
-                      <div className="text-sm">{userData.email}</div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Telefone</Label>
-                    {isEditMode ? (
-                      <Input defaultValue={userData.phone} />
-                    ) : (
-                      <div className="text-sm">{userData.phone}</div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Localização</Label>
-                    {isEditMode ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input defaultValue={userData.city} placeholder="Cidade" />
-                        <Input defaultValue={userData.neighborhood} placeholder="Bairro" />
-                      </div>
-                    ) : (
-                      <div className="text-sm flex items-center gap-1">
-                        <MapPin className="h-3 w-3" /> 
-                        {userData.city}/{userData.neighborhood}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="text-md font-semibold flex items-center gap-1">
-                  <Calendar className="h-4 w-4" /> Informações do Sistema
-                </h4>
-                
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Data de Cadastro</Label>
-                    <div className="text-sm">{formatDateTime(userData.createdAt)}</div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Último Acesso</Label>
-                    <div className="text-sm">{formatDateTime(userData.lastLogin)}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <h4 className="text-md font-semibold mb-3 flex items-center gap-1">
-                  <PanelRight className="h-4 w-4" /> Observação Administrativa
-                </h4>
-                
-                <div className="space-y-2">
-                  {isAdminNoteVisible ? (
-                    <>
-                      <Textarea
-                        placeholder="Adicione uma observação sobre este usuário (visível apenas para administradores)..."
-                        value={adminNote}
-                        onChange={(e) => setAdminNote(e.target.value)}
-                      />
-                      <div className="flex justify-end">
-                        <Button size="sm" variant="outline" onClick={() => setIsAdminNoteVisible(false)}>
-                          Salvar Observação
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div 
-                      className="text-sm p-3 bg-muted/50 rounded-md min-h-[80px] cursor-pointer hover:bg-muted"
-                      onClick={() => setIsAdminNoteVisible(true)}
-                    >
-                      {adminNote ? adminNote : "Clique para adicionar uma observação sobre este usuário..."}
-                    </div>
-                  )}
-                  <div className="text-xs text-muted-foreground">
-                    Esta observação é visível apenas para administradores.
-                  </div>
-                </div>
-              </div>
+              <UserProfileSection userData={userData} />
+              <UserContactInfo userData={userData} isEditMode={isEditMode} />
+              <AdminNoteSection
+                adminNote={adminNote}
+                isAdminNoteVisible={isAdminNoteVisible}
+                onAdminNoteChange={setAdminNote}
+                onAdminNoteVisibilityChange={setIsAdminNoteVisible}
+              />
             </div>
 
-            {/* Center & Right columns - Tabs with more details */}
             <div className="col-span-2">
               <Tabs defaultValue="profile">
                 <TabsList className="mb-4">
@@ -388,7 +122,6 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                   <TabsTrigger value="recognition">Avaliações</TabsTrigger>
                 </TabsList>
                 
-                {/* Profile Tab */}
                 <TabsContent value="profile">
                   <div className="space-y-6">
                     <div>
@@ -444,7 +177,6 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                   </div>
                 </TabsContent>
                 
-                {/* Achievements Tab */}
                 <TabsContent value="achievements">
                   <div className="space-y-6">
                     <div>
@@ -506,7 +238,6 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                   </div>
                 </TabsContent>
                 
-                {/* Bookings Tab */}
                 <TabsContent value="bookings">
                   <div className="space-y-6">
                     <div>
@@ -548,7 +279,6 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                   </div>
                 </TabsContent>
                 
-                {/* Recognition Tab */}
                 <TabsContent value="recognition">
                   <div className="space-y-6">
                     <div>
