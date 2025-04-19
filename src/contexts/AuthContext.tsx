@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { User, UserRole, Profile } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -78,10 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
-      const isRoleAdmin = !!data;
-      console.log("Resultado da verificação de admin via is_admin RPC:", isRoleAdmin);
-      
-      setAdminRoles(isRoleAdmin);
+      console.log("Resultado da verificação de admin via is_admin RPC:", data);
+      setAdminRoles(!!data);
     } catch (error) {
       console.error('Erro ao verificar papel de admin:', error);
       setAdminRoles(false);
@@ -93,6 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       
       try {
+        // Primeiro configurar o listener de autenticação para capturar eventos
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (event, currentSession) => {
             console.log("Evento de autenticação:", event);
@@ -101,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(formattedUser);
             
             if (currentSession?.user) {
+              // Usar setTimeout para evitar deadlock na execução
               setTimeout(() => {
                 fetchProfile(currentSession.user.id);
                 checkAdminRole(currentSession.user.id);
@@ -112,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         );
         
+        // Depois verificar se já existe uma sessão ativa
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
         const formattedUser = formatUser(currentSession);
@@ -135,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initialize();
   }, []);
 
+  // Use useMemo para derivar isAdmin de adminRoles para evitar recálculos desnecessários
   const isAdmin = useMemo(() => {
     console.log("Verificando isAdmin:", { adminRoles });
     return adminRoles;

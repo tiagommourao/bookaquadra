@@ -1,11 +1,9 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AdminUser } from '@/types';
-import { User } from '@supabase/supabase-js';
-
-// URL constantes para o Supabase
-const SUPABASE_URL = "https://yvgdtiuhrticewtlutio.supabase.co";
+import { AuthUserView } from '@/types/auth';
 
 export function useAdminUsersData() {
   const queryClient = useQueryClient();
@@ -14,6 +12,8 @@ export function useAdminUsersData() {
     queryKey: ['adminUsers'],
     queryFn: async () => {
       try {
+        console.log("Iniciando busca de usuários admin");
+        
         // Buscar perfis com todas as informações relacionadas
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
@@ -40,24 +40,30 @@ export function useAdminUsersData() {
         // Buscar dados de autenticação através da view segura
         const { data: authUsers, error: authError } = await supabase
           .from('auth_users_view')
-          .select('*');
+          .select();
 
         if (authError) {
           console.error("Erro ao buscar dados de autenticação:", authError);
           throw authError;
         }
 
-        // Criar mapa de emails para fácil acesso
-        const emailMap = new Map();
-        const lastLoginMap = new Map();
+        console.log("Dados de auth recebidos:", authUsers?.length || 0);
+
+        // Criar mapa de emails e último login para fácil acesso
+        const emailMap = new Map<string, string>();
+        const lastLoginMap = new Map<string, string>();
         
         if (authUsers) {
-          authUsers.forEach((user: any) => {
-            emailMap.set(user.id, user.email);
-            lastLoginMap.set(user.id, user.last_sign_in_at);
+          authUsers.forEach((user: AuthUserView) => {
+            if (user.id && user.email) {
+              emailMap.set(user.id, user.email);
+            }
+            if (user.id && user.last_sign_in_at) {
+              lastLoginMap.set(user.id, user.last_sign_in_at);
+            }
           });
         }
-
+        
         // Buscar roles dos usuários
         const { data: userRoles, error: rolesError } = await supabase
           .from('user_roles')
@@ -105,7 +111,7 @@ export function useAdminUsersData() {
         }
 
         // Criar mapa de roles administrativas
-        const adminMap = new Map();
+        const adminMap = new Map<string, boolean>();
         userRoles?.forEach(ur => {
           if (ur.role === 'admin') {
             adminMap.set(ur.user_id, true);
@@ -113,25 +119,25 @@ export function useAdminUsersData() {
         });
 
         // Criar mapa de modalidades esportivas por usuário
-        const sportsMap = new Map();
+        const sportsMap = new Map<string, Array<{ name: string; level: string }>>();
         userSports?.forEach(us => {
           if (!sportsMap.has(us.user_id)) {
             sportsMap.set(us.user_id, []);
           }
-          sportsMap.get(us.user_id).push({
-            name: us.sport_types?.name,
-            level: us.skill_levels?.name
+          sportsMap.get(us.user_id)?.push({
+            name: us.sport_types?.name || '',
+            level: us.skill_levels?.name || '',
           });
         });
 
         // Criar mapa de conquistas por usuário
-        const achievementsMap = new Map();
+        const achievementsMap = new Map<string, Array<{ name: string; icon: string }>>();
         userAchievements?.forEach(ua => {
           if (!achievementsMap.has(ua.user_id)) {
             achievementsMap.set(ua.user_id, []);
           }
           if (ua.achievement_types) {
-            achievementsMap.get(ua.user_id).push({
+            achievementsMap.get(ua.user_id)?.push({
               name: ua.achievement_types.name,
               icon: ua.achievement_types.icon
             });
@@ -145,12 +151,15 @@ export function useAdminUsersData() {
         }
 
         // Transformar os dados para o formato AdminUser
-        return (profiles || []).map(profile => {
-          const authUser = authUsers?.find(au => au.id === profile.id);
+        const adminUsers = (profiles || []).map(profile => {
+          // Buscar email e último login do usuário através dos mapas
+          const email = emailMap.get(profile.id) || '';
+          const lastLogin = lastLoginMap.get(profile.id) || '';
+          
           return {
             id: profile.id,
             name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário',
-            email: authUser?.email || '',
+            email: email,
             phone: profile.phone || '',
             city: profile.city || '',
             neighborhood: profile.neighborhood || '',
@@ -160,13 +169,16 @@ export function useAdminUsersData() {
             status: profile.is_active ? 'active' : 'blocked',
             isAdmin: adminMap.get(profile.id) || false,
             createdAt: profile.created_at,
-            lastLogin: authUser?.last_sign_in_at,
+            lastLogin: lastLogin,
             avatarUrl: profile.avatar_url,
             badges: achievementsMap.get(profile.id) || [],
             preferences: profile.preferences || {},
             profileProgress: profile.profile_progress || 0
           };
         });
+        
+        console.log(`Processados ${adminUsers.length} usuários com sucesso`);
+        return adminUsers;
       } catch (error) {
         console.error("Erro na função queryFn:", error);
         throw error;
