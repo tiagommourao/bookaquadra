@@ -30,7 +30,14 @@ import PaymentsList from "./pages/admin/payments/PaymentsList";
 
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  },
+});
 
 // Protected route for users
 const UserProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -63,11 +70,11 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     email: user?.email
   });
   
-  // Temporarily allow any authenticated user to access admin routes
-  // until we have proper admin users set up
+  // Temporariamente permitindo qualquer usuário autenticado acessar rotas de admin
+  // até termos usuários administradores configurados adequadamente
   return <>{children}</>;
   
-  // Uncomment this for production:
+  // Descomente isso para produção:
   // return isAdmin ? <>{children}</> : <Navigate to="/" />;
 };
 

@@ -1274,6 +1274,10 @@ export type Database = {
         Args: Record<PropertyKey, never> | { user_id: string }
         Returns: boolean
       }
+      is_admin_user: {
+        Args: { check_user_id: string }
+        Returns: boolean
+      }
       test_mercadopago_integration: {
         Args: { integration_id: string }
         Returns: Json

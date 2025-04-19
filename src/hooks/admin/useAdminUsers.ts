@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User } from '@/types';
 import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -52,7 +51,7 @@ export const useAdminUsers = () => {
 
     try {
       // Fetch profiles with related user data
-      const { data: profiles, error: profilesError } = await supabase
+      const { data: profiles, error: profilesError, count } = await supabase
         .from('profiles')
         .select(`
           id, 
@@ -65,7 +64,7 @@ export const useAdminUsers = () => {
           created_at,
           is_active,
           credit_balance
-        `)
+        `, { count: 'exact' })
         .range((page - 1) * pageSize, page * pageSize - 1);
       
       if (profilesError) throw profilesError;
@@ -90,7 +89,7 @@ export const useAdminUsers = () => {
       
       if (sportsError) throw sportsError;
 
-      // Create map of admin roles
+      // Criar mapa de papéis de admin
       const adminMap = new Map();
       if (userRoles) {
         userRoles.forEach(ur => {
@@ -100,7 +99,7 @@ export const useAdminUsers = () => {
         });
       }
 
-      // Create map of sports by user
+      // Criar mapa de esportes por usuário
       const sportsMap = new Map();
       if (userSports) {
         userSports.forEach(us => {
@@ -114,37 +113,37 @@ export const useAdminUsers = () => {
         });
       }
 
-      // Transform profiles into AdminUser format
+      // Transformar perfis no formato AdminUser
       const formattedUsers: AdminUser[] = (profiles || []).map(profile => ({
         id: profile.id,
         name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-        email: '', // Email is not included in profiles table for security
+        email: '', // Email não é incluído na tabela de perfis por segurança
         phone: profile.phone || '',
         city: profile.city || '',
         neighborhood: profile.neighborhood || '',
-        level: 'standard', // Default level if not specified
+        level: 'standard', // Nível padrão se não especificado
         points: profile.credit_balance || 0,
         sports: sportsMap.get(profile.id) || [],
         status: profile.is_active ? 'active' : 'blocked',
         isAdmin: adminMap.get(profile.id) || false,
         createdAt: profile.created_at,
-        lastLogin: '', // Not available in this context
+        lastLogin: '', // Não disponível neste contexto
         avatarUrl: profile.avatar_url,
-        badges: [] // Badges would need additional query
+        badges: [] // Badges precisariam de consulta adicional
       }));
       
-      // Update state with fetched data
+      // Atualizar estado com os dados obtidos
       setUsers(formattedUsers);
       setPagination({
         page,
         pageSize,
-        totalCount: formattedUsers.length // This would ideally come from a count query
+        totalCount: count || formattedUsers.length
       });
       setLoading(false);
 
     } catch (err: any) {
-      console.error("Error fetching users:", err);
-      setError(err.message || 'Failed to fetch users');
+      console.error("Erro ao buscar usuários:", err);
+      setError(err.message || 'Falha ao buscar usuários');
       toast.error('Erro ao carregar usuários');
       setLoading(false);
     }
@@ -272,16 +271,41 @@ export const useAdminUsers = () => {
   // Export users to CSV
   const exportUsers = async (filters?: any) => {
     try {
-      // This would be implemented to export real data
-      const mockCSV = "id,name,email,level,points,status\n1,John Doe,john@example.com,gold,1200,active";
-      return mockCSV;
+      // Para implementar exportação de dados reais
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, phone, city, neighborhood, credit_balance, created_at, is_active');
+      
+      if (profilesError) throw profilesError;
+      
+      // Transformar dados em CSV
+      if (!profiles || profiles.length === 0) {
+        return "No data to export";
+      }
+      
+      // Cria o cabeçalho do CSV
+      const headers = ['ID', 'Nome', 'Telefone', 'Cidade', 'Bairro', 'Pontos', 'Status', 'Data de Cadastro'].join(',');
+      
+      // Transforma cada linha em CSV
+      const rows = profiles.map(p => [
+        p.id,
+        `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        p.phone || '',
+        p.city || '',
+        p.neighborhood || '',
+        p.credit_balance || 0,
+        p.is_active ? 'Ativo' : 'Bloqueado',
+        new Date(p.created_at).toLocaleDateString('pt-BR')
+      ].join(','));
+      
+      return [headers, ...rows].join('\n');
     } catch (err: any) {
       toast.error(`Erro ao exportar usuários: ${err.message || 'Falha na operação'}`);
       return null;
     }
   };
 
-  // Initialize by fetching users
+  // Inicializar buscando usuários
   useEffect(() => {
     fetchUsers();
   }, []);

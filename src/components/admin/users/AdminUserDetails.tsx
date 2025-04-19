@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -45,21 +44,21 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   };
 
   const handleSetAdmin = async () => {
-    await setAsAdmin.mutateAsync(userId);
+    await setAsAdmin.mutate(userId);
   };
 
   const handleRemoveAdmin = async () => {
-    await removeAdminRole.mutateAsync(userId);
+    await removeAdminRole.mutate(userId);
   };
 
   const handleBlockUser = async () => {
-    await blockUser.mutateAsync({ userId, reason: blockReason });
+    await blockUser.mutate({ userId, reason: blockReason });
     setIsBlockDialogOpen(false);
     setBlockReason('');
   };
 
   const handleUnblockUser = async () => {
-    await unblockUser.mutateAsync(userId);
+    await unblockUser.mutate(userId);
   };
 
   return (
