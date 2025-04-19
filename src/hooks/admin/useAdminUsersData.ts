@@ -10,7 +10,7 @@ export function useAdminUsersData() {
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['adminUsers'],
     queryFn: async () => {
-      // Fetch users from auth.users through the profiles table
+      // Buscar perfis com todas as informações relacionadas
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
@@ -22,19 +22,52 @@ export function useAdminUsersData() {
           city,
           neighborhood,
           created_at,
-          is_active
+          is_active,
+          preferences,
+          credit_balance,
+          profile_progress
         `);
 
       if (profilesError) throw profilesError;
 
-      // Get user roles separately to avoid relation errors
+      // Buscar roles dos usuários
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role');
       
       if (rolesError) throw rolesError;
 
-      // Create a map of user_id to admin status
+      // Buscar modalidades esportivas dos usuários
+      const { data: userSports, error: sportsError } = await supabase
+        .from('user_sports')
+        .select(`
+          user_id,
+          sport_type_id,
+          sport_types (
+            name
+          ),
+          skill_level_id,
+          skill_levels (
+            name
+          )
+        `);
+
+      if (sportsError) throw sportsError;
+
+      // Buscar conquistas dos usuários
+      const { data: userAchievements, error: achievementsError } = await supabase
+        .from('user_achievements')
+        .select(`
+          user_id,
+          achievement_types (
+            name,
+            icon
+          )
+        `);
+
+      if (achievementsError) throw achievementsError;
+
+      // Criar mapa de roles administrativas
       const adminMap = new Map();
       userRoles?.forEach(ur => {
         if (ur.role === 'admin') {
@@ -42,23 +75,51 @@ export function useAdminUsersData() {
         }
       });
 
-      // Transform the data to match our AdminUser type
+      // Criar mapa de modalidades esportivas por usuário
+      const sportsMap = new Map();
+      userSports?.forEach(us => {
+        if (!sportsMap.has(us.user_id)) {
+          sportsMap.set(us.user_id, []);
+        }
+        sportsMap.get(us.user_id).push({
+          name: us.sport_types?.name,
+          level: us.skill_levels?.name
+        });
+      });
+
+      // Criar mapa de conquistas por usuário
+      const achievementsMap = new Map();
+      userAchievements?.forEach(ua => {
+        if (!achievementsMap.has(ua.user_id)) {
+          achievementsMap.set(ua.user_id, []);
+        }
+        if (ua.achievement_types) {
+          achievementsMap.get(ua.user_id).push({
+            name: ua.achievement_types.name,
+            icon: ua.achievement_types.icon
+          });
+        }
+      });
+
+      // Transformar os dados para o formato AdminUser
       return (profiles || []).map(profile => ({
         id: profile.id,
         name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-        email: '', // We'll get this from auth.users through RLS policies
+        email: '', // Email será preenchido via RLS
         phone: profile.phone || '',
         city: profile.city || '',
         neighborhood: profile.neighborhood || '',
         level: 'user',
-        points: 0,
-        sports: [],
+        points: profile.credit_balance || 0,
+        sports: sportsMap.get(profile.id) || [],
         status: profile.is_active ? 'active' : 'blocked',
         isAdmin: adminMap.get(profile.id) || false,
         createdAt: profile.created_at,
         lastLogin: null,
         avatarUrl: profile.avatar_url,
-        badges: []
+        badges: achievementsMap.get(profile.id) || [],
+        preferences: profile.preferences || {},
+        profileProgress: profile.profile_progress || 0
       })) as AdminUser[];
     }
   });

@@ -413,13 +413,21 @@ export interface AdminUser {
   neighborhood?: string;
   level: string;
   points: number;
-  sports: string[];
+  sports: Array<{
+    name: string;
+    level: string;
+  }>;
   status: 'active' | 'blocked' | 'suspended';
   isAdmin: boolean;
   createdAt: string;
   lastLogin: string | null;
   avatarUrl: string | null;
-  badges: string[];
+  badges: Array<{
+    name: string;
+    icon: string;
+  }>;
+  preferences?: Record<string, any>;
+  profileProgress: number;
 }
 
 // Re-export os novos tipos de pagamento
