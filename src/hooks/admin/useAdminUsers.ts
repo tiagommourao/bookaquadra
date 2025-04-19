@@ -43,42 +43,76 @@ export const useAdminUsers = () => {
     setError(null);
 
     try {
-      // In a real implementation, this would fetch from Supabase
-      // const start = (page - 1) * pageSize;
-      // const end = start + pageSize - 1;
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize - 1;
       
-      // const query = supabase
-      //   .from('profiles')
-      //   .select('*, user_sports(*), user_gamification(*)', { count: 'exact' })
-      //   .range(start, end);
-      
-      // if (filters?.search) {
-      //   query.or(`first_name.ilike.%${filters.search}%, last_name.ilike.%${filters.search}%, email.ilike.%${filters.search}%`);
-      // }
-      
-      // const { data, count, error } = await query;
-      
-      // If error, throw it to catch block
-      // if (error) throw error;
+      // Construir a query base
+      let query = supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_sports:user_sports(
+            *,
+            sport_type:sport_type_id(name),
+            skill_level:skill_level_id(name)
+          ),
+          user_gamification:user_gamification(
+            total_points,
+            current_level:current_level_id(name)
+          ),
+          user_achievements:user_achievements(
+            *,
+            achievement:achievement_type_id(name, icon)
+          ),
+          auth_user:id(email, last_sign_in_at)
+        `, { 
+          count: 'exact' 
+        })
+        .range(start, end);
 
-      // For demo purposes, simulate API response with mock data
-      const mockUsers: AdminUser[] = [
-        // Mock users would go here
-      ];
-      
-      // Set users and pagination
-      // setUsers(data as AdminUser[]);
-      // setPagination({
-      //   page,
-      //   pageSize,
-      //   totalCount: count || 0
-      // });
-      
-      setLoading(false);
+      // Aplicar filtros se existirem
+      if (filters?.search) {
+        query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+      }
+
+      if (filters?.status && filters.status.length > 0) {
+        query = query.in('status', filters.status);
+      }
+
+      const { data, count, error } = await query;
+
+      if (error) throw error;
+
+      // Transformar os dados para o formato AdminUser
+      const formattedUsers: AdminUser[] = data?.map(profile => ({
+        id: profile.id,
+        email: profile.auth_user?.email || '',
+        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+        phone: profile.phone || '',
+        city: profile.city || '',
+        neighborhood: profile.neighborhood || '',
+        level: profile.user_gamification?.[0]?.current_level?.name || 'Iniciante',
+        points: profile.user_gamification?.[0]?.total_points || 0,
+        sports: profile.user_sports?.map(sport => sport.sport_type?.name || '') || [],
+        status: profile.is_active ? 'active' : 'blocked',
+        avatarUrl: profile.avatar_url,
+        badges: profile.user_achievements?.map(achievement => achievement.achievement?.name) || [],
+        lastLogin: profile.auth_user?.last_sign_in_at,
+        role: 'user' // Por padrão todos são usuários normais
+      })) || [];
+
+      setUsers(formattedUsers);
+      setPagination({
+        page,
+        pageSize,
+        totalCount: count || 0
+      });
       
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch users');
+      console.error('Erro ao buscar usuários:', err);
+      setError(err.message || 'Falha ao carregar usuários');
       toast.error('Erro ao carregar usuários');
+    } finally {
       setLoading(false);
     }
   };
@@ -86,13 +120,15 @@ export const useAdminUsers = () => {
   // Block user
   const blockUser = async (userId: string, reason: string): Promise<boolean> => {
     try {
-      // This would be implemented to update the user's status in Supabase
-      // const { error } = await supabase
-      //   .from('profiles')
-      //   .update({ is_active: false, status: 'blocked', block_reason: reason })
-      //   .eq('id', userId);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
       
-      // if (error) throw error;
+      if (error) throw error;
       
       toast.success('Usuário bloqueado com sucesso');
       return true;
@@ -105,13 +141,15 @@ export const useAdminUsers = () => {
   // Unblock user
   const unblockUser = async (userId: string): Promise<boolean> => {
     try {
-      // This would be implemented to update the user's status in Supabase
-      // const { error } = await supabase
-      //   .from('profiles')
-      //   .update({ is_active: true, status: 'active', block_reason: null })
-      //   .eq('id', userId);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
       
-      // if (error) throw error;
+      if (error) throw error;
       
       toast.success('Usuário desbloqueado com sucesso');
       return true;
@@ -121,61 +159,22 @@ export const useAdminUsers = () => {
     }
   };
 
-  // Set user as admin
-  const setAsAdmin = async (userId: string): Promise<boolean> => {
-    try {
-      // This would update the user's role in auth.users and/or add them to a user_roles table
-      // const { error } = await supabase.rpc('admin_set_user_role', {
-      //   target_user_id: userId,
-      //   new_role: 'admin'
-      // });
-      
-      // if (error) throw error;
-      
-      toast.success('Usuário promovido a administrador com sucesso');
-      return true;
-    } catch (err: any) {
-      toast.error(`Erro ao promover usuário: ${err.message || 'Falha na operação'}`);
-      return false;
-    }
-  };
-
-  // Remove admin role
-  const removeAdminRole = async (userId: string): Promise<boolean> => {
-    try {
-      // This would update the user's role in auth.users and/or remove them from a user_roles table
-      // const { error } = await supabase.rpc('admin_set_user_role', {
-      //   target_user_id: userId,
-      //   new_role: 'user'
-      // });
-      
-      // if (error) throw error;
-      
-      toast.success('Privilégios de administrador removidos com sucesso');
-      return true;
-    } catch (err: any) {
-      toast.error(`Erro ao atualizar privilégios: ${err.message || 'Falha na operação'}`);
-      return false;
-    }
-  };
-
   // Update user
   const updateUser = async (userId: string, userData: Partial<AdminUser>): Promise<boolean> => {
     try {
-      // This would update the user's profile in Supabase
-      // const { error } = await supabase
-      //   .from('profiles')
-      //   .update({
-      //     first_name: userData.name?.split(' ')[0],
-      //     last_name: userData.name?.split(' ').slice(1).join(' '),
-      //     phone: userData.phone,
-      //     city: userData.city,
-      //     neighborhood: userData.neighborhood,
-      //     // other fields as needed
-      //   })
-      //   .eq('id', userId);
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: userData.name?.split(' ')[0],
+          last_name: userData.name?.split(' ').slice(1).join(' '),
+          phone: userData.phone,
+          city: userData.city,
+          neighborhood: userData.neighborhood,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
       
-      // if (error) throw error;
+      if (error) throw error;
       
       toast.success('Dados do usuário atualizados com sucesso');
       return true;
@@ -186,14 +185,47 @@ export const useAdminUsers = () => {
   };
 
   // Export users to CSV
-  const exportUsers = async (filters?: any): Promise<string | null> => {
+  const exportUsers = async (): Promise<string | null> => {
     try {
-      // This would get all users from Supabase and format them as CSV
-      // Downloading could be handled on the frontend
-      
-      // For mock purposes
-      const mockCSV = "id,name,email,level,points,status\n1,John Doe,john@example.com,gold,1200,active";
-      return mockCSV;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_sports!inner(
+            sport_type!inner(name),
+            skill_level!inner(name)
+          ),
+          user_gamification!inner(
+            total_points,
+            current_level:current_level_id(name)
+          )
+        `);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error('Nenhum dado encontrado para exportar');
+      }
+
+      // Formatar dados para CSV
+      const headers = ['ID,Nome,Email,Telefone,Cidade,Bairro,Nível,Pontos,Modalidades,Status\n'];
+      const rows = data.map(user => {
+        const sports = user.user_sports?.map(s => s.sport_type?.name).join(';') || '';
+        return [
+          user.id,
+          `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+          user.auth_user?.email || '',
+          user.phone || '',
+          user.city || '',
+          user.neighborhood || '',
+          user.user_gamification?.[0]?.current_level?.name || 'Iniciante',
+          user.user_gamification?.[0]?.total_points || 0,
+          sports,
+          user.is_active ? 'Ativo' : 'Bloqueado'
+        ].join(',');
+      });
+
+      return headers.concat(rows.join('\n'));
     } catch (err: any) {
       toast.error(`Erro ao exportar usuários: ${err.message || 'Falha na operação'}`);
       return null;
@@ -208,8 +240,6 @@ export const useAdminUsers = () => {
     fetchUsers,
     blockUser,
     unblockUser,
-    setAsAdmin,
-    removeAdminRole,
     updateUser,
     exportUsers
   };
