@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { User, UserRole, Profile } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [adminRoles, setAdminRoles] = useState<boolean>(false);
 
   const formatUser = (session: Session | null): User | null => {
     if (!session?.user) return null;
@@ -61,6 +63,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const checkAdminRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .single();
+        
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erro ao verificar papel de admin:', error);
+      }
+      
+      setAdminRoles(!!data);
+    } catch (error) {
+      console.error('Erro ao verificar papel de admin:', error);
+      setAdminRoles(false);
+    }
+  };
+
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
@@ -74,9 +96,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (currentSession?.user) {
               setTimeout(() => {
                 fetchProfile(currentSession.user.id);
+                checkAdminRole(currentSession.user.id);
               }, 0);
             } else {
               setProfile(null);
+              setAdminRoles(false);
             }
           }
         );
@@ -87,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (currentSession?.user) {
           await fetchProfile(currentSession.user.id);
+          await checkAdminRole(currentSession.user.id);
         }
         
         return () => {
@@ -102,10 +127,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initialize();
   }, []);
 
-  const isAdmin = React.useMemo(() => {
-    return user?.role === 'admin' || 
+  const isAdmin = useMemo(() => {
+    return adminRoles || 
       session?.user?.email === 'tiagommourao@gmail.com';
-  }, [user, session]);
+  }, [adminRoles, session]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -174,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (refreshedSession?.user) {
         await fetchProfile(refreshedSession.user.id);
+        await checkAdminRole(refreshedSession.user.id);
       }
     } catch (error) {
       console.error('Erro ao atualizar dados do usuário:', error);

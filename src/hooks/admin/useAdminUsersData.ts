@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { AdminUser } from '@/types';
 
 export function useAdminUsersData() {
@@ -29,6 +29,16 @@ export function useAdminUsersData() {
         `);
 
       if (profilesError) throw profilesError;
+
+      // Buscar usuários do auth para obter emails
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      if (authError) throw authError;
+      
+      // Criar mapa de emails para fácil acesso
+      const emailMap = new Map();
+      authUsers?.users?.forEach(user => {
+        emailMap.set(user.id, user.email);
+      });
 
       // Buscar roles dos usuários
       const { data: userRoles, error: rolesError } = await supabase
@@ -105,7 +115,7 @@ export function useAdminUsersData() {
       return (profiles || []).map(profile => ({
         id: profile.id,
         name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-        email: '', // Email será preenchido via RLS
+        email: emailMap.get(profile.id) || '',
         phone: profile.phone || '',
         city: profile.city || '',
         neighborhood: profile.neighborhood || '',
@@ -120,7 +130,7 @@ export function useAdminUsersData() {
         badges: achievementsMap.get(profile.id) || [],
         preferences: profile.preferences || {},
         profileProgress: profile.profile_progress || 0
-      })) as AdminUser[];
+      }));
     }
   });
 
@@ -138,17 +148,10 @@ export function useAdminUsersData() {
     },
     onSuccess: (userId) => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast({
-        title: "Usuário promovido",
-        description: "O usuário foi promovido a administrador com sucesso."
-      });
+      toast("Usuário promovido a administrador com sucesso");
     },
     onError: (error) => {
-      toast({
-        title: "Erro ao promover usuário",
-        description: error.message || "Não foi possível promover o usuário a administrador.",
-        variant: "destructive"
-      });
+      toast(`Erro ao promover usuário: ${error.message || 'Falha na operação'}`);
     }
   });
 
@@ -165,17 +168,10 @@ export function useAdminUsersData() {
     },
     onSuccess: (userId) => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast({
-        title: "Permissões removidas",
-        description: "As permissões de administrador foram removidas com sucesso."
-      });
+      toast("Permissões de administrador removidas com sucesso");
     },
     onError: (error) => {
-      toast({
-        title: "Erro ao remover permissões",
-        description: error.message || "Não foi possível remover as permissões de administrador.",
-        variant: "destructive"
-      });
+      toast(`Erro ao remover permissões: ${error.message || 'Falha na operação'}`);
     }
   });
 
@@ -191,17 +187,10 @@ export function useAdminUsersData() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast({
-        title: "Usuário bloqueado",
-        description: "O usuário foi bloqueado com sucesso."
-      });
+      toast("Usuário bloqueado com sucesso");
     },
     onError: (error) => {
-      toast({
-        title: "Erro ao bloquear usuário",
-        description: error.message || "Não foi possível bloquear o usuário.",
-        variant: "destructive"
-      });
+      toast(`Erro ao bloquear usuário: ${error.message || 'Falha na operação'}`);
     }
   });
 
@@ -217,17 +206,10 @@ export function useAdminUsersData() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast({
-        title: "Usuário desbloqueado",
-        description: "O usuário foi desbloqueado com sucesso."
-      });
+      toast("Usuário desbloqueado com sucesso");
     },
     onError: (error) => {
-      toast({
-        title: "Erro ao desbloquear usuário",
-        description: error.message || "Não foi possível desbloquear o usuário.",
-        variant: "destructive"
-      });
+      toast(`Erro ao desbloquear usuário: ${error.message || 'Falha na operação'}`);
     }
   });
 

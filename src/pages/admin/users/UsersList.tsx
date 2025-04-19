@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,10 +14,10 @@ import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { UserLevel } from '@/components/gamification/UserLevel';
 import { AdminUsersFilter } from '@/components/admin/users/AdminUsersFilter';
 import { AdminUserDetails } from '@/components/admin/users/AdminUserDetails';
-import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AdminUserData } from '@/types/admin';
+import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
 
 const UsersList = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,12 +25,7 @@ const UsersList = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const { users, loading, fetchUsers, pagination } = useAdminUsers();
-
-  // Initialize by loading users
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  const { users, isLoading, setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsersData();
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -103,7 +98,7 @@ const UsersList = () => {
   };
 
   const getSportBadge = (sport: { name: string; level: string }) => {
-    switch (sport.name.toLowerCase()) {
+    switch (sport.name?.toLowerCase()) {
       case 'tênis':
       case 'tenis':
         return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-green-50 text-green-700 mr-1">🎾 Tênis ({sport.level})</Badge>;
@@ -122,6 +117,22 @@ const UsersList = () => {
 
   const closeUserDetails = () => {
     setSelectedUser(null);
+  };
+
+  const handleSetAdmin = async (userId: string) => {
+    await setAsAdmin.mutateAsync(userId);
+  };
+
+  const handleRemoveAdmin = async (userId: string) => {
+    await removeAdminRole.mutateAsync(userId);
+  };
+
+  const handleBlockUser = async (userId: string, reason: string = 'Bloqueio administrativo') => {
+    await blockUser.mutateAsync({ userId, reason });
+  };
+
+  const handleUnblockUser = async (userId: string) => {
+    await unblockUser.mutateAsync(userId);
   };
 
   return (
@@ -176,35 +187,10 @@ const UsersList = () => {
               </div>
 
               {isFilterOpen && (
-                <Card className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <h4 className="font-medium mb-2">Modalidades</h4>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="cursor-pointer">🎾 Tênis</Badge>
-                        <Badge variant="outline" className="cursor-pointer">🏓 Padel</Badge>
-                        <Badge variant="outline" className="cursor-pointer">🏝️ Beach Tennis</Badge>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Níveis</h4>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="cursor-pointer">Bronze</Badge>
-                        <Badge variant="outline" className="cursor-pointer">Silver</Badge>
-                        <Badge variant="outline" className="cursor-pointer">Gold</Badge>
-                        <Badge variant="outline" className="cursor-pointer">Legend</Badge>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Data de cadastro</h4>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="cursor-pointer">Últimos 7 dias</Badge>
-                        <Badge variant="outline" className="cursor-pointer">Este mês</Badge>
-                        <Badge variant="outline" className="cursor-pointer">Este ano</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
+                <AdminUsersFilter 
+                  onClose={() => setIsFilterOpen(false)}
+                  onApply={() => setIsFilterOpen(false)}
+                />
               )}
 
               {selectedUsers.length > 0 && (
@@ -248,7 +234,7 @@ const UsersList = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? (
+                    {isLoading ? (
                       <TableRow>
                         <TableCell colSpan={9} className="text-center py-8">Carregando usuários...</TableCell>
                       </TableRow>
@@ -329,20 +315,32 @@ const UsersList = () => {
                                     <Edit className="h-4 w-4 mr-2" /> Editar
                                   </DropdownMenuItem>
                                   {user.isAdmin ? (
-                                    <DropdownMenuItem className="cursor-pointer text-amber-600">
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer text-amber-600"
+                                      onClick={() => handleRemoveAdmin(user.id)}
+                                    >
                                       <UserCog className="h-4 w-4 mr-2" /> Remover Admin
                                     </DropdownMenuItem>
                                   ) : (
-                                    <DropdownMenuItem className="cursor-pointer text-blue-600">
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer text-blue-600"
+                                      onClick={() => handleSetAdmin(user.id)}
+                                    >
                                       <Shield className="h-4 w-4 mr-2" /> Promover a Admin
                                     </DropdownMenuItem>
                                   )}
                                   {user.status === 'blocked' ? (
-                                    <DropdownMenuItem className="cursor-pointer text-green-600">
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer text-green-600"
+                                      onClick={() => handleUnblockUser(user.id)}
+                                    >
                                       <Shield className="h-4 w-4 mr-2" /> Desbloquear
                                     </DropdownMenuItem>
                                   ) : (
-                                    <DropdownMenuItem className="cursor-pointer text-destructive">
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer text-destructive"
+                                      onClick={() => handleBlockUser(user.id)}
+                                    >
                                       <ShieldAlert className="h-4 w-4 mr-2" /> Bloquear
                                     </DropdownMenuItem>
                                   )}
