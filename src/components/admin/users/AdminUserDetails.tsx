@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Edit, Mail, UserCog, Key, ShieldAlert, Shield, Calendar, Clock, X, Trophy, Heart } from 'lucide-react';
+import { Edit, Mail, UserCog, Key, ShieldAlert, Shield, Calendar, Clock, X } from 'lucide-react';
+import { Trophy } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
 import { UserProfileSection } from './details/UserProfileSection';
 import { UserContactInfo } from './details/UserContactInfo';
@@ -31,6 +33,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   const { setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsers();
 
   const formatDateTime = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
@@ -42,17 +45,21 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   };
 
   const handleSetAdmin = async () => {
-    await setAsAdmin(userId);
+    await setAsAdmin.mutateAsync(userId);
   };
 
   const handleRemoveAdmin = async () => {
-    await removeAdminRole(userId);
+    await removeAdminRole.mutateAsync(userId);
   };
 
   const handleBlockUser = async () => {
-    await blockUser({ userId, reason: blockReason });
+    await blockUser.mutateAsync({ userId, reason: blockReason });
     setIsBlockDialogOpen(false);
     setBlockReason('');
+  };
+
+  const handleUnblockUser = async () => {
+    await unblockUser.mutateAsync(userId);
   };
 
   return (
@@ -80,7 +87,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
             <DialogClose asChild>
               <Button variant="outline">Cancelar</Button>
             </DialogClose>
-            <Button variant="destructive" onClick={() => setIsBlockDialogOpen(false)}>
+            <Button variant="destructive" onClick={handleBlockUser}>
               Confirmar Bloqueio
             </Button>
           </DialogFooter>
@@ -133,33 +140,42 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                     <div>
                       <h4 className="text-md font-semibold mb-3">Modalidades Esportivas</h4>
                       <div className="space-y-3">
-                        {/*{userData.sports.map((sport) => (
-                          <div key={sport} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="bg-accent/50">{getSportLabel(sport)}</Badge>
-                              <span className="text-sm">Nível Intermediário</span>
+                        {userData.sports && userData.sports.length > 0 ? (
+                          userData.sports.map((sport, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-accent/50">{sport.name}</Badge>
+                                <span className="text-sm">Nível {sport.level || 'Iniciante'}</span>
+                              </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              Desde {formatDate("2023-10-15")}
-                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center text-muted-foreground py-3">
+                            Nenhuma modalidade esportiva cadastrada
                           </div>
-                        ))}*/}
+                        )}
                       </div>
                     </div>
                     
                     <div>
                       <h4 className="text-md font-semibold mb-3">Badges e Conquistas</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {userData.badges.map((badge) => (
-                          <div key={badge.name} className="p-3 bg-muted/30 rounded-md">
-                            <div className="flex items-center gap-2">
-                              <div className="text-2xl">{badge.icon}</div>
-                              <div>
-                                <div className="font-medium text-sm">{badge.name}</div>
+                        {userData.badges && userData.badges.length > 0 ? (
+                          userData.badges.map((badge) => (
+                            <div key={badge.name} className="p-3 bg-muted/30 rounded-md">
+                              <div className="flex items-center gap-2">
+                                <div className="text-2xl">{badge.icon}</div>
+                                <div>
+                                  <div className="font-medium text-sm">{badge.name}</div>
+                                </div>
                               </div>
                             </div>
+                          ))
+                        ) : (
+                          <div className="col-span-3 text-center text-muted-foreground py-3">
+                            Nenhuma badge conquistada
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                     
@@ -207,8 +223,8 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
 
                     <div>
                       <h4 className="text-md font-semibold mb-3">Marcos Importantes</h4>
-                      <div className="space-y-3">
-                        
+                      <div className="space-y-3 text-center text-muted-foreground py-3">
+                        Nenhum marco registrado
                       </div>
                     </div>
 
@@ -216,27 +232,27 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                       <h4 className="text-md font-semibold mb-3">Estatísticas</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">52</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Jogos Totais</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">7</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Quadras Diferentes</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">12</div>
+                          <div className="text-xl font-bold">{userData.badges?.length || 0}</div>
                           <div className="text-xs text-muted-foreground">Badges Conquistadas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">8</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Avaliações Positivas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">14</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Parceiros Diferentes</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">5</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Meses de Atividade</div>
                         </div>
                       </div>
@@ -248,8 +264,8 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                   <div className="space-y-6">
                     <div>
                       <h4 className="text-md font-semibold mb-3">Próximas Reservas</h4>
-                      <div className="space-y-3">
-                        
+                      <div className="text-center text-muted-foreground py-3">
+                        Nenhuma reserva futura encontrada
                       </div>
                     </div>
 
@@ -260,8 +276,8 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                           Ver todas
                         </Button>
                       </div>
-                      <div className="space-y-3">
-                        
+                      <div className="text-center text-muted-foreground py-3">
+                        Nenhuma reserva anterior encontrada
                       </div>
                     </div>
 
@@ -269,15 +285,15 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                       <h4 className="text-md font-semibold mb-3">Resumo de Atividade</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">12</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Reservas no Último Mês</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">R$ 580</div>
+                          <div className="text-xl font-bold">R$ 0</div>
                           <div className="text-xs text-muted-foreground">Valor Total</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">1</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Cancelamentos</div>
                         </div>
                       </div>
@@ -291,8 +307,8 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                       <h4 className="text-md font-semibold mb-3 flex items-center gap-1">
                         <Heart className="h-4 w-4" /> Avaliações Recebidas
                       </h4>
-                      <div className="space-y-3">
-                        
+                      <div className="text-center text-muted-foreground py-3">
+                        Nenhuma avaliação recebida
                       </div>
                     </div>
 
@@ -300,15 +316,15 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                       <h4 className="text-md font-semibold mb-3">Resumo de Feedback</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold text-green-600">92%</div>
+                          <div className="text-xl font-bold text-green-600">0%</div>
                           <div className="text-xs text-muted-foreground">Taxa de Aprovação</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">8</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Avaliações Recebidas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">2</div>
+                          <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground">Avaliações Enviadas</div>
                         </div>
                       </div>
@@ -331,7 +347,11 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
 
           <div className="flex gap-2">
             {userData.status === 'blocked' ? (
-              <Button variant="outline" className="text-green-600 border-green-200 hover:bg-green-50">
+              <Button 
+                variant="outline" 
+                className="text-green-600 border-green-200 hover:bg-green-50"
+                onClick={handleUnblockUser}
+              >
                 <Shield className="mr-2 h-4 w-4" /> Desbloquear
               </Button>
             ) : (
@@ -345,11 +365,19 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
             )}
             
             {userData.isAdmin ? (
-              <Button variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50">
+              <Button 
+                variant="outline" 
+                className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                onClick={handleRemoveAdmin}
+              >
                 <UserCog className="mr-2 h-4 w-4" /> Remover Admin
               </Button>
             ) : (
-              <Button variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50">
+              <Button 
+                variant="outline" 
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                onClick={handleSetAdmin}
+              >
                 <UserCog className="mr-2 h-4 w-4" /> Promover a Admin
               </Button>
             )}
@@ -359,4 +387,3 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
     </>
   );
 };
-

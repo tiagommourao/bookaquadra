@@ -1,24 +1,23 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { 
   Search, FilterIcon, Download, Mail, ShieldAlert, Shield, 
   MoreHorizontal, UserCog, UserX, Eye, Edit 
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { UserLevel } from '@/components/gamification/UserLevel';
 import { AdminUsersFilter } from '@/components/admin/users/AdminUsersFilter';
 import { AdminUserDetails } from '@/components/admin/users/AdminUserDetails';
-import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
+import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AdminUserData } from '@/types/admin';
 
 const UsersList = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,9 +25,15 @@ const UsersList = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const { users, isLoading } = useAdminUsersData();
+  const { users, loading, fetchUsers, pagination } = useAdminUsers();
+
+  // Initialize by loading users
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
@@ -38,6 +43,7 @@ const UsersList = () => {
   };
 
   const formatDateTime = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
@@ -100,13 +106,13 @@ const UsersList = () => {
     switch (sport.name.toLowerCase()) {
       case 'tênis':
       case 'tenis':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 mr-1">🎾 Tênis ({sport.level})</Badge>;
+        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-green-50 text-green-700 mr-1">🎾 Tênis ({sport.level})</Badge>;
       case 'padel':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 mr-1">🏓 Padel ({sport.level})</Badge>;
+        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-blue-50 text-blue-700 mr-1">🏓 Padel ({sport.level})</Badge>;
       case 'beach tennis':
-        return <Badge variant="outline" className="bg-orange-50 text-orange-700 mr-1">🏝️ Beach ({sport.level})</Badge>;
+        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-orange-50 text-orange-700 mr-1">🏝️ Beach ({sport.level})</Badge>;
       default:
-        return <Badge variant="outline" className="bg-gray-50 text-gray-700 mr-1">{sport.name} ({sport.level})</Badge>;
+        return <Badge key={`${sport.name}-${sport.level}`} variant="outline" className="bg-gray-50 text-gray-700 mr-1">{sport.name} ({sport.level})</Badge>;
     }
   };
 
@@ -242,98 +248,111 @@ const UsersList = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedUsers.includes(user.id)}
-                            onChange={() => toggleUserSelection(user.id)}
-                            className="rounded border-gray-300 text-primary focus:ring-primary"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-3">
-                            <AvatarFrame
-                              src={user.avatarUrl || undefined}
-                              fallback={user.name.charAt(0)}
-                              frameType={user.level as any}
-                              size="sm"
-                            />
-                            <div>
-                              <div className="font-medium">{user.name}</div>
-                              <div className="text-xs text-muted-foreground">{user.city}/{user.neighborhood}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="text-sm">{user.email}</div>
-                            <div className="text-xs text-muted-foreground">{user.phone}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <UserLevel level={user.level as any} points={user.points} showDetails />
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {user.sports.map((sport, idx) => getSportBadge(sport))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(user.status, user.isAdmin)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm whitespace-nowrap">
-                            {formatDate(user.createdAt)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm whitespace-nowrap">
-                            {user.lastLogin && formatDateTime(user.lastLogin)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-1">
-                            <Button variant="ghost" size="icon" onClick={() => showUserDetails(user.id)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="cursor-pointer">
-                                  <Edit className="h-4 w-4 mr-2" /> Editar
-                                </DropdownMenuItem>
-                                {user.isAdmin ? (
-                                  <DropdownMenuItem className="cursor-pointer text-amber-600">
-                                    <UserCog className="h-4 w-4 mr-2" /> Remover Admin
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem className="cursor-pointer text-blue-600">
-                                    <Shield className="h-4 w-4 mr-2" /> Promover a Admin
-                                  </DropdownMenuItem>
-                                )}
-                                {user.status === 'blocked' ? (
-                                  <DropdownMenuItem className="cursor-pointer text-green-600">
-                                    <Shield className="h-4 w-4 mr-2" /> Desbloquear
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem className="cursor-pointer text-destructive">
-                                    <ShieldAlert className="h-4 w-4 mr-2" /> Bloquear
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8">Carregando usuários...</TableCell>
                       </TableRow>
-                    ))}
+                    ) : filteredUsers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8">Nenhum usuário encontrado</TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.id)}
+                              onChange={() => toggleUserSelection(user.id)}
+                              className="rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <AvatarFrame
+                                src={user.avatarUrl || undefined}
+                                fallback={user.name.charAt(0)}
+                                frameType={user.level as any}
+                                size="sm"
+                              />
+                              <div>
+                                <div className="font-medium">{user.name || 'Sem nome'}</div>
+                                <div className="text-xs text-muted-foreground">{user.city}/{user.neighborhood}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="text-sm">{user.email}</div>
+                              <div className="text-xs text-muted-foreground">{user.phone}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <UserLevel level={user.level as any} points={user.points} showDetails />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {user.sports && user.sports.length > 0 ? 
+                                user.sports.map((sport) => getSportBadge(sport)) : 
+                                <span className="text-xs text-muted-foreground">Nenhum esporte</span>
+                              }
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(user.status, user.isAdmin)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm whitespace-nowrap">
+                              {formatDate(user.createdAt)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm whitespace-nowrap">
+                              {user.lastLogin ? formatDateTime(user.lastLogin) : 'Nunca'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <Button variant="ghost" size="icon" onClick={() => showUserDetails(user.id)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem className="cursor-pointer">
+                                    <Edit className="h-4 w-4 mr-2" /> Editar
+                                  </DropdownMenuItem>
+                                  {user.isAdmin ? (
+                                    <DropdownMenuItem className="cursor-pointer text-amber-600">
+                                      <UserCog className="h-4 w-4 mr-2" /> Remover Admin
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem className="cursor-pointer text-blue-600">
+                                      <Shield className="h-4 w-4 mr-2" /> Promover a Admin
+                                    </DropdownMenuItem>
+                                  )}
+                                  {user.status === 'blocked' ? (
+                                    <DropdownMenuItem className="cursor-pointer text-green-600">
+                                      <Shield className="h-4 w-4 mr-2" /> Desbloquear
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem className="cursor-pointer text-destructive">
+                                      <ShieldAlert className="h-4 w-4 mr-2" /> Bloquear
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -345,7 +364,7 @@ const UsersList = () => {
           <AdminUserDetails 
             userId={selectedUser} 
             onClose={closeUserDetails} 
-            userData={filteredUsers.find(user => user.id === selectedUser)!}
+            userData={filteredUsers.find(user => user.id === selectedUser) as AdminUserData}
           />
         )}
       </div>

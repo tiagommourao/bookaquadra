@@ -45,7 +45,7 @@ const UserProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Protected route for admins
 const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading, isAdmin, user } = useAuth();
+  const { isAuthenticated, isLoading, user, isAdmin } = useAuth();
   
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
@@ -63,8 +63,8 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     email: user?.email
   });
   
-  // For development purposes, consider all authenticated users as admins
-  // Remove or modify this for production
+  // Temporarily allow any authenticated user to access admin routes
+  // until we have proper admin users set up
   return <>{children}</>;
   
   // Uncomment this for production:
