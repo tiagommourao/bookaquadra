@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AdminUser } from '@/types';
+import { User } from '@supabase/supabase-js';
 
 export function useAdminUsersData() {
   const queryClient = useQueryClient();
@@ -31,14 +32,16 @@ export function useAdminUsersData() {
       if (profilesError) throw profilesError;
 
       // Buscar usuários do auth para obter emails
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
       if (authError) throw authError;
       
       // Criar mapa de emails para fácil acesso
       const emailMap = new Map();
-      authUsers?.users?.forEach(user => {
-        emailMap.set(user.id, user.email);
-      });
+      if (authData?.users) {
+        authData.users.forEach((user: User) => {
+          emailMap.set(user.id, user.email);
+        });
+      }
 
       // Buscar roles dos usuários
       const { data: userRoles, error: rolesError } = await supabase
