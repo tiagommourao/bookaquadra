@@ -360,7 +360,22 @@ export type Database = {
           updated_by?: string | null
           webhook_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "integrations_mercadopago_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_mercadopago_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integrations_mercadopago_logs: {
         Row: {
@@ -388,6 +403,13 @@ export type Database = {
           integration_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "integrations_mercadopago_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "integrations_mercadopago_logs_integration_id_fkey"
             columns: ["integration_id"]
@@ -426,6 +448,13 @@ export type Database = {
           reason?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_status_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payment_status_logs_payment_id_fkey"
             columns: ["payment_id"]
@@ -497,10 +526,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "payments_admin_modified_by_fkey"
+            columns: ["admin_modified_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payments_booking_id_fkey"
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
             referencedColumns: ["id"]
           },
         ]
@@ -592,7 +635,15 @@ export type Database = {
           profile_progress?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recognition_types: {
         Row: {
@@ -1139,7 +1190,22 @@ export type Database = {
           role?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_sports: {
         Row: {
@@ -1200,6 +1266,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_sports_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -1209,6 +1282,16 @@ export type Database = {
           email: string | null
           id: string | null
           last_sign_in_at: string | null
+        }
+        Insert: {
+          email?: string | null
+          id?: string | null
+          last_sign_in_at?: string | null
+        }
+        Update: {
+          email?: string | null
+          id?: string | null
+          last_sign_in_at?: string | null
         }
         Relationships: []
       }
@@ -1236,10 +1319,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "payments_admin_modified_by_fkey"
+            columns: ["admin_modified_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payments_booking_id_fkey"
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
             referencedColumns: ["id"]
           },
         ]
@@ -1268,26 +1365,36 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "payments_admin_modified_by_fkey"
+            columns: ["admin_modified_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payments_booking_id_fkey"
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Functions: {
-      get_auth_users: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          id: string
-          email: string
-          last_sign_in_at: string
-        }[]
+      check_user_role: {
+        Args: { user_id: string }
+        Returns: string
       }
       is_admin: {
-        Args: Record<PropertyKey, never> | { user_id: string }
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_admin_user: {

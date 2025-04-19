@@ -41,9 +41,10 @@ export function useAdminUsersData() {
           return [];
         }
 
-        // Buscar dados de autenticação usando a função RPC
+        // Buscar dados de autenticação usando a view atualizada
         const { data: authUsersData, error: authError } = await supabase
-          .rpc('get_auth_users');
+          .from('auth_users_view')
+          .select('*');
         
         if (authError) {
           console.error("Erro ao buscar dados de autenticação:", authError);
@@ -66,7 +67,7 @@ export function useAdminUsersData() {
           }
         });
 
-        // Buscar roles dos usuários
+        // Buscar roles dos usuários usando a nova função
         const { data: userRoles, error: rolesError } = await supabase
           .from('user_roles')
           .select('user_id, role');
@@ -112,7 +113,7 @@ export function useAdminUsersData() {
           throw achievementsError;
         }
 
-        // Criar mapa de roles administrativas
+        // Criar mapa de roles administrativas usando a nova lógica
         const adminMap = new Map<string, boolean>();
         if (userRoles && userRoles.length > 0) {
           userRoles.forEach(ur => {
