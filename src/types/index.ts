@@ -403,5 +403,24 @@ export type OnboardingStep =
 // Game type preferences
 export type GameTypePreference = 'individual' | 'doubles' | 'group';
 
+// Admin User type for the admin panel
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  city?: string;
+  neighborhood?: string;
+  level: string;
+  points: number;
+  sports: string[];
+  status: 'active' | 'blocked' | 'suspended';
+  isAdmin: boolean;
+  createdAt: string;
+  lastLogin: string | null;
+  avatarUrl: string | null;
+  badges: string[];
+}
+
 // Re-export os novos tipos de pagamento
 export * from './payment';

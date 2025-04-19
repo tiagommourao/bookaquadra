@@ -22,13 +22,25 @@ export function useAdminUsersData() {
           city,
           neighborhood,
           created_at,
-          is_active,
-          user_roles (
-            role
-          )
+          is_active
         `);
 
       if (profilesError) throw profilesError;
+
+      // Get user roles separately to avoid relation errors
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      if (rolesError) throw rolesError;
+
+      // Create a map of user_id to admin status
+      const adminMap = new Map();
+      userRoles?.forEach(ur => {
+        if (ur.role === 'admin') {
+          adminMap.set(ur.user_id, true);
+        }
+      });
 
       // Transform the data to match our AdminUser type
       return (profiles || []).map(profile => ({
@@ -42,7 +54,7 @@ export function useAdminUsersData() {
         points: 0,
         sports: [],
         status: profile.is_active ? 'active' : 'blocked',
-        isAdmin: profile.user_roles?.some(ur => ur.role === 'admin') || false,
+        isAdmin: adminMap.get(profile.id) || false,
         createdAt: profile.created_at,
         lastLogin: null,
         avatarUrl: profile.avatar_url,

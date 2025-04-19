@@ -49,6 +49,7 @@ import {
   Heart,
   Award,
 } from 'lucide-react';
+import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
 
 interface UserBadge {
   id: string;

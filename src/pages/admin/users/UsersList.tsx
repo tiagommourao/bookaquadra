@@ -15,7 +15,7 @@ import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { UserLevel } from '@/components/gamification/UserLevel';
 import { AdminUsersFilter } from '@/components/admin/users/AdminUsersFilter';
 import { AdminUserDetails } from '@/components/admin/users/AdminUserDetails';
-import { useAdminUsersData } from '@/hooks/admin/useAdminUsers';
+import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
