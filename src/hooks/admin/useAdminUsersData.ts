@@ -37,24 +37,31 @@ export function useAdminUsersData() {
           throw profilesError;
         }
 
+        if (!profiles || profiles.length === 0) {
+          console.log("Nenhum perfil encontrado");
+          return [];
+        }
+
         // Buscar dados de autenticação através da view segura
+        // Vamos usar uma consulta explícita com campos nomeados para evitar problemas de tipo
         const { data: authUsersData, error: authError } = await supabase
           .from('auth_users_view')
-          .select('*');
+          .select('id, email, last_sign_in_at');
 
         if (authError) {
           console.error("Erro ao buscar dados de autenticação:", authError);
           throw authError;
         }
 
-        const authUsers = authUsersData as AuthUserView[];
-        console.log("Dados de auth recebidos:", authUsers?.length || 0);
+        // Garantir que temos os dados e que eles estão no formato esperado
+        const authUsers = authUsersData as AuthUserView[] || [];
+        console.log("Dados de auth recebidos:", authUsers?.length || 0, "Primeiro item:", authUsers?.[0]);
 
         // Criar mapa de emails e último login para fácil acesso
         const emailMap = new Map<string, string>();
         const lastLoginMap = new Map<string, string>();
         
-        if (authUsers) {
+        if (authUsers && authUsers.length > 0) {
           authUsers.forEach((user: AuthUserView) => {
             if (user.id && user.email) {
               emailMap.set(user.id, user.email);
@@ -113,46 +120,50 @@ export function useAdminUsersData() {
 
         // Criar mapa de roles administrativas
         const adminMap = new Map<string, boolean>();
-        userRoles?.forEach(ur => {
-          if (ur.role === 'admin') {
-            adminMap.set(ur.user_id, true);
-          }
-        });
+        if (userRoles && userRoles.length > 0) {
+          userRoles.forEach(ur => {
+            if (ur.role === 'admin') {
+              adminMap.set(ur.user_id, true);
+            }
+          });
+        }
 
         // Criar mapa de modalidades esportivas por usuário
         const sportsMap = new Map<string, Array<{ name: string; level: string }>>();
-        userSports?.forEach(us => {
-          if (!sportsMap.has(us.user_id)) {
-            sportsMap.set(us.user_id, []);
-          }
-          sportsMap.get(us.user_id)?.push({
-            name: us.sport_types?.name || '',
-            level: us.skill_levels?.name || '',
+        if (userSports && userSports.length > 0) {
+          userSports.forEach(us => {
+            if (!sportsMap.has(us.user_id)) {
+              sportsMap.set(us.user_id, []);
+            }
+            const sportsList = sportsMap.get(us.user_id);
+            if (sportsList) {
+              sportsList.push({
+                name: us.sport_types?.name || '',
+                level: us.skill_levels?.name || '',
+              });
+            }
           });
-        });
+        }
 
         // Criar mapa de conquistas por usuário
         const achievementsMap = new Map<string, Array<{ name: string; icon: string }>>();
-        userAchievements?.forEach(ua => {
-          if (!achievementsMap.has(ua.user_id)) {
-            achievementsMap.set(ua.user_id, []);
-          }
-          if (ua.achievement_types) {
-            achievementsMap.get(ua.user_id)?.push({
-              name: ua.achievement_types.name,
-              icon: ua.achievement_types.icon
-            });
-          }
-        });
-
-        // Verificar se temos dados para transformar
-        if (!profiles || profiles.length === 0) {
-          console.log("Nenhum perfil encontrado");
-          return [];
+        if (userAchievements && userAchievements.length > 0) {
+          userAchievements.forEach(ua => {
+            if (!achievementsMap.has(ua.user_id)) {
+              achievementsMap.set(ua.user_id, []);
+            }
+            const achievementsList = achievementsMap.get(ua.user_id);
+            if (achievementsList && ua.achievement_types) {
+              achievementsList.push({
+                name: ua.achievement_types.name,
+                icon: ua.achievement_types.icon
+              });
+            }
+          });
         }
 
         // Transformar os dados para o formato AdminUser
-        const adminUsers = (profiles || []).map(profile => {
+        const adminUsers = profiles.map(profile => {
           // Buscar email e último login do usuário através dos mapas
           const email = emailMap.get(profile.id) || '';
           const lastLogin = lastLoginMap.get(profile.id) || '';

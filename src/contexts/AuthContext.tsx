@@ -65,24 +65,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAdminRole = async (userId: string) => {
     try {
-      console.log("Verificando papel de admin para usuário:", userId);
+      console.log("[isAdmin] Verificando papel de admin para usuário:", userId);
       
-      // Usar a função RPC is_admin do banco de dados
+      // Usar a função RPC is_admin do banco de dados para verificar se o usuário é admin
       const { data, error } = await supabase
         .rpc('is_admin', { 
           user_id: userId 
         });
       
       if (error) {
-        console.error('Erro ao verificar papel de admin via RPC:', error);
+        console.error('[isAdmin] Erro ao verificar papel de admin via RPC:', error);
         setAdminRoles(false);
         return;
       }
       
-      console.log("Resultado da verificação de admin via is_admin RPC:", data);
+      console.log("[isAdmin] Resultado da verificação de admin via is_admin RPC:", data);
       setAdminRoles(!!data);
     } catch (error) {
-      console.error('Erro ao verificar papel de admin:', error);
+      console.error('[isAdmin] Erro ao verificar papel de admin:', error);
       setAdminRoles(false);
     }
   };
@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Use useMemo para derivar isAdmin de adminRoles para evitar recálculos desnecessários
   const isAdmin = useMemo(() => {
-    console.log("Verificando isAdmin:", { adminRoles });
+    console.log("[isAdmin] Verificando isAdmin:", { adminRoles });
     return adminRoles;
   }, [adminRoles]);
 
