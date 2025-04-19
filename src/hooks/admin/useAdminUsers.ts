@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types';
@@ -30,7 +29,6 @@ export const useAdminUsers = () => {
     totalCount: 0
   });
 
-  // Fetch users
   const fetchUsers = async (
     page = 1, 
     pageSize = 10, 
@@ -49,7 +47,6 @@ export const useAdminUsers = () => {
       const start = (page - 1) * pageSize;
       const end = start + pageSize - 1;
       
-      // Construir a query base
       let query = supabase
         .from('profiles')
         .select(`
@@ -77,12 +74,10 @@ export const useAdminUsers = () => {
         })
         .range(start, end);
 
-      // Adicionar join com a tabela auth.users para obter o email e data de último login
       const { data: authUsersData } = await supabase
         .from('auth_users_view')
         .select('id, email, last_sign_in_at');
 
-      // Criar um mapa de usuários auth para facilitar o acesso
       const authUsersMap = new Map();
       if (authUsersData) {
         authUsersData.forEach(user => {
@@ -90,13 +85,11 @@ export const useAdminUsers = () => {
         });
       }
 
-      // Verificar roles de administrador
       const { data: adminRoles } = await supabase
         .from('user_roles')
         .select('user_id, role')
         .eq('role', 'admin');
 
-      // Criar um conjunto de IDs de administradores
       const adminIds = new Set();
       if (adminRoles) {
         adminRoles.forEach(role => {
@@ -104,7 +97,6 @@ export const useAdminUsers = () => {
         });
       }
 
-      // Aplicar filtros se existirem
       if (filters?.search) {
         query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%`);
       }
@@ -121,9 +113,7 @@ export const useAdminUsers = () => {
 
       if (error) throw error;
 
-      // Transformar os dados para o formato AdminUser
       const formattedUsers: AdminUser[] = data?.map(profile => {
-        // Buscar dados do auth.users usando o mapa
         const authUser = authUsersMap.get(profile.id);
 
         return {
@@ -161,7 +151,6 @@ export const useAdminUsers = () => {
     }
   };
 
-  // Block user
   const blockUser = async (userId: string, reason: string): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -182,7 +171,6 @@ export const useAdminUsers = () => {
     }
   };
 
-  // Unblock user
   const unblockUser = async (userId: string): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -203,7 +191,6 @@ export const useAdminUsers = () => {
     }
   };
 
-  // Update user
   const updateUser = async (userId: string, userData: Partial<AdminUser>): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -228,22 +215,19 @@ export const useAdminUsers = () => {
     }
   };
 
-  // Export users to CSV
   const exportUsers = async (): Promise<string | null> => {
     try {
-      // Utilizar os usuários já carregados se existirem
       if (users.length === 0) {
-        await fetchUsers(1, 100); // Buscar mais usuários para exportação
+        await fetchUsers(1, 100);
       }
       
       if (users.length === 0) {
         throw new Error('Nenhum dado encontrado para exportar');
       }
 
-      // Formatar dados para CSV
       const headers = 'ID,Nome,Email,Telefone,Cidade,Bairro,Nível,Pontos,Modalidades,Status\n';
       const rows = users.map(user => {
-        const sports = user.sports.join(';');
+        const sports = user.sports.length > 0 ? user.sports.join(';') : '';
         return [
           user.id,
           user.name,

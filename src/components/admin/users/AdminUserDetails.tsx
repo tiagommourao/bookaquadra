@@ -96,7 +96,7 @@ export interface UserData {
   status: 'active' | 'blocked' | 'suspended';
   avatarUrl?: string;
   badges?: string[];
-  lastLogin?: Date | string;
+  lastLogin?: string | Date;
   createdAt: string;
   isAdmin: boolean;
 }
