@@ -19,94 +19,6 @@ import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-const MOCK_USERS = [
-  {
-    id: '1',
-    name: 'Maria Silva',
-    email: 'maria@example.com',
-    phone: '(11) 98765-4321',
-    city: 'São Paulo',
-    neighborhood: 'Moema',
-    level: 'gold',
-    points: 970,
-    sports: ['padel', 'tennis'],
-    status: 'active',
-    isAdmin: false,
-    createdAt: '2023-10-15T14:30:00Z',
-    lastLogin: '2024-04-15T09:45:00Z',
-    avatarUrl: null,
-    badges: ['fairplay', 'streak10', 'seasonal'],
-  },
-  {
-    id: '2',
-    name: 'João Costa',
-    email: 'joao@example.com',
-    phone: '(11) 91234-5678',
-    city: 'São Paulo',
-    neighborhood: 'Pinheiros',
-    level: 'silver',
-    points: 790,
-    sports: ['beach', 'padel'],
-    status: 'blocked',
-    isAdmin: false,
-    createdAt: '2023-11-05T10:15:00Z',
-    lastLogin: '2024-03-20T16:30:00Z',
-    avatarUrl: null,
-    badges: ['streak10', 'explorer'],
-  },
-  {
-    id: '3',
-    name: 'Ana Ferreira',
-    email: 'ana@example.com',
-    phone: '(11) 97654-3210',
-    city: 'São Paulo',
-    neighborhood: 'Vila Madalena',
-    level: 'legend',
-    points: 1650,
-    sports: ['tennis', 'beach', 'padel'],
-    status: 'active',
-    isAdmin: true,
-    createdAt: '2023-09-10T09:00:00Z',
-    lastLogin: '2024-04-16T08:10:00Z',
-    avatarUrl: null,
-    badges: ['fairplay', 'streak10', 'explorer', 'teacher', 'community'],
-  },
-  {
-    id: '4',
-    name: 'Carlos Oliveira',
-    email: 'carlos@example.com',
-    phone: '(11) 95555-4444',
-    city: 'Santos',
-    neighborhood: 'Gonzaga',
-    level: 'bronze',
-    points: 320,
-    sports: ['beach'],
-    status: 'suspended',
-    isAdmin: false,
-    createdAt: '2024-01-20T15:45:00Z',
-    lastLogin: '2024-02-10T19:20:00Z',
-    avatarUrl: null,
-    badges: ['explorer'],
-  },
-  {
-    id: '5',
-    name: 'Patricia Mendes',
-    email: 'patricia@example.com',
-    phone: '(11) 93333-2222',
-    city: 'São Paulo',
-    neighborhood: 'Jardim Paulista',
-    level: 'gold',
-    points: 1100,
-    sports: ['tennis', 'padel'],
-    status: 'active',
-    isAdmin: false,
-    createdAt: '2023-08-15T11:30:00Z',
-    lastLogin: '2024-04-14T14:35:00Z',
-    avatarUrl: null,
-    badges: ['fairplay', 'streak10', 'community'],
-  },
-];
-
 const UsersList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -183,16 +95,17 @@ const UsersList = () => {
     }
   };
 
-  const getSportsBadge = (sport: string) => {
-    switch (sport) {
-      case 'tennis':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 mr-1">🎾 Tênis</Badge>;
+  const getSportBadge = (sport: { name: string; level: string }) => {
+    switch (sport.name.toLowerCase()) {
+      case 'tênis':
+      case 'tenis':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 mr-1">🎾 Tênis ({sport.level})</Badge>;
       case 'padel':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 mr-1">🏓 Padel</Badge>;
-      case 'beach':
-        return <Badge variant="outline" className="bg-orange-50 text-orange-700 mr-1">🏝️ Beach</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 mr-1">🏓 Padel ({sport.level})</Badge>;
+      case 'beach tennis':
+        return <Badge variant="outline" className="bg-orange-50 text-orange-700 mr-1">🏝️ Beach ({sport.level})</Badge>;
       default:
-        return <Badge variant="outline" className="bg-gray-50 text-gray-700 mr-1">{sport}</Badge>;
+        return <Badge variant="outline" className="bg-gray-50 text-gray-700 mr-1">{sport.name} ({sport.level})</Badge>;
     }
   };
 
@@ -365,7 +278,7 @@ const UsersList = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {user.sports.map(sport => getSportsBadge(sport))}
+                            {user.sports.map((sport, idx) => getSportBadge(sport))}
                           </div>
                         </TableCell>
                         <TableCell>

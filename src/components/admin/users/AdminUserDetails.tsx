@@ -98,7 +98,10 @@ interface UserData {
   createdAt: string;
   lastLogin: string;
   avatarUrl: string | null;
-  badges: string[];
+  badges: Array<{
+    name: string;
+    icon: string;
+  }>;
 }
 
 interface AdminUserDetailsProps {
@@ -114,101 +117,6 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   const [adminNote, setAdminNote] = useState('');
   const [isAdminNoteVisible, setIsAdminNoteVisible] = useState(false);
   const { setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsersData();
-
-  const userBadges: UserBadge[] = [
-    {
-      id: '1',
-      name: 'Fair Play',
-      description: 'Reconhecido por 5 outros jogadores pelo seu fair play',
-      icon: '🤝',
-      earnedAt: '2024-03-15T10:00:00Z',
-    },
-    {
-      id: '2',
-      name: 'Maratonista',
-      description: 'Jogou 10 partidas em um período de 30 dias',
-      icon: '🏃',
-      earnedAt: '2024-02-20T14:30:00Z',
-    },
-    {
-      id: '3',
-      name: 'Explorador',
-      description: 'Jogou em 5 quadras diferentes',
-      icon: '🧭',
-      earnedAt: '2024-01-05T16:45:00Z',
-    },
-    {
-      id: '4',
-      name: 'Sazonalista',
-      description: 'Edição Especial de Verão 2024',
-      icon: '🏝️',
-      earnedAt: '2024-01-15T11:20:00Z',
-    },
-  ];
-
-  const recentBookings: UserBooking[] = [
-    {
-      id: '1',
-      date: '15/04/2024',
-      time: '09:00 - 10:00',
-      court: 'Quadra de Padel 02',
-      status: 'completed',
-    },
-    {
-      id: '2',
-      date: '10/04/2024',
-      time: '16:00 - 17:00',
-      court: 'Beach Tennis 01',
-      status: 'completed',
-    },
-    {
-      id: '3',
-      date: '25/04/2024',
-      time: '14:00 - 15:30',
-      court: 'Tênis 03',
-      status: 'upcoming',
-    },
-  ];
-
-  const achievements: UserAchievement[] = [
-    {
-      id: '1',
-      name: 'Subiu para Gold',
-      description: 'Alcançou o nível Gold com 970 pontos',
-      date: '2024-03-10T09:30:00Z',
-      icon: '🏆',
-    },
-    {
-      id: '2',
-      name: '50 Jogos',
-      description: 'Completou 50 jogos na plataforma',
-      date: '2024-02-25T14:15:00Z',
-      icon: '🎮',
-    },
-  ];
-
-  const recognitions: UserRecognition[] = [
-    {
-      id: '1',
-      fromUser: 'Carlos Oliveira',
-      type: 'fairplay',
-      comment: 'Excelente atitude durante o jogo, muito respeito!',
-      date: '2024-04-10T16:30:00Z',
-    },
-    {
-      id: '2',
-      fromUser: 'Ana Ferreira',
-      type: 'skills',
-      comment: 'Técnica impressionante!',
-      date: '2024-03-20T10:15:00Z',
-    },
-    {
-      id: '3',
-      fromUser: 'João Costa',
-      type: 'teamwork',
-      date: '2024-03-05T18:45:00Z',
-    },
-  ];
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -486,7 +394,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                     <div>
                       <h4 className="text-md font-semibold mb-3">Modalidades Esportivas</h4>
                       <div className="space-y-3">
-                        {userData.sports.map((sport) => (
+                        {/*{userData.sports.map((sport) => (
                           <div key={sport} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="bg-accent/50">{getSportLabel(sport)}</Badge>
@@ -496,22 +404,19 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                               Desde {formatDate("2023-10-15")}
                             </div>
                           </div>
-                        ))}
+                        ))}*/}
                       </div>
                     </div>
                     
                     <div>
                       <h4 className="text-md font-semibold mb-3">Badges e Conquistas</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {userBadges.map((badge) => (
-                          <div key={badge.id} className="p-3 bg-muted/30 rounded-md">
+                        {userData.badges.map((badge) => (
+                          <div key={badge.name} className="p-3 bg-muted/30 rounded-md">
                             <div className="flex items-center gap-2">
                               <div className="text-2xl">{badge.icon}</div>
                               <div>
                                 <div className="font-medium text-sm">{badge.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {formatDate(badge.earnedAt)}
-                                </div>
                               </div>
                             </div>
                           </div>
@@ -565,20 +470,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                     <div>
                       <h4 className="text-md font-semibold mb-3">Marcos Importantes</h4>
                       <div className="space-y-3">
-                        {achievements.map((achievement) => (
-                          <div key={achievement.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
-                            <div className="flex items-center gap-3">
-                              <div className="text-2xl">{achievement.icon}</div>
-                              <div>
-                                <div className="font-medium">{achievement.name}</div>
-                                <div className="text-xs text-muted-foreground">{achievement.description}</div>
-                              </div>
-                            </div>
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatDate(achievement.date)}
-                            </div>
-                          </div>
-                        ))}
+                        
                       </div>
                     </div>
 
@@ -620,22 +512,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                     <div>
                       <h4 className="text-md font-semibold mb-3">Próximas Reservas</h4>
                       <div className="space-y-3">
-                        {recentBookings.filter(b => b.status === 'upcoming').map((booking) => (
-                          <div key={booking.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
-                            <div>
-                              <div className="font-medium">{booking.court}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {booking.date}, {booking.time}
-                              </div>
-                            </div>
-                            {getBookingStatusBadge(booking.status)}
-                          </div>
-                        ))}
-                        {recentBookings.filter(b => b.status === 'upcoming').length === 0 && (
-                          <div className="text-sm text-muted-foreground text-center p-4">
-                            Não há reservas futuras.
-                          </div>
-                        )}
+                        
                       </div>
                     </div>
 
@@ -647,17 +524,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                         </Button>
                       </div>
                       <div className="space-y-3">
-                        {recentBookings.filter(b => b.status !== 'upcoming').map((booking) => (
-                          <div key={booking.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
-                            <div>
-                              <div className="font-medium">{booking.court}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {booking.date}, {booking.time}
-                              </div>
-                            </div>
-                            {getBookingStatusBadge(booking.status)}
-                          </div>
-                        ))}
+                        
                       </div>
                     </div>
 
@@ -689,25 +556,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                         <Heart className="h-4 w-4" /> Avaliações Recebidas
                       </h4>
                       <div className="space-y-3">
-                        {recognitions.map((recognition) => (
-                          <div key={recognition.id} className="p-3 bg-muted/30 rounded-md">
-                            <div className="flex justify-between mb-2">
-                              <div className="font-medium text-sm flex items-center gap-1">
-                                <Award className="h-3 w-3" />
-                                {getRecognitionTypeLabel(recognition.type)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {formatDate(recognition.date)}
-                              </div>
-                            </div>
-                            <div className="text-sm">De: <span className="font-medium">{recognition.fromUser}</span></div>
-                            {recognition.comment && (
-                              <div className="text-sm text-muted-foreground mt-1 italic">
-                                "{recognition.comment}"
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        
                       </div>
                     </div>
 
