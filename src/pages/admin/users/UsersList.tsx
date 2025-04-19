@@ -31,7 +31,6 @@ const UsersList = () => {
   const { user, isAdmin } = useAuth();
 
   useEffect(() => {
-    // Registrar informações importantes para diagnóstico
     console.log("UsersList - Estado atual:", {
       isAdmin,
       currentUser: user?.email,
@@ -80,7 +79,6 @@ const UsersList = () => {
     });
   }, [users, searchQuery, selectedStatus]);
 
-  // Implementação corrigida da seleção de usuários
   const toggleUserSelection = (userId: string) => {
     if (!userId) {
       console.error("ID de usuário inválido recebido em toggleUserSelection");
@@ -88,15 +86,10 @@ const UsersList = () => {
     }
     
     setSelectedUsers(prevSelected => {
-      const isSelected = prevSelected.includes(userId);
-      
-      if (isSelected) {
-        // Se já estiver selecionado, remover da lista
+      if (prevSelected.includes(userId)) {
         return prevSelected.filter(id => id !== userId);
-      } else {
-        // Se não estiver selecionado, adicionar à lista
-        return [...prevSelected, userId];
       }
+      return [...prevSelected, userId];
     });
   };
 
@@ -106,7 +99,9 @@ const UsersList = () => {
       return;
     }
     
-    const availableIds = filteredUsers.map(user => user.id).filter(Boolean) as string[];
+    const availableIds = filteredUsers
+      .map(user => user.id)
+      .filter(Boolean) as string[];
     
     if (availableIds.length === 0) {
       console.error("Nenhum ID de usuário válido disponível para seleção");
@@ -116,17 +111,17 @@ const UsersList = () => {
     const allSelected = availableIds.every(id => selectedUsers.includes(id));
     
     if (allSelected) {
-      // Se todos estiverem selecionados, desmarcar todos
       setSelectedUsers(prev => prev.filter(id => !availableIds.includes(id)));
     } else {
-      // Selecionar todos os IDs válidos que ainda não estão selecionados
-      const newSelection = [...selectedUsers];
-      availableIds.forEach(id => {
-        if (!selectedUsers.includes(id)) {
-          newSelection.push(id);
-        }
+      setSelectedUsers(prev => {
+        const newSelection = [...prev];
+        availableIds.forEach(id => {
+          if (!prev.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
       });
-      setSelectedUsers(newSelection);
     }
   };
 
@@ -177,14 +172,12 @@ const UsersList = () => {
 
     try {
       if (action === 'promote') {
-        // Promover usuários selecionados para admin
         for (const userId of selectedUsers) {
           if (!userId) continue;
           await setAsAdmin.mutateAsync(userId);
         }
         toast.success(`${selectedUsers.length} usuário(s) promovido(s) a admin com sucesso`);
       } else if (action === 'block') {
-        // Bloquear usuários selecionados
         for (const userId of selectedUsers) {
           if (!userId) continue;
           await blockUser.mutateAsync({ userId, reason: 'Bloqueio em massa via painel administrativo' });
@@ -192,7 +185,6 @@ const UsersList = () => {
         toast.success(`${selectedUsers.length} usuário(s) bloqueado(s) com sucesso`);
       }
       
-      // Limpar seleção após operação
       setSelectedUsers([]);
     } catch (error: any) {
       console.error(`Erro na operação em massa (${action}):`, error);

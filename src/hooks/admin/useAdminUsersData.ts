@@ -5,6 +5,7 @@ import { AdminUser } from '@/types';
 
 export function useAdminUsersData() {
   const queryClient = useQueryClient();
+  console.log("Iniciando useAdminUsersData hook");
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['adminUsers'],
@@ -35,12 +36,12 @@ export function useAdminUsersData() {
           throw profilesError;
         }
 
-        if (!profiles || profiles.length === 0) {
+        if (!profiles) {
           console.log("Nenhum perfil encontrado");
           return [];
         }
 
-        // Buscar dados diretamente usando a função RPC
+        // Buscar dados de autenticação usando a função RPC
         const { data: authUsersData, error: authError } = await supabase
           .rpc('get_auth_users');
         
@@ -49,23 +50,22 @@ export function useAdminUsersData() {
           throw authError;
         }
 
-        // Garantir que temos os dados e que eles estão no formato esperado
         const authUsers = authUsersData || [];
-        console.log("Dados de auth recebidos:", authUsers?.length || 0, "Primeiro item:", authUsers?.[0]);
+        console.log("Dados de auth recebidos:", authUsers?.length || 0);
 
-        // Criar mapa de emails e último login para fácil acesso
+        // Criar mapas para acesso eficiente
         const emailMap = new Map<string, string>();
         const lastLoginMap = new Map<string, string>();
         
         authUsers.forEach(user => {
           if (user.id && user.email) {
             emailMap.set(user.id, user.email);
-          }
-          if (user.id && user.last_sign_in_at) {
-            lastLoginMap.set(user.id, user.last_sign_in_at);
+            if (user.last_sign_in_at) {
+              lastLoginMap.set(user.id, user.last_sign_in_at);
+            }
           }
         });
-        
+
         // Buscar roles dos usuários
         const { data: userRoles, error: rolesError } = await supabase
           .from('user_roles')
@@ -157,31 +157,25 @@ export function useAdminUsersData() {
         }
 
         // Transformar os dados para o formato AdminUser
-        const adminUsers = profiles.map(profile => {
-          // Buscar email e último login do usuário através dos mapas
-          const email = emailMap.get(profile.id) || '';
-          const lastLogin = lastLoginMap.get(profile.id) || '';
-          
-          return {
-            id: profile.id,
-            name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário',
-            email: email,
-            phone: profile.phone || '',
-            city: profile.city || '',
-            neighborhood: profile.neighborhood || '',
-            level: 'user',
-            points: profile.credit_balance || 0,
-            sports: sportsMap.get(profile.id) || [],
-            status: profile.is_active ? 'active' : 'blocked',
-            isAdmin: adminMap.get(profile.id) || false,
-            createdAt: profile.created_at,
-            lastLogin: lastLogin,
-            avatarUrl: profile.avatar_url,
-            badges: achievementsMap.get(profile.id) || [],
-            preferences: profile.preferences || {},
-            profileProgress: profile.profile_progress || 0
-          };
-        });
+        const adminUsers = profiles.map(profile => ({
+          id: profile.id,
+          name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário',
+          email: emailMap.get(profile.id) || '',
+          phone: profile.phone || '',
+          city: profile.city || '',
+          neighborhood: profile.neighborhood || '',
+          level: 'user',
+          points: profile.credit_balance || 0,
+          sports: sportsMap.get(profile.id) || [],
+          status: profile.is_active ? 'active' : 'blocked',
+          isAdmin: adminMap.get(profile.id) || false,
+          createdAt: profile.created_at,
+          lastLogin: lastLoginMap.get(profile.id) || '',
+          avatarUrl: profile.avatar_url,
+          badges: achievementsMap.get(profile.id) || [],
+          preferences: profile.preferences || {},
+          profileProgress: profile.profile_progress || 0
+        }));
         
         console.log(`Processados ${adminUsers.length} usuários com sucesso`);
         return adminUsers;
