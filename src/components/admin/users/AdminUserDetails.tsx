@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -49,6 +50,9 @@ import {
   Heart,
   Award,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDate, formatDateTime, formatSportName, getDayName } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface UserBadge {
   id: string;
@@ -63,7 +67,7 @@ interface UserBooking {
   date: string;
   time: string;
   court: string;
-  status: string;
+  status: 'completed' | 'upcoming' | 'cancelled';
 }
 
 interface UserAchievement {
@@ -113,135 +117,174 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   const [blockReason, setBlockReason] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [isAdminNoteVisible, setIsAdminNoteVisible] = useState(false);
-
-  // Mock data for user details sections
-  const userBadges: UserBadge[] = [
-    {
-      id: '1',
-      name: 'Fair Play',
-      description: 'Reconhecido por 5 outros jogadores pelo seu fair play',
-      icon: '🤝',
-      earnedAt: '2024-03-15T10:00:00Z',
-    },
-    {
-      id: '2',
-      name: 'Maratonista',
-      description: 'Jogou 10 partidas em um período de 30 dias',
-      icon: '🏃',
-      earnedAt: '2024-02-20T14:30:00Z',
-    },
-    {
-      id: '3',
-      name: 'Explorador',
-      description: 'Jogou em 5 quadras diferentes',
-      icon: '🧭',
-      earnedAt: '2024-01-05T16:45:00Z',
-    },
-    {
-      id: '4',
-      name: 'Sazonalista',
-      description: 'Edição Especial de Verão 2024',
-      icon: '🏝️',
-      earnedAt: '2024-01-15T11:20:00Z',
-    },
-  ];
-
-  const recentBookings: UserBooking[] = [
-    {
-      id: '1',
-      date: '15/04/2024',
-      time: '09:00 - 10:00',
-      court: 'Quadra de Padel 02',
-      status: 'completed',
-    },
-    {
-      id: '2',
-      date: '10/04/2024',
-      time: '16:00 - 17:00',
-      court: 'Beach Tennis 01',
-      status: 'completed',
-    },
-    {
-      id: '3',
-      date: '25/04/2024',
-      time: '14:00 - 15:30',
-      court: 'Tênis 03',
-      status: 'upcoming',
-    },
-  ];
-
-  const achievements: UserAchievement[] = [
-    {
-      id: '1',
-      name: 'Subiu para Gold',
-      description: 'Alcançou o nível Gold com 970 pontos',
-      date: '2024-03-10T09:30:00Z',
-      icon: '🏆',
-    },
-    {
-      id: '2',
-      name: '50 Jogos',
-      description: 'Completou 50 jogos na plataforma',
-      date: '2024-02-25T14:15:00Z',
-      icon: '🎮',
-    },
-  ];
-
-  const recognitions: UserRecognition[] = [
-    {
-      id: '1',
-      fromUser: 'Carlos Oliveira',
-      type: 'fairplay',
-      comment: 'Excelente atitude durante o jogo, muito respeito!',
-      date: '2024-04-10T16:30:00Z',
-    },
-    {
-      id: '2',
-      fromUser: 'Ana Ferreira',
-      type: 'skills',
-      comment: 'Técnica impressionante!',
-      date: '2024-03-20T10:15:00Z',
-    },
-    {
-      id: '3',
-      fromUser: 'João Costa',
-      type: 'teamwork',
-      date: '2024-03-05T18:45:00Z',
-    },
-  ];
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
-  };
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
-
-  const getSportLabel = (sport: string) => {
-    switch (sport) {
-      case 'tennis':
-        return '🎾 Tênis';
-      case 'padel':
-        return '🏓 Padel';
-      case 'beach':
-        return '🏝️ Beach Tennis';
-      default:
-        return sport;
+  
+  // Estados para dados carregados do banco
+  const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
+  const [recentBookings, setRecentBookings] = useState<UserBooking[]>([]);
+  const [achievements, setAchievements] = useState<UserAchievement[]>([]);
+  const [recognitions, setRecognitions] = useState<UserRecognition[]>([]);
+  const [userPreferences, setUserPreferences] = useState<any>(null);
+  const [userSportsDetails, setUserSportsDetails] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Carregar dados do usuário do banco
+  useEffect(() => {
+    const fetchUserData = async () => {
+      setLoading(true);
+      try {
+        // Buscar esportes do usuário
+        const { data: userSports, error: sportsError } = await supabase
+          .from('user_sports')
+          .select(`
+            id,
+            notes,
+            is_verified,
+            verified_at,
+            sport_type_id(id, name, icon),
+            skill_level_id(id, name, description)
+          `)
+          .eq('user_id', userId);
+          
+        if (sportsError) throw sportsError;
+        
+        if (userSports) {
+          setUserSportsDetails(userSports.map(sport => ({
+            id: sport.id,
+            name: sport.sport_type_id?.name || '',
+            icon: sport.sport_type_id?.icon || '',
+            skillLevel: sport.skill_level_id?.name || 'Iniciante',
+            skillDescription: sport.skill_level_id?.description,
+            isVerified: sport.is_verified,
+            verifiedAt: sport.verified_at,
+            notes: sport.notes
+          })));
+        }
+          
+        // Buscar preferências do usuário
+        const { data: preferences, error: preferencesError } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+          
+        if (preferencesError && preferencesError.code !== 'PGRST116') {
+          throw preferencesError;
+        }
+          
+        if (preferences) {
+          setUserPreferences(preferences);
+        }
+        
+        // Buscar conquistas do usuário
+        const { data: userAchievements, error: achievementsError } = await supabase
+          .from('user_achievements')
+          .select(`
+            id,
+            earned_at,
+            is_featured,
+            achievement_type_id(id, name, description, icon, points)
+          `)
+          .eq('user_id', userId);
+          
+        if (achievementsError) throw achievementsError;
+        
+        if (userAchievements) {
+          setAchievements(userAchievements.map(achievement => ({
+            id: achievement.id,
+            name: achievement.achievement_type_id?.name || '',
+            description: achievement.achievement_type_id?.description || '',
+            date: achievement.earned_at,
+            icon: achievement.achievement_type_id?.icon || '🏆'
+          })));
+          
+          setUserBadges(userAchievements.map(achievement => ({
+            id: achievement.id,
+            name: achievement.achievement_type_id?.name || '',
+            description: achievement.achievement_type_id?.description || '',
+            icon: achievement.achievement_type_id?.icon || '🏆',
+            earnedAt: achievement.earned_at
+          })));
+        }
+        
+        // Buscar reservas do usuário
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select(`
+            id,
+            booking_date,
+            start_time,
+            end_time,
+            status,
+            court_id(id, name)
+          `)
+          .eq('user_id', userId)
+          .order('booking_date', { ascending: false })
+          .limit(10);
+          
+        if (bookingsError) throw bookingsError;
+        
+        if (bookings) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          setRecentBookings(bookings.map(booking => {
+            const bookingDate = new Date(booking.booking_date);
+            bookingDate.setHours(0, 0, 0, 0);
+            
+            let bookingStatus: 'completed' | 'upcoming' | 'cancelled' = 'completed';
+            
+            if (booking.status === 'cancelled') {
+              bookingStatus = 'cancelled';
+            } else if (bookingDate >= today) {
+              bookingStatus = 'upcoming';
+            }
+            
+            return {
+              id: booking.id,
+              date: formatDate(booking.booking_date),
+              time: `${booking.start_time.slice(0, 5)} - ${booking.end_time.slice(0, 5)}`,
+              court: booking.court_id?.name || 'Quadra sem nome',
+              status: bookingStatus
+            };
+          }));
+        }
+        
+        // Buscar avaliações recebidas pelo usuário
+        const { data: userRecognitions, error: recognitionsError } = await supabase
+          .from('user_recognitions')
+          .select(`
+            id,
+            comment,
+            created_at,
+            from_user_id(id, first_name, last_name),
+            recognition_type_id(id, name, icon)
+          `)
+          .eq('to_user_id', userId);
+          
+        if (recognitionsError) throw recognitionsError;
+        
+        if (userRecognitions) {
+          setRecognitions(userRecognitions.map(recognition => ({
+            id: recognition.id,
+            fromUser: `${recognition.from_user_id?.first_name || ''} ${recognition.from_user_id?.last_name || ''}`.trim(),
+            type: recognition.recognition_type_id?.name || '',
+            comment: recognition.comment,
+            date: recognition.created_at
+          })));
+        }
+        
+      } catch (error: any) {
+        console.error('Erro ao carregar dados do usuário:', error);
+        toast.error('Falha ao carregar dados completos do usuário');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (userId) {
+      fetchUserData();
     }
-  };
+  }, [userId]);
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -280,6 +323,57 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
       default:
         return type;
     }
+  };
+  
+  const getPreferredGameTypes = () => {
+    if (!userPreferences?.preferred_game_types || userPreferences.preferred_game_types.length === 0) {
+      return 'Não informado';
+    }
+    
+    return userPreferences.preferred_game_types.map((type: string) => {
+      switch (type) {
+        case 'singles':
+          return 'Individual';
+        case 'doubles':
+          return 'Duplas';
+        case 'group':
+          return 'Grupo';
+        default:
+          return type;
+      }
+    }).join(', ');
+  };
+  
+  const getPreferredDays = () => {
+    if (!userPreferences?.preferred_days || userPreferences.preferred_days.length === 0) {
+      return 'Não informado';
+    }
+    
+    return userPreferences.preferred_days
+      .map((day: number) => getDayName(day))
+      .join(', ');
+  };
+  
+  const getPreferredTimes = () => {
+    if (!userPreferences?.preferred_times) {
+      return 'Não informado';
+    }
+    
+    const times: string[] = [];
+    
+    if (userPreferences.preferred_times.morning) {
+      times.push('Manhã');
+    }
+    
+    if (userPreferences.preferred_times.afternoon) {
+      times.push('Tarde');
+    }
+    
+    if (userPreferences.preferred_times.evening) {
+      times.push('Noite');
+    }
+    
+    return times.length > 0 ? times.join(', ') : 'Não informado';
   };
 
   return (
@@ -336,6 +430,14 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
           </div>
         </CardHeader>
         <CardContent className="p-6">
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-sm text-muted-foreground">Carregando dados do usuário...</p>
+              </div>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Left column - Basic Info */}
             <div className="space-y-6">
@@ -379,7 +481,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                     {isEditMode ? (
                       <Input defaultValue={userData.phone} />
                     ) : (
-                      <div className="text-sm">{userData.phone}</div>
+                      <div className="text-sm">{userData.phone || 'Não informado'}</div>
                     )}
                   </div>
 
@@ -393,7 +495,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                     ) : (
                       <div className="text-sm flex items-center gap-1">
                         <MapPin className="h-3 w-3" /> 
-                        {userData.city}/{userData.neighborhood}
+                        {userData.city && userData.neighborhood ? `${userData.city}/${userData.neighborhood}` : 'Não informado'}
                       </div>
                     )}
                   </div>
@@ -468,53 +570,90 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                     <div>
                       <h4 className="text-md font-semibold mb-3">Modalidades Esportivas</h4>
                       <div className="space-y-3">
-                        {userData.sports.map((sport) => (
-                          <div key={sport} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="bg-accent/50">{getSportLabel(sport)}</Badge>
-                              <span className="text-sm">Nível Intermediário</span>
+                        {userSportsDetails.length > 0 ? (
+                          userSportsDetails.map((sport) => (
+                            <div key={sport.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-accent/50">
+                                  {formatSportName(sport.name)}
+                                </Badge>
+                                <span className="text-sm">Nível {sport.skillLevel}</span>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {sport.isVerified && (
+                                  <Badge variant="secondary" className="text-xs">Verificado</Badge>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              Desde {formatDate("2023-10-15")}
-                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-muted-foreground text-center py-4">
+                            Nenhuma modalidade esportiva registrada
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                     
                     <div>
                       <h4 className="text-md font-semibold mb-3">Badges e Conquistas</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {userBadges.map((badge) => (
-                          <div key={badge.id} className="p-3 bg-muted/30 rounded-md">
-                            <div className="flex items-center gap-2">
-                              <div className="text-2xl">{badge.icon}</div>
-                              <div>
-                                <div className="font-medium text-sm">{badge.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {formatDate(badge.earnedAt)}
+                      {userBadges.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {userBadges.map((badge) => (
+                            <div key={badge.id} className="p-3 bg-muted/30 rounded-md">
+                              <div className="flex items-center gap-2">
+                                <div className="text-2xl">{badge.icon}</div>
+                                <div>
+                                  <div className="font-medium text-sm">{badge.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {formatDate(badge.earnedAt)}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground text-center py-4">
+                          Nenhuma conquista registrada
+                        </div>
+                      )}
                     </div>
                     
                     <div>
                       <h4 className="text-md font-semibold mb-3">Preferências</h4>
                       <div className="space-y-3">
+                        <div className="p-3 bg-muted/30 rounded-md">
+                          <div className="font-medium text-sm mb-2">Preferências de Jogo</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground">Tipos de Jogo Preferidos</div>
+                              <div className="text-sm">{getPreferredGameTypes()}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Dias Preferidos</div>
+                              <div className="text-sm">{getPreferredDays()}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">Horários Preferidos</div>
+                              <div className="text-sm">{getPreferredTimes()}</div>
+                            </div>
+                          </div>
+                        </div>
                         <div className="flex justify-between items-center">
                           <div className="text-sm">Receber notificações por e-mail</div>
-                          <Switch checked={true} />
+                          <Switch checked={userPreferences?.wants_notifications || false} disabled />
                         </div>
                         <div className="flex justify-between items-center">
-                          <div className="text-sm">Aparecer em rankings públicos</div>
-                          <Switch checked={true} />
+                          <div className="text-sm">Status do onboarding</div>
+                          <Badge variant={userPreferences?.onboarding_completed ? "success" : "secondary"}>
+                            {userPreferences?.onboarding_completed ? "Completo" : "Pendente"}
+                          </Badge>
                         </div>
                         <div className="flex justify-between items-center">
-                          <div className="text-sm">Disponível para jogo em grupo</div>
-                          <Switch checked={false} />
+                          <div className="text-sm">Termos aceitos</div>
+                          <Badge variant={userPreferences?.terms_accepted ? "success" : "secondary"}>
+                            {userPreferences?.terms_accepted ? "Sim" : "Não"}
+                          </Badge>
                         </div>
                       </div>
                     </div>
@@ -546,50 +685,52 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
 
                     <div>
                       <h4 className="text-md font-semibold mb-3">Marcos Importantes</h4>
-                      <div className="space-y-3">
-                        {achievements.map((achievement) => (
-                          <div key={achievement.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
-                            <div className="flex items-center gap-3">
-                              <div className="text-2xl">{achievement.icon}</div>
-                              <div>
-                                <div className="font-medium">{achievement.name}</div>
-                                <div className="text-xs text-muted-foreground">{achievement.description}</div>
+                      {achievements.length > 0 ? (
+                        <div className="space-y-3">
+                          {achievements.map((achievement) => (
+                            <div key={achievement.id} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
+                              <div className="flex items-center gap-3">
+                                <div className="text-2xl">{achievement.icon}</div>
+                                <div>
+                                  <div className="font-medium">{achievement.name}</div>
+                                  <div className="text-xs text-muted-foreground">{achievement.description}</div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                {formatDate(achievement.date)}
                               </div>
                             </div>
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatDate(achievement.date)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground text-center py-4">
+                          Nenhum marco importante registrado
+                        </div>
+                      )}
                     </div>
 
                     <div>
                       <h4 className="text-md font-semibold mb-3">Estatísticas</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">52</div>
+                          <div className="text-xl font-bold">{recentBookings.filter(b => b.status === 'completed').length}</div>
                           <div className="text-xs text-muted-foreground">Jogos Totais</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">7</div>
+                          <div className="text-xl font-bold">{new Set(recentBookings.map(b => b.court)).size}</div>
                           <div className="text-xs text-muted-foreground">Quadras Diferentes</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">12</div>
+                          <div className="text-xl font-bold">{userBadges.length}</div>
                           <div className="text-xs text-muted-foreground">Badges Conquistadas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">8</div>
-                          <div className="text-xs text-muted-foreground">Avaliações Positivas</div>
+                          <div className="text-xl font-bold">{recognitions.length}</div>
+                          <div className="text-xs text-muted-foreground">Avaliações Recebidas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">14</div>
-                          <div className="text-xs text-muted-foreground">Parceiros Diferentes</div>
-                        </div>
-                        <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">5</div>
-                          <div className="text-xs text-muted-foreground">Meses de Atividade</div>
+                          <div className="text-xl font-bold">{userSportsDetails.length}</div>
+                          <div className="text-xs text-muted-foreground">Modalidades Praticadas</div>
                         </div>
                       </div>
                     </div>
@@ -640,6 +781,11 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                             {getBookingStatusBadge(booking.status)}
                           </div>
                         ))}
+                        {recentBookings.filter(b => b.status !== 'upcoming').length === 0 && (
+                          <div className="text-sm text-muted-foreground text-center p-4">
+                            Nenhuma reserva passada encontrada.
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -647,15 +793,15 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                       <h4 className="text-md font-semibold mb-3">Resumo de Atividade</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">12</div>
-                          <div className="text-xs text-muted-foreground">Reservas no Último Mês</div>
+                          <div className="text-xl font-bold">{recentBookings.length}</div>
+                          <div className="text-xs text-muted-foreground">Total de Reservas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">R$ 580</div>
-                          <div className="text-xs text-muted-foreground">Valor Total</div>
+                          <div className="text-xl font-bold">{recentBookings.filter(b => b.status === 'upcoming').length}</div>
+                          <div className="text-xs text-muted-foreground">Agendadas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">1</div>
+                          <div className="text-xl font-bold">{recentBookings.filter(b => b.status === 'cancelled').length}</div>
                           <div className="text-xs text-muted-foreground">Cancelamentos</div>
                         </div>
                       </div>
@@ -670,42 +816,50 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                       <h4 className="text-md font-semibold mb-3 flex items-center gap-1">
                         <Heart className="h-4 w-4" /> Avaliações Recebidas
                       </h4>
-                      <div className="space-y-3">
-                        {recognitions.map((recognition) => (
-                          <div key={recognition.id} className="p-3 bg-muted/30 rounded-md">
-                            <div className="flex justify-between mb-2">
-                              <div className="font-medium text-sm flex items-center gap-1">
-                                <Award className="h-3 w-3" />
-                                {getRecognitionTypeLabel(recognition.type)}
+                      {recognitions.length > 0 ? (
+                        <div className="space-y-3">
+                          {recognitions.map((recognition) => (
+                            <div key={recognition.id} className="p-3 bg-muted/30 rounded-md">
+                              <div className="flex justify-between mb-2">
+                                <div className="font-medium text-sm flex items-center gap-1">
+                                  <Award className="h-3 w-3" />
+                                  {getRecognitionTypeLabel(recognition.type)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formatDate(recognition.date)}
+                                </div>
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                {formatDate(recognition.date)}
-                              </div>
+                              <div className="text-sm">De: <span className="font-medium">{recognition.fromUser}</span></div>
+                              {recognition.comment && (
+                                <div className="text-sm text-muted-foreground mt-1 italic">
+                                  "{recognition.comment}"
+                                </div>
+                              )}
                             </div>
-                            <div className="text-sm">De: <span className="font-medium">{recognition.fromUser}</span></div>
-                            {recognition.comment && (
-                              <div className="text-sm text-muted-foreground mt-1 italic">
-                                "{recognition.comment}"
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground text-center py-4">
+                          Nenhuma avaliação recebida
+                        </div>
+                      )}
                     </div>
 
                     <div>
                       <h4 className="text-md font-semibold mb-3">Resumo de Feedback</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold text-green-600">92%</div>
+                          <div className="text-xl font-bold text-green-600">
+                            {recognitions.length > 0 ? '100%' : '-'}
+                          </div>
                           <div className="text-xs text-muted-foreground">Taxa de Aprovação</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">8</div>
+                          <div className="text-xl font-bold">{recognitions.length}</div>
                           <div className="text-xs text-muted-foreground">Avaliações Recebidas</div>
                         </div>
                         <div className="p-3 bg-muted/30 rounded-md text-center">
-                          <div className="text-xl font-bold">2</div>
+                          <div className="text-xl font-bold">-</div>
                           <div className="text-xs text-muted-foreground">Avaliações Enviadas</div>
                         </div>
                       </div>
@@ -715,6 +869,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
               </Tabs>
             </div>
           </div>
+          )}
         </CardContent>
         <CardFooter className="border-t bg-muted/50 flex justify-between">
           <div className="flex gap-2">
