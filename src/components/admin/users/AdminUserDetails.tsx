@@ -35,12 +35,14 @@ import {
   Calendar,
   Trophy,
   Heart,
+  Award
 } from 'lucide-react';
 import { formatDate, formatDateTime, formatSportName } from '@/lib/utils';
 import { UserProfileHeader } from './components/UserProfileHeader';
 import { UserContactInfo } from './components/UserContactInfo';
 import { UserPreferences } from './components/UserPreferences';
 import { useUserDetails } from './hooks/useUserDetails';
+import { UserLevel } from '@/components/gamification/UserLevel';
 
 interface UserBadge {
   id: string;
@@ -359,7 +361,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                             <div className="text-xs text-muted-foreground">Quadras Diferentes</div>
                           </div>
                           <div className="p-3 bg-muted/30 rounded-md text-center">
-                            <div className="text-xl font-bold">{userBadges.length}</div>
+                            <div className="text-xl font-bold">{achievements.length}</div>
                             <div className="text-xs text-muted-foreground">Badges Conquistadas</div>
                           </div>
                           <div className="p-3 bg-muted/30 rounded-md text-center">

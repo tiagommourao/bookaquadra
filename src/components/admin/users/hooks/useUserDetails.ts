@@ -124,14 +124,14 @@ export function useUserDetails(userId: string) {
           }));
         }
         
-        // Buscar avaliações recebidas pelo usuário
+        // Buscar avaliações recebidas pelo usuário - FIX: Adicionando aliases para resolver ambiguidade
         const { data: userRecognitions, error: recognitionsError } = await supabase
           .from('user_recognitions')
           .select(`
             id,
             comment,
             created_at,
-            from_user:from_user_id(id, first_name, last_name),
+            from_profiles:profiles!from_user_id(first_name, last_name),
             recognition_type_id(id, name, icon)
           `)
           .eq('to_user_id', userId);
@@ -141,7 +141,7 @@ export function useUserDetails(userId: string) {
         if (userRecognitions) {
           setRecognitions(userRecognitions.map(recognition => ({
             id: recognition.id,
-            fromUser: `${recognition.from_user?.first_name || ''} ${recognition.from_user?.last_name || ''}`.trim(),
+            fromUser: `${recognition.from_profiles?.first_name || ''} ${recognition.from_profiles?.last_name || ''}`.trim(),
             type: recognition.recognition_type_id?.name || '',
             comment: recognition.comment,
             date: recognition.created_at
