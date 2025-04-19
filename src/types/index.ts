@@ -3,6 +3,12 @@
 // User role types
 export type UserRole = 'user' | 'admin';
 
+// Importar o tipo ExtendedUser do AuthContext
+import { ExtendedUser } from '@/contexts/AuthContext';
+
+// Re-exportar ExtendedUser
+export type { ExtendedUser };
+
 // User type
 export interface User {
   id: string;
