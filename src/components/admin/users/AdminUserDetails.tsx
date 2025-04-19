@@ -249,14 +249,14 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
           }));
         }
         
-        // Buscar avaliações recebidas pelo usuário
+        // Buscar avaliações recebidas pelo usuário - CORRIGIDO PARA RESOLVER ERRO DE AMBIGUIDADE
         const { data: userRecognitions, error: recognitionsError } = await supabase
           .from('user_recognitions')
           .select(`
             id,
             comment,
             created_at,
-            from_user_id(id, first_name, last_name),
+            from_user:from_user_id(id, first_name, last_name),
             recognition_type_id(id, name, icon)
           `)
           .eq('to_user_id', userId);
@@ -266,7 +266,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
         if (userRecognitions) {
           setRecognitions(userRecognitions.map(recognition => ({
             id: recognition.id,
-            fromUser: `${recognition.from_user_id?.first_name || ''} ${recognition.from_user_id?.last_name || ''}`.trim(),
+            fromUser: `${recognition.from_user?.first_name || ''} ${recognition.from_user?.last_name || ''}`.trim(),
             type: recognition.recognition_type_id?.name || '',
             comment: recognition.comment,
             date: recognition.created_at
@@ -645,13 +645,13 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
                         </div>
                         <div className="flex justify-between items-center">
                           <div className="text-sm">Status do onboarding</div>
-                          <Badge variant={userPreferences?.onboarding_completed ? "success" : "secondary"}>
+                          <Badge variant={userPreferences?.onboarding_completed ? "secondary" : "outline"} className={userPreferences?.onboarding_completed ? "bg-green-100 text-green-800" : ""}>
                             {userPreferences?.onboarding_completed ? "Completo" : "Pendente"}
                           </Badge>
                         </div>
                         <div className="flex justify-between items-center">
                           <div className="text-sm">Termos aceitos</div>
-                          <Badge variant={userPreferences?.terms_accepted ? "success" : "secondary"}>
+                          <Badge variant={userPreferences?.terms_accepted ? "secondary" : "outline"} className={userPreferences?.terms_accepted ? "bg-green-100 text-green-800" : ""}>
                             {userPreferences?.terms_accepted ? "Sim" : "Não"}
                           </Badge>
                         </div>
@@ -911,3 +911,4 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
     </>
   );
 };
+
