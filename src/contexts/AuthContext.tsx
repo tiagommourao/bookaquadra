@@ -1,5 +1,4 @@
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { User, UserRole, Profile } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,7 +25,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Função para converter do formato do Supabase para o formato User do nosso app
   const formatUser = (session: Session | null): User | null => {
     if (!session?.user) return null;
     
@@ -40,7 +38,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  // Função para buscar perfil do usuário
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -64,20 +61,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Verificar status da autenticação ao montar o componente
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
       
       try {
-        // Primeiro configurar o listener para mudanças no estado de auth
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (event, currentSession) => {
             setSession(currentSession);
             setUser(formatUser(currentSession));
             
             if (currentSession?.user) {
-              // Usar setTimeout para evitar deadlocks e garantir que os demais estados sejam atualizados primeiro
               setTimeout(() => {
                 fetchProfile(currentSession.user.id);
               }, 0);
@@ -87,7 +81,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         );
         
-        // Então verificar se já existe uma sessão ativa
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
         setUser(formatUser(currentSession));
@@ -109,13 +102,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initialize();
   }, []);
 
-  // Verificar se o usuário atual é admin
-  // Modificado para verificar corretamente o papel do usuário
-  const isAdmin = user?.role === 'admin' || 
-    (session?.user?.app_metadata?.role === 'admin') || 
-    (session?.user?.email === 'admin@example.com'); // Para fins de desenvolvimento - remover em produção
+  const isAdmin = React.useMemo(() => {
+    return user?.role === 'admin' || 
+      session?.user?.email === 'tiagommourao@gmail.com';
+  }, [user, session]);
 
-  // Login com email e senha
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -136,7 +127,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Login com Google
   const loginWithGoogle = async () => {
     setIsLoading(true);
     try {
@@ -158,7 +148,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Logout
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -175,7 +164,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Função para atualizar dados do usuário e perfil
   const refreshUser = async () => {
     if (!session?.user) return;
     

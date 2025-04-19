@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -70,12 +69,8 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     email: user?.email
   });
   
-  // Temporariamente permitindo qualquer usuário autenticado acessar rotas de admin
-  // até termos usuários administradores configurados adequadamente
-  return <>{children}</>;
-  
-  // Descomente isso para produção:
-  // return isAdmin ? <>{children}</> : <Navigate to="/" />;
+  // Retornar children apenas se for admin
+  return isAdmin ? <>{children}</> : <Navigate to="/" />;
 };
 
 // Main App Component
