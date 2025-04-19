@@ -241,9 +241,9 @@ export const useAdminUsers = () => {
       }
 
       // Formatar dados para CSV
-      const headers = ['ID,Nome,Email,Telefone,Cidade,Bairro,Nível,Pontos,Modalidades,Status\n'];
+      const headers = 'ID,Nome,Email,Telefone,Cidade,Bairro,Nível,Pontos,Modalidades,Status\n';
       const rows = users.map(user => {
-        const sports = user.sports?.join(';') || '';
+        const sports = user.sports.join(';');
         return [
           user.id,
           user.name,

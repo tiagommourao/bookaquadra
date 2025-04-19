@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Card, 
@@ -83,22 +82,23 @@ interface UserRecognition {
   date: string;
 }
 
-interface UserData {
+// Adicionar uma interface explícita para UserData com propriedades opcionais
+export interface UserData {
   id: string;
   name: string;
   email: string;
-  phone: string;
-  city: string;
-  neighborhood: string;
+  phone?: string;  // Tornar telefone opcional
+  city?: string;
+  neighborhood?: string;
   level: string;
   points: number;
   sports: string[];
-  status: string;
-  isAdmin: boolean;
+  status: 'active' | 'blocked' | 'suspended';
+  avatarUrl?: string;
+  badges?: string[];
+  lastLogin?: Date | string;
   createdAt: string;
-  lastLogin: string;
-  avatarUrl: string | null;
-  badges: string[];
+  isAdmin: boolean;
 }
 
 interface AdminUserDetailsProps {
