@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,11 +15,10 @@ import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { UserLevel } from '@/components/gamification/UserLevel';
 import { AdminUsersFilter } from '@/components/admin/users/AdminUsersFilter';
 import { AdminUserDetails } from '@/components/admin/users/AdminUserDetails';
-import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
+import { useAdminUsersData } from '@/hooks/admin/useAdminUsers';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-// Mock data - would be replaced with real data from API
 const MOCK_USERS = [
   {
     id: '1',
@@ -115,8 +113,8 @@ const UsersList = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const { users, isLoading } = useAdminUsersData();
 
-  // Format date in a user-friendly way
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
@@ -126,7 +124,6 @@ const UsersList = () => {
     }).format(date);
   };
 
-  // Format time in a user-friendly way
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
@@ -138,8 +135,7 @@ const UsersList = () => {
     }).format(date);
   };
 
-  // Filter users based on search query and status filter
-  const filteredUsers = MOCK_USERS.filter(user => {
+  const filteredUsers = (users || []).filter(user => {
     const matchesSearch = 
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       user.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -154,7 +150,6 @@ const UsersList = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Toggle selection of a user for batch operations
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers(prev => 
       prev.includes(userId)
@@ -163,7 +158,6 @@ const UsersList = () => {
     );
   };
 
-  // Toggle selection of all visible users
   const toggleSelectAll = () => {
     if (selectedUsers.length === filteredUsers.length) {
       setSelectedUsers([]);
@@ -172,7 +166,6 @@ const UsersList = () => {
     }
   };
 
-  // Get status badge style based on user status
   const getStatusBadge = (status: string, isAdmin: boolean) => {
     if (isAdmin) {
       return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">Admin</Badge>;
@@ -190,7 +183,6 @@ const UsersList = () => {
     }
   };
 
-  // Get sports badges
   const getSportsBadge = (sport: string) => {
     switch (sport) {
       case 'tennis':
@@ -204,12 +196,10 @@ const UsersList = () => {
     }
   };
 
-  // Show user details panel
   const showUserDetails = (userId: string) => {
     setSelectedUser(userId);
   };
 
-  // Close user details panel
   const closeUserDetails = () => {
     setSelectedUser(null);
   };
@@ -233,7 +223,6 @@ const UsersList = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col space-y-4">
-              {/* Search and filter controls */}
               <div className="flex flex-wrap gap-4 justify-between items-center">
                 <div className="flex items-center gap-2 flex-grow max-w-md">
                   <div className="relative flex-grow">
@@ -298,7 +287,6 @@ const UsersList = () => {
                 </Card>
               )}
 
-              {/* Batch actions */}
               {selectedUsers.length > 0 && (
                 <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
                   <span className="text-sm font-medium">{selectedUsers.length} usuários selecionados</span>
@@ -315,7 +303,6 @@ const UsersList = () => {
                 </div>
               )}
 
-              {/* Users table */}
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -440,7 +427,6 @@ const UsersList = () => {
           </CardContent>
         </Card>
 
-        {/* User details component (shown when a user is selected) */}
         {selectedUser && (
           <AdminUserDetails 
             userId={selectedUser} 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Card, 
@@ -113,8 +112,8 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   const [blockReason, setBlockReason] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [isAdminNoteVisible, setIsAdminNoteVisible] = useState(false);
+  const { setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsersData();
 
-  // Mock data for user details sections
   const userBadges: UserBadge[] = [
     {
       id: '1',
@@ -280,6 +279,24 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
       default:
         return type;
     }
+  };
+
+  const handleSetAdmin = async () => {
+    await setAsAdmin.mutateAsync(userId);
+  };
+
+  const handleRemoveAdmin = async () => {
+    await removeAdminRole.mutateAsync(userId);
+  };
+
+  const handleBlockUser = async () => {
+    await blockUser.mutateAsync({ userId, reason: blockReason });
+    setIsBlockDialogOpen(false);
+    setBlockReason('');
+  };
+
+  const handleUnblockUser = async () => {
+    await unblockUser.mutateAsync(userId);
   };
 
   return (
