@@ -66,26 +66,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log("Verificando papel de admin para usuário:", userId);
       
-      // Verificar se o usuário está na tabela user_roles com papel 'admin'
+      // Usar a função RPC is_admin do banco de dados
       const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
+        .rpc('is_admin', { 
+          user_id: userId 
+        });
       
       if (error) {
-        console.error('Erro ao verificar papel de admin:', error);
+        console.error('Erro ao verificar papel de admin via RPC:', error);
+        setAdminRoles(false);
+        return;
       }
       
       const isRoleAdmin = !!data;
-      console.log("Resultado da verificação de admin via tabela user_roles:", isRoleAdmin);
+      console.log("Resultado da verificação de admin via is_admin RPC:", isRoleAdmin);
       
-      // Verificar email especial também (permanece como fallback)
-      const isSpecialAdmin = user?.email === 'tiagommourao@gmail.com';
-      console.log("Verificação de admin via email especial:", isSpecialAdmin);
-      
-      setAdminRoles(isRoleAdmin || isSpecialAdmin);
+      setAdminRoles(isRoleAdmin);
     } catch (error) {
       console.error('Erro ao verificar papel de admin:', error);
       setAdminRoles(false);
@@ -140,9 +136,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const isAdmin = useMemo(() => {
-    console.log("Verificando isAdmin:", { adminRoles, email: user?.email });
-    return adminRoles || user?.email === 'tiagommourao@gmail.com';
-  }, [adminRoles, user]);
+    console.log("Verificando isAdmin:", { adminRoles });
+    return adminRoles;
+  }, [adminRoles]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);

@@ -1,8 +1,12 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AdminUser } from '@/types';
 import { User } from '@supabase/supabase-js';
+
+// URL constantes para o Supabase
+const SUPABASE_URL = "https://yvgdtiuhrticewtlutio.supabase.co";
 
 export function useAdminUsersData() {
   const queryClient = useQueryClient();
@@ -34,42 +38,28 @@ export function useAdminUsersData() {
           throw profilesError;
         }
 
-        // Buscar usuários do auth para obter emails
-        // Note: Estamos usando a API REST direta porque .auth.admin requer privilégios especiais
-        const session = await supabase.auth.getSession();
-        const authToken = session.data.session?.access_token;
-        
-        // Obter URL e chave do projeto Supabase
-        const supabaseUrl = supabase.supabaseUrl;
-        const projectRef = supabaseUrl.match(/https:\/\/(.*?)\.supabase\.co/)?.[1] || '';
-        
-        // Requisição direta à API para obter os usuários (requer token de autenticação)
-        const response = await fetch(
-          `${supabaseUrl}/auth/v1/admin/users`, 
-          {
-            headers: {
-              'Authorization': `Bearer ${authToken}`,
-              'apikey': supabase.supabaseKey
-            }
-          }
-        );
-        
-        if (!response.ok) {
-          console.error("Erro na API de usuários:", await response.text());
-          throw new Error(`Erro ao buscar usuários: ${response.status}`);
+        // Para obter emails, precisamos usar uma abordagem diferente
+        // Como não podemos usar auth.admin diretamente no cliente, faremos uma solicitação
+        // para uma view ou função que tenha as permissões adequadas
+        const { data: authUsers, error: authError } = await supabase
+          .from('auth_users_view')
+          .select('id, email, last_sign_in_at')
+          .throwOnError();
+
+        if (authError) {
+          console.error("Erro ao buscar dados de autenticação:", authError);
+          throw authError;
         }
-        
-        const authData = await response.json();
-        console.log("Dados de autenticação recebidos:", authData);
-        
+
         // Criar mapa de emails para fácil acesso
         const emailMap = new Map();
-        if (authData?.users) {
-          authData.users.forEach((user: User) => {
+        const lastLoginMap = new Map();
+        
+        if (authUsers) {
+          authUsers.forEach((user: any) => {
             emailMap.set(user.id, user.email);
+            lastLoginMap.set(user.id, user.last_sign_in_at);
           });
-        } else {
-          console.warn("Nenhum dado de usuário recebido da API");
         }
 
         // Buscar roles dos usuários
@@ -161,6 +151,7 @@ export function useAdminUsersData() {
         // Transformar os dados para o formato AdminUser
         return (profiles || []).map(profile => {
           const email = emailMap.get(profile.id) || '';
+          const lastLogin = lastLoginMap.get(profile.id);
           return {
             id: profile.id,
             name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário',
@@ -174,7 +165,7 @@ export function useAdminUsersData() {
             status: profile.is_active ? 'active' : 'blocked',
             isAdmin: adminMap.get(profile.id) || false,
             createdAt: profile.created_at,
-            lastLogin: null, // Poderíamos adicionar essa informação via API se necessário
+            lastLogin: lastLogin,
             avatarUrl: profile.avatar_url,
             badges: achievementsMap.get(profile.id) || [],
             preferences: profile.preferences || {},
@@ -204,10 +195,10 @@ export function useAdminUsersData() {
     },
     onSuccess: (userId) => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast("Usuário promovido a administrador com sucesso");
+      toast.success("Usuário promovido a administrador com sucesso");
     },
     onError: (error) => {
-      toast(`Erro ao promover usuário: ${error.message || 'Falha na operação'}`);
+      toast.error(`Erro ao promover usuário: ${error.message || 'Falha na operação'}`);
     }
   });
 
@@ -224,10 +215,10 @@ export function useAdminUsersData() {
     },
     onSuccess: (userId) => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast("Permissões de administrador removidas com sucesso");
+      toast.success("Permissões de administrador removidas com sucesso");
     },
     onError: (error) => {
-      toast(`Erro ao remover permissões: ${error.message || 'Falha na operação'}`);
+      toast.error(`Erro ao remover permissões: ${error.message || 'Falha na operação'}`);
     }
   });
 
@@ -243,10 +234,10 @@ export function useAdminUsersData() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast("Usuário bloqueado com sucesso");
+      toast.success("Usuário bloqueado com sucesso");
     },
     onError: (error) => {
-      toast(`Erro ao bloquear usuário: ${error.message || 'Falha na operação'}`);
+      toast.error(`Erro ao bloquear usuário: ${error.message || 'Falha na operação'}`);
     }
   });
 
@@ -262,10 +253,10 @@ export function useAdminUsersData() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
-      toast("Usuário desbloqueado com sucesso");
+      toast.success("Usuário desbloqueado com sucesso");
     },
     onError: (error) => {
-      toast(`Erro ao desbloquear usuário: ${error.message || 'Falha na operação'}`);
+      toast.error(`Erro ao desbloquear usuário: ${error.message || 'Falha na operação'}`);
     }
   });
 

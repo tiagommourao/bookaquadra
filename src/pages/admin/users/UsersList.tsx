@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -20,6 +19,7 @@ import { AdminUserData } from '@/types/admin';
 import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const UsersList = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,7 +136,7 @@ const UsersList = () => {
   const handleSetAdmin = async (userId: string) => {
     try {
       await setAsAdmin.mutateAsync(userId);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao promover usuário:", error);
       toast.error("Houve um erro ao promover o usuário. Tente novamente.");
     }
@@ -145,7 +145,7 @@ const UsersList = () => {
   const handleRemoveAdmin = async (userId: string) => {
     try {
       await removeAdminRole.mutateAsync(userId);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao remover admin:", error);
       toast.error("Houve um erro ao remover privilégios de admin. Tente novamente.");
     }
@@ -154,7 +154,7 @@ const UsersList = () => {
   const handleBlockUser = async (userId: string, reason: string = 'Bloqueio administrativo') => {
     try {
       await blockUser.mutateAsync({ userId, reason });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao bloquear usuário:", error);
       toast.error("Houve um erro ao bloquear o usuário. Tente novamente.");
     }
@@ -163,7 +163,7 @@ const UsersList = () => {
   const handleUnblockUser = async (userId: string) => {
     try {
       await unblockUser.mutateAsync(userId);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao desbloquear usuário:", error);
       toast.error("Houve um erro ao desbloquear o usuário. Tente novamente.");
     }
