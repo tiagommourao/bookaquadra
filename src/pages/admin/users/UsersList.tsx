@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
   Search, FilterIcon, Download, Mail, ShieldAlert, Shield, 
-  MoreHorizontal, UserCog, UserX, Eye, Edit 
+  MoreHorizontal, UserCog, UserX, Eye, Edit, AlertCircle
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,6 +18,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AdminUserData } from '@/types/admin';
 import { useAdminUsersData } from '@/hooks/admin/useAdminUsersData';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
 
 const UsersList = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,7 +27,19 @@ const UsersList = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const { users, isLoading, setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsersData();
+  const { users, isLoading, error, setAsAdmin, removeAdminRole, blockUser, unblockUser } = useAdminUsersData();
+  const { user, isAdmin } = useAuth();
+
+  useEffect(() => {
+    // Registrar informações importantes para diagnóstico
+    console.log("UsersList - Estado atual:", {
+      isAdmin,
+      currentUser: user?.email,
+      loadingUsers: isLoading,
+      usersCount: users?.length,
+      error
+    });
+  }, [isAdmin, user, isLoading, users, error]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -120,19 +134,53 @@ const UsersList = () => {
   };
 
   const handleSetAdmin = async (userId: string) => {
-    await setAsAdmin.mutateAsync(userId);
+    try {
+      await setAsAdmin.mutateAsync(userId);
+    } catch (error) {
+      console.error("Erro ao promover usuário:", error);
+      toast.error("Houve um erro ao promover o usuário. Tente novamente.");
+    }
   };
 
   const handleRemoveAdmin = async (userId: string) => {
-    await removeAdminRole.mutateAsync(userId);
+    try {
+      await removeAdminRole.mutateAsync(userId);
+    } catch (error) {
+      console.error("Erro ao remover admin:", error);
+      toast.error("Houve um erro ao remover privilégios de admin. Tente novamente.");
+    }
   };
 
   const handleBlockUser = async (userId: string, reason: string = 'Bloqueio administrativo') => {
-    await blockUser.mutateAsync({ userId, reason });
+    try {
+      await blockUser.mutateAsync({ userId, reason });
+    } catch (error) {
+      console.error("Erro ao bloquear usuário:", error);
+      toast.error("Houve um erro ao bloquear o usuário. Tente novamente.");
+    }
   };
 
   const handleUnblockUser = async (userId: string) => {
-    await unblockUser.mutateAsync(userId);
+    try {
+      await unblockUser.mutateAsync(userId);
+    } catch (error) {
+      console.error("Erro ao desbloquear usuário:", error);
+      toast.error("Houve um erro ao desbloquear o usuário. Tente novamente.");
+    }
+  };
+
+  const renderErrorState = () => {
+    if (!error) return null;
+    
+    return (
+      <Alert variant="destructive" className="mt-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Erro ao carregar usuários</AlertTitle>
+        <AlertDescription>
+          {error instanceof Error ? error.message : 'Ocorreu um erro ao carregar os dados dos usuários. Por favor, tente novamente.'}
+        </AlertDescription>
+      </Alert>
+    );
   };
 
   return (
@@ -145,6 +193,8 @@ const UsersList = () => {
           </Button>
         </div>
         
+        {renderErrorState()}
+
         <Card>
           <CardHeader>
             <CardTitle>Lista de Usuários</CardTitle>
@@ -236,7 +286,18 @@ const UsersList = () => {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">Carregando usuários...</TableCell>
+                        <TableCell colSpan={9} className="text-center py-8">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                            <span>Carregando usuários...</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : error ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-destructive">
+                          Erro ao carregar dados. Verifique suas permissões de administrador.
+                        </TableCell>
                       </TableRow>
                     ) : filteredUsers.length === 0 ? (
                       <TableRow>

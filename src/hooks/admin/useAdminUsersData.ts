@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -11,130 +10,184 @@ export function useAdminUsersData() {
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['adminUsers'],
     queryFn: async () => {
-      // Buscar perfis com todas as informações relacionadas
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          avatar_url,
-          phone,
-          city,
-          neighborhood,
-          created_at,
-          is_active,
-          preferences,
-          credit_balance,
-          profile_progress
-        `);
+      try {
+        // Buscar perfis com todas as informações relacionadas
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            avatar_url,
+            phone,
+            city,
+            neighborhood,
+            created_at,
+            is_active,
+            preferences,
+            credit_balance,
+            profile_progress
+          `);
 
-      if (profilesError) throw profilesError;
-
-      // Buscar usuários do auth para obter emails
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-      if (authError) throw authError;
-      
-      // Criar mapa de emails para fácil acesso
-      const emailMap = new Map();
-      if (authData?.users) {
-        authData.users.forEach((user: User) => {
-          emailMap.set(user.id, user.email);
-        });
-      }
-
-      // Buscar roles dos usuários
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-      
-      if (rolesError) throw rolesError;
-
-      // Buscar modalidades esportivas dos usuários
-      const { data: userSports, error: sportsError } = await supabase
-        .from('user_sports')
-        .select(`
-          user_id,
-          sport_type_id,
-          sport_types (
-            name
-          ),
-          skill_level_id,
-          skill_levels (
-            name
-          )
-        `);
-
-      if (sportsError) throw sportsError;
-
-      // Buscar conquistas dos usuários
-      const { data: userAchievements, error: achievementsError } = await supabase
-        .from('user_achievements')
-        .select(`
-          user_id,
-          achievement_types (
-            name,
-            icon
-          )
-        `);
-
-      if (achievementsError) throw achievementsError;
-
-      // Criar mapa de roles administrativas
-      const adminMap = new Map();
-      userRoles?.forEach(ur => {
-        if (ur.role === 'admin') {
-          adminMap.set(ur.user_id, true);
+        if (profilesError) {
+          console.error("Erro ao buscar perfis:", profilesError);
+          throw profilesError;
         }
-      });
 
-      // Criar mapa de modalidades esportivas por usuário
-      const sportsMap = new Map();
-      userSports?.forEach(us => {
-        if (!sportsMap.has(us.user_id)) {
-          sportsMap.set(us.user_id, []);
+        // Buscar usuários do auth para obter emails
+        // Note: Estamos usando a API REST direta porque .auth.admin requer privilégios especiais
+        const session = await supabase.auth.getSession();
+        const authToken = session.data.session?.access_token;
+        
+        // Obter URL e chave do projeto Supabase
+        const supabaseUrl = supabase.supabaseUrl;
+        const projectRef = supabaseUrl.match(/https:\/\/(.*?)\.supabase\.co/)?.[1] || '';
+        
+        // Requisição direta à API para obter os usuários (requer token de autenticação)
+        const response = await fetch(
+          `${supabaseUrl}/auth/v1/admin/users`, 
+          {
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'apikey': supabase.supabaseKey
+            }
+          }
+        );
+        
+        if (!response.ok) {
+          console.error("Erro na API de usuários:", await response.text());
+          throw new Error(`Erro ao buscar usuários: ${response.status}`);
         }
-        sportsMap.get(us.user_id).push({
-          name: us.sport_types?.name,
-          level: us.skill_levels?.name
-        });
-      });
-
-      // Criar mapa de conquistas por usuário
-      const achievementsMap = new Map();
-      userAchievements?.forEach(ua => {
-        if (!achievementsMap.has(ua.user_id)) {
-          achievementsMap.set(ua.user_id, []);
-        }
-        if (ua.achievement_types) {
-          achievementsMap.get(ua.user_id).push({
-            name: ua.achievement_types.name,
-            icon: ua.achievement_types.icon
+        
+        const authData = await response.json();
+        console.log("Dados de autenticação recebidos:", authData);
+        
+        // Criar mapa de emails para fácil acesso
+        const emailMap = new Map();
+        if (authData?.users) {
+          authData.users.forEach((user: User) => {
+            emailMap.set(user.id, user.email);
           });
+        } else {
+          console.warn("Nenhum dado de usuário recebido da API");
         }
-      });
 
-      // Transformar os dados para o formato AdminUser
-      return (profiles || []).map(profile => ({
-        id: profile.id,
-        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-        email: emailMap.get(profile.id) || '',
-        phone: profile.phone || '',
-        city: profile.city || '',
-        neighborhood: profile.neighborhood || '',
-        level: 'user',
-        points: profile.credit_balance || 0,
-        sports: sportsMap.get(profile.id) || [],
-        status: profile.is_active ? 'active' : 'blocked',
-        isAdmin: adminMap.get(profile.id) || false,
-        createdAt: profile.created_at,
-        lastLogin: null,
-        avatarUrl: profile.avatar_url,
-        badges: achievementsMap.get(profile.id) || [],
-        preferences: profile.preferences || {},
-        profileProgress: profile.profile_progress || 0
-      }));
-    }
+        // Buscar roles dos usuários
+        const { data: userRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('user_id, role');
+        
+        if (rolesError) {
+          console.error("Erro ao buscar roles:", rolesError);
+          throw rolesError;
+        }
+
+        // Buscar modalidades esportivas dos usuários
+        const { data: userSports, error: sportsError } = await supabase
+          .from('user_sports')
+          .select(`
+            user_id,
+            sport_type_id,
+            sport_types (
+              name
+            ),
+            skill_level_id,
+            skill_levels (
+              name
+            )
+          `);
+
+        if (sportsError) {
+          console.error("Erro ao buscar esportes:", sportsError);
+          throw sportsError;
+        }
+
+        // Buscar conquistas dos usuários
+        const { data: userAchievements, error: achievementsError } = await supabase
+          .from('user_achievements')
+          .select(`
+            user_id,
+            achievement_types (
+              name,
+              icon
+            )
+          `);
+
+        if (achievementsError) {
+          console.error("Erro ao buscar conquistas:", achievementsError);
+          throw achievementsError;
+        }
+
+        // Criar mapa de roles administrativas
+        const adminMap = new Map();
+        userRoles?.forEach(ur => {
+          if (ur.role === 'admin') {
+            adminMap.set(ur.user_id, true);
+          }
+        });
+
+        // Criar mapa de modalidades esportivas por usuário
+        const sportsMap = new Map();
+        userSports?.forEach(us => {
+          if (!sportsMap.has(us.user_id)) {
+            sportsMap.set(us.user_id, []);
+          }
+          sportsMap.get(us.user_id).push({
+            name: us.sport_types?.name,
+            level: us.skill_levels?.name
+          });
+        });
+
+        // Criar mapa de conquistas por usuário
+        const achievementsMap = new Map();
+        userAchievements?.forEach(ua => {
+          if (!achievementsMap.has(ua.user_id)) {
+            achievementsMap.set(ua.user_id, []);
+          }
+          if (ua.achievement_types) {
+            achievementsMap.get(ua.user_id).push({
+              name: ua.achievement_types.name,
+              icon: ua.achievement_types.icon
+            });
+          }
+        });
+
+        // Verificar se temos dados para transformar
+        if (!profiles || profiles.length === 0) {
+          console.log("Nenhum perfil encontrado");
+          return [];
+        }
+
+        // Transformar os dados para o formato AdminUser
+        return (profiles || []).map(profile => {
+          const email = emailMap.get(profile.id) || '';
+          return {
+            id: profile.id,
+            name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário',
+            email: email,
+            phone: profile.phone || '',
+            city: profile.city || '',
+            neighborhood: profile.neighborhood || '',
+            level: 'user',
+            points: profile.credit_balance || 0,
+            sports: sportsMap.get(profile.id) || [],
+            status: profile.is_active ? 'active' : 'blocked',
+            isAdmin: adminMap.get(profile.id) || false,
+            createdAt: profile.created_at,
+            lastLogin: null, // Poderíamos adicionar essa informação via API se necessário
+            avatarUrl: profile.avatar_url,
+            badges: achievementsMap.get(profile.id) || [],
+            preferences: profile.preferences || {},
+            profileProgress: profile.profile_progress || 0
+          };
+        });
+      } catch (error) {
+        console.error("Erro na função queryFn:", error);
+        throw error;
+      }
+    },
+    retry: 1,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   const setAsAdmin = useMutation({

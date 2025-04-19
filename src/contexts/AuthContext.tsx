@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { User, UserRole, Profile } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,18 +64,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAdminRole = async (userId: string) => {
     try {
+      console.log("Verificando papel de admin para usuário:", userId);
+      
+      // Verificar se o usuário está na tabela user_roles com papel 'admin'
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
         .eq('role', 'admin')
-        .single();
-        
-      if (error && error.code !== 'PGRST116') {
+        .maybeSingle();
+      
+      if (error) {
         console.error('Erro ao verificar papel de admin:', error);
       }
       
-      setAdminRoles(!!data);
+      const isRoleAdmin = !!data;
+      console.log("Resultado da verificação de admin via tabela user_roles:", isRoleAdmin);
+      
+      // Verificar email especial também (permanece como fallback)
+      const isSpecialAdmin = user?.email === 'tiagommourao@gmail.com';
+      console.log("Verificação de admin via email especial:", isSpecialAdmin);
+      
+      setAdminRoles(isRoleAdmin || isSpecialAdmin);
     } catch (error) {
       console.error('Erro ao verificar papel de admin:', error);
       setAdminRoles(false);
@@ -90,8 +99,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (event, currentSession) => {
+            console.log("Evento de autenticação:", event);
             setSession(currentSession);
-            setUser(formatUser(currentSession));
+            const formattedUser = formatUser(currentSession);
+            setUser(formattedUser);
             
             if (currentSession?.user) {
               setTimeout(() => {
@@ -107,7 +118,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
-        setUser(formatUser(currentSession));
+        const formattedUser = formatUser(currentSession);
+        setUser(formattedUser);
         
         if (currentSession?.user) {
           await fetchProfile(currentSession.user.id);
@@ -128,9 +140,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const isAdmin = useMemo(() => {
-    return adminRoles || 
-      session?.user?.email === 'tiagommourao@gmail.com';
-  }, [adminRoles, session]);
+    console.log("Verificando isAdmin:", { adminRoles, email: user?.email });
+    return adminRoles || user?.email === 'tiagommourao@gmail.com';
+  }, [adminRoles, user]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
