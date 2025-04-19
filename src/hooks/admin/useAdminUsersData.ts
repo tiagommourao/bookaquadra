@@ -38,15 +38,16 @@ export function useAdminUsersData() {
         }
 
         // Buscar dados de autenticação através da view segura
-        const { data: authUsers, error: authError } = await supabase
+        const { data: authUsersData, error: authError } = await supabase
           .from('auth_users_view')
-          .select();
+          .select('*');
 
         if (authError) {
           console.error("Erro ao buscar dados de autenticação:", authError);
           throw authError;
         }
 
+        const authUsers = authUsersData as AuthUserView[];
         console.log("Dados de auth recebidos:", authUsers?.length || 0);
 
         // Criar mapa de emails e último login para fácil acesso

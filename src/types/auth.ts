@@ -1,8 +1,8 @@
 
 export interface AuthUserView {
-  id: string;
-  email: string;
-  last_sign_in_at: string;
+  id: string | null;
+  email: string | null;
+  last_sign_in_at: string | null;
 }
 
 export type Database = {
