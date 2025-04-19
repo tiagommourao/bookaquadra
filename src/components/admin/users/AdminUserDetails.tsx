@@ -1,14 +1,20 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Edit, Mail, UserCog, Key, ShieldAlert, Shield, Calendar, Clock, X } from 'lucide-react';
+import { Edit, Mail, UserCog, Key, ShieldAlert, Shield, Calendar, Clock, X, Trophy, Heart } from 'lucide-react';
 import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
 import { UserProfileSection } from './details/UserProfileSection';
 import { UserContactInfo } from './details/UserContactInfo';
 import { AdminNoteSection } from './details/AdminNoteSection';
 import { AdminUserData } from '@/types/admin';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { UserLevel } from '@/components/gamification/UserLevel';
 
 interface AdminUserDetailsProps {
   userId: string;
@@ -36,15 +42,15 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
   };
 
   const handleSetAdmin = async () => {
-    await setAsAdmin.mutateAsync(userId);
+    await setAsAdmin(userId);
   };
 
   const handleRemoveAdmin = async () => {
-    await removeAdminRole.mutateAsync(userId);
+    await removeAdminRole(userId);
   };
 
   const handleBlockUser = async () => {
-    await blockUser.mutateAsync({ userId, reason: blockReason });
+    await blockUser({ userId, reason: blockReason });
     setIsBlockDialogOpen(false);
     setBlockReason('');
   };
@@ -353,3 +359,4 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
     </>
   );
 };
+

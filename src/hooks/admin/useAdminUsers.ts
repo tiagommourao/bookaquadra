@@ -84,7 +84,7 @@ export const useAdminUsers = () => {
   };
 
   // Block user
-  const blockUser = async (userId: string, reason: string): Promise<boolean> => {
+  const blockUser = async ({ userId, reason }: { userId: string; reason: string }) => {
     try {
       // This would be implemented to update the user's status in Supabase
       // const { error } = await supabase
@@ -103,7 +103,7 @@ export const useAdminUsers = () => {
   };
 
   // Unblock user
-  const unblockUser = async (userId: string): Promise<boolean> => {
+  const unblockUser = async (userId: string) => {
     try {
       // This would be implemented to update the user's status in Supabase
       // const { error } = await supabase
@@ -122,7 +122,7 @@ export const useAdminUsers = () => {
   };
 
   // Set user as admin
-  const setAsAdmin = async (userId: string): Promise<boolean> => {
+  const setAsAdmin = async (userId: string) => {
     try {
       // This would update the user's role in auth.users and/or add them to a user_roles table
       // const { error } = await supabase.rpc('admin_set_user_role', {
@@ -141,7 +141,7 @@ export const useAdminUsers = () => {
   };
 
   // Remove admin role
-  const removeAdminRole = async (userId: string): Promise<boolean> => {
+  const removeAdminRole = async (userId: string) => {
     try {
       // This would update the user's role in auth.users and/or remove them from a user_roles table
       // const { error } = await supabase.rpc('admin_set_user_role', {
@@ -160,7 +160,7 @@ export const useAdminUsers = () => {
   };
 
   // Update user
-  const updateUser = async (userId: string, userData: Partial<AdminUser>): Promise<boolean> => {
+  const updateUser = async (userId: string, userData: Partial<AdminUser>) => {
     try {
       // This would update the user's profile in Supabase
       // const { error } = await supabase
@@ -186,7 +186,7 @@ export const useAdminUsers = () => {
   };
 
   // Export users to CSV
-  const exportUsers = async (filters?: any): Promise<string | null> => {
+  const exportUsers = async (filters?: any) => {
     try {
       // This would get all users from Supabase and format them as CSV
       // Downloading could be handled on the frontend

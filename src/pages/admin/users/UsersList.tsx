@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -291,7 +292,7 @@ const UsersList = () => {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm whitespace-nowrap">
-                            {formatDateTime(user.lastLogin)}
+                            {user.lastLogin && formatDateTime(user.lastLogin)}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -344,7 +345,7 @@ const UsersList = () => {
           <AdminUserDetails 
             userId={selectedUser} 
             onClose={closeUserDetails} 
-            userData={MOCK_USERS.find(user => user.id === selectedUser)!}
+            userData={filteredUsers.find(user => user.id === selectedUser)!}
           />
         )}
       </div>
