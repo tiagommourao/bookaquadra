@@ -78,19 +78,30 @@ const UsersList = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Implementação corrigida da seleção de usuários
   const toggleUserSelection = (userId: string) => {
-    setSelectedUsers(prev => 
-      prev.includes(userId)
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
+    setSelectedUsers(prevSelected => {
+      const isSelected = prevSelected.includes(userId);
+      
+      if (isSelected) {
+        // Se já estiver selecionado, remover da lista
+        return prevSelected.filter(id => id !== userId);
+      } else {
+        // Se não estiver selecionado, adicionar à lista
+        return [...prevSelected, userId];
+      }
+    });
   };
 
   const toggleSelectAll = () => {
-    if (selectedUsers.length === filteredUsers.length) {
-      setSelectedUsers([]);
-    } else {
-      setSelectedUsers(filteredUsers.map(user => user.id));
+    if (filteredUsers.length > 0) {
+      if (selectedUsers.length === filteredUsers.length) {
+        // Se todos estiverem selecionados, desmarcar todos
+        setSelectedUsers([]);
+      } else {
+        // Caso contrário, selecionar todos
+        setSelectedUsers(filteredUsers.map(user => user.id));
+      }
     }
   };
 
@@ -131,6 +142,35 @@ const UsersList = () => {
 
   const closeUserDetails = () => {
     setSelectedUser(null);
+  };
+
+  const handleBulkActions = async (action: 'promote' | 'block') => {
+    if (selectedUsers.length === 0) {
+      toast.error("Nenhum usuário selecionado");
+      return;
+    }
+
+    try {
+      if (action === 'promote') {
+        // Promover usuários selecionados para admin
+        for (const userId of selectedUsers) {
+          await setAsAdmin.mutateAsync(userId);
+        }
+        toast.success(`${selectedUsers.length} usuário(s) promovido(s) a admin com sucesso`);
+      } else if (action === 'block') {
+        // Bloquear usuários selecionados
+        for (const userId of selectedUsers) {
+          await blockUser.mutateAsync({ userId, reason: 'Bloqueio em massa via painel administrativo' });
+        }
+        toast.success(`${selectedUsers.length} usuário(s) bloqueado(s) com sucesso`);
+      }
+      
+      // Limpar seleção após operação
+      setSelectedUsers([]);
+    } catch (error: any) {
+      console.error(`Erro na operação em massa (${action}):`, error);
+      toast.error(`Erro ao processar ação em massa: ${error.message || 'Falha na operação'}`);
+    }
   };
 
   const handleSetAdmin = async (userId: string) => {
@@ -250,10 +290,19 @@ const UsersList = () => {
                   <Button size="sm" variant="outline">
                     <Mail className="mr-2 h-4 w-4" /> Enviar Mensagem
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleBulkActions('promote')}
+                  >
                     <Shield className="mr-2 h-4 w-4" /> Promover a Admin
                   </Button>
-                  <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleBulkActions('block')}
+                  >
                     <UserX className="mr-2 h-4 w-4" /> Bloquear
                   </Button>
                 </div>
@@ -267,7 +316,7 @@ const UsersList = () => {
                         <div className="flex items-center">
                           <input
                             type="checkbox"
-                            checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                            checked={filteredUsers.length > 0 && selectedUsers.length === filteredUsers.length}
                             onChange={toggleSelectAll}
                             className="rounded border-gray-300 text-primary focus:ring-primary"
                           />
@@ -342,7 +391,7 @@ const UsersList = () => {
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {user.sports && user.sports.length > 0 ? 
-                                user.sports.map((sport) => getSportBadge(sport)) : 
+                                user.sports.map((sport, idx) => getSportBadge(sport)) : 
                                 <span className="text-xs text-muted-foreground">Nenhum esporte</span>
                               }
                             </div>

@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -43,7 +42,7 @@ export function useAdminUsersData() {
         }
 
         // Buscar dados de autenticação através da view segura
-        // Vamos usar uma consulta explícita com campos nomeados para evitar problemas de tipo
+        // Vamos usar uma consulta SQL direta para evitar problemas de tipagem
         const { data: authUsersData, error: authError } = await supabase
           .from('auth_users_view')
           .select('id, email, last_sign_in_at');
@@ -54,23 +53,21 @@ export function useAdminUsersData() {
         }
 
         // Garantir que temos os dados e que eles estão no formato esperado
-        const authUsers = authUsersData as AuthUserView[] || [];
+        const authUsers = authUsersData || [];
         console.log("Dados de auth recebidos:", authUsers?.length || 0, "Primeiro item:", authUsers?.[0]);
 
         // Criar mapa de emails e último login para fácil acesso
         const emailMap = new Map<string, string>();
         const lastLoginMap = new Map<string, string>();
         
-        if (authUsers && authUsers.length > 0) {
-          authUsers.forEach((user: AuthUserView) => {
-            if (user.id && user.email) {
-              emailMap.set(user.id, user.email);
-            }
-            if (user.id && user.last_sign_in_at) {
-              lastLoginMap.set(user.id, user.last_sign_in_at);
-            }
-          });
-        }
+        authUsers.forEach(user => {
+          if (user.id && user.email) {
+            emailMap.set(user.id, user.email);
+          }
+          if (user.id && user.last_sign_in_at) {
+            lastLoginMap.set(user.id, user.last_sign_in_at);
+          }
+        });
         
         // Buscar roles dos usuários
         const { data: userRoles, error: rolesError } = await supabase

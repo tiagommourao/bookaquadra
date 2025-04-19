@@ -1,9 +1,9 @@
 
 // Definição de tipos para a view auth_users_view
 export interface AuthUserView {
-  id: string | null;
-  email: string | null;
-  last_sign_in_at: string | null;
+  id: string;
+  email: string;
+  last_sign_in_at: string;
 }
 
 // Definição de tipos para o banco de dados Supabase
