@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types';
 import { toast } from 'sonner';
 
-export interface AdminUser extends User {
+export interface AdminUser extends Omit<User, 'id'> {
+  id: string;
   phone?: string;
   city?: string;
   neighborhood?: string;
@@ -15,6 +16,8 @@ export interface AdminUser extends User {
   avatarUrl?: string;
   badges?: string[];
   lastLogin?: Date | string;
+  createdAt: string;
+  role: 'user' | 'admin';
 }
 
 export const useAdminUsers = () => {
@@ -50,33 +53,68 @@ export const useAdminUsers = () => {
       let query = supabase
         .from('profiles')
         .select(`
-          *,
+          id,
+          first_name,
+          last_name,
+          phone,
+          city,
+          neighborhood,
+          avatar_url,
+          is_active,
+          created_at,
           user_sports:user_sports(
-            *,
-            sport_type:sport_type_id(name),
-            skill_level:skill_level_id(name)
+            sport_type_id(name)
           ),
           user_gamification:user_gamification(
             total_points,
-            current_level:current_level_id(name)
+            current_level_id(name)
           ),
           user_achievements:user_achievements(
-            *,
-            achievement:achievement_type_id(name, icon)
-          ),
-          auth_user:id(email, last_sign_in_at)
+            achievement_type_id(name, icon)
+          )
         `, { 
           count: 'exact' 
         })
         .range(start, end);
 
+      // Adicionar join com a tabela auth.users para obter o email e data de último login
+      const { data: authUsersData } = await supabase
+        .from('auth_users_view')
+        .select('id, email, last_sign_in_at');
+
+      // Criar um mapa de usuários auth para facilitar o acesso
+      const authUsersMap = new Map();
+      if (authUsersData) {
+        authUsersData.forEach(user => {
+          authUsersMap.set(user.id, user);
+        });
+      }
+
+      // Verificar roles de administrador
+      const { data: adminRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .eq('role', 'admin');
+
+      // Criar um conjunto de IDs de administradores
+      const adminIds = new Set();
+      if (adminRoles) {
+        adminRoles.forEach(role => {
+          adminIds.add(role.user_id);
+        });
+      }
+
       // Aplicar filtros se existirem
       if (filters?.search) {
-        query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+        query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%`);
       }
 
       if (filters?.status && filters.status.length > 0) {
-        query = query.in('status', filters.status);
+        if (filters.status.includes('active')) {
+          query = query.eq('is_active', true);
+        } else if (filters.status.includes('blocked')) {
+          query = query.eq('is_active', false);
+        }
       }
 
       const { data, count, error } = await query;
@@ -84,22 +122,28 @@ export const useAdminUsers = () => {
       if (error) throw error;
 
       // Transformar os dados para o formato AdminUser
-      const formattedUsers: AdminUser[] = data?.map(profile => ({
-        id: profile.id,
-        email: profile.auth_user?.email || '',
-        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-        phone: profile.phone || '',
-        city: profile.city || '',
-        neighborhood: profile.neighborhood || '',
-        level: profile.user_gamification?.[0]?.current_level?.name || 'Iniciante',
-        points: profile.user_gamification?.[0]?.total_points || 0,
-        sports: profile.user_sports?.map(sport => sport.sport_type?.name || '') || [],
-        status: profile.is_active ? 'active' : 'blocked',
-        avatarUrl: profile.avatar_url,
-        badges: profile.user_achievements?.map(achievement => achievement.achievement?.name) || [],
-        lastLogin: profile.auth_user?.last_sign_in_at,
-        role: 'user' // Por padrão todos são usuários normais
-      })) || [];
+      const formattedUsers: AdminUser[] = data?.map(profile => {
+        // Buscar dados do auth.users usando o mapa
+        const authUser = authUsersMap.get(profile.id);
+
+        return {
+          id: profile.id,
+          email: authUser?.email || '',
+          name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+          phone: profile.phone || '',
+          city: profile.city || '',
+          neighborhood: profile.neighborhood || '',
+          level: profile.user_gamification?.[0]?.current_level_id?.name || 'Iniciante',
+          points: profile.user_gamification?.[0]?.total_points || 0,
+          sports: profile.user_sports?.map((sport: any) => sport.sport_type_id?.name || '').filter(Boolean) || [],
+          status: profile.is_active ? 'active' : 'blocked',
+          avatarUrl: profile.avatar_url,
+          badges: profile.user_achievements?.map((achievement: any) => achievement.achievement_type_id?.name).filter(Boolean) || [],
+          lastLogin: authUser?.last_sign_in_at,
+          createdAt: profile.created_at,
+          role: adminIds.has(profile.id) ? 'admin' : 'user'
+        };
+      }) || [];
 
       setUsers(formattedUsers);
       setPagination({
@@ -187,41 +231,30 @@ export const useAdminUsers = () => {
   // Export users to CSV
   const exportUsers = async (): Promise<string | null> => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_sports!inner(
-            sport_type!inner(name),
-            skill_level!inner(name)
-          ),
-          user_gamification!inner(
-            total_points,
-            current_level:current_level_id(name)
-          )
-        `);
-
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
+      // Utilizar os usuários já carregados se existirem
+      if (users.length === 0) {
+        await fetchUsers(1, 100); // Buscar mais usuários para exportação
+      }
+      
+      if (users.length === 0) {
         throw new Error('Nenhum dado encontrado para exportar');
       }
 
       // Formatar dados para CSV
       const headers = ['ID,Nome,Email,Telefone,Cidade,Bairro,Nível,Pontos,Modalidades,Status\n'];
-      const rows = data.map(user => {
-        const sports = user.user_sports?.map(s => s.sport_type?.name).join(';') || '';
+      const rows = users.map(user => {
+        const sports = user.sports?.join(';') || '';
         return [
           user.id,
-          `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-          user.auth_user?.email || '',
+          user.name,
+          user.email,
           user.phone || '',
           user.city || '',
           user.neighborhood || '',
-          user.user_gamification?.[0]?.current_level?.name || 'Iniciante',
-          user.user_gamification?.[0]?.total_points || 0,
+          user.level || 'Iniciante',
+          user.points || 0,
           sports,
-          user.is_active ? 'Ativo' : 'Bloqueado'
+          user.status === 'active' ? 'Ativo' : 'Bloqueado'
         ].join(',');
       });
 

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   Table,
@@ -134,7 +133,7 @@ export const UsersTable = ({
               </TableCell>
               <TableCell>
                 <div className="text-sm whitespace-nowrap">
-                  {formatDate(new Date(user.createdAt))}
+                  {user.createdAt ? formatDate(new Date(user.createdAt)) : '-'}
                 </div>
               </TableCell>
               <TableCell>

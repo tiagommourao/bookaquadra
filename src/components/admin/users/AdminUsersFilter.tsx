@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,14 +15,14 @@ import {
 } from "@/components/ui/select";
 import { DateRange } from "react-day-picker";
 
-interface AdminUsersFilterProps {
-  onClose: () => void;
-  onApply: (filters: any) => void;
+export interface AdminUsersFilterProps {
+  onClose?: () => void;
+  onApply?: (filters: any) => void;
 }
 
 export const AdminUsersFilter: React.FC<AdminUsersFilterProps> = ({
-  onClose,
-  onApply
+  onClose = () => {},
+  onApply = () => {}
 }) => {
   const [sportFilters, setSportFilters] = useState<string[]>([]);
   const [levelFilters, setLevelFilters] = useState<string[]>([]);

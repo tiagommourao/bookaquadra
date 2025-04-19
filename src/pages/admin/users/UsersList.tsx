@@ -18,6 +18,7 @@ const UsersList = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [filters, setFilters] = useState<any>({});
 
   const {
     users,
@@ -64,6 +65,17 @@ const UsersList = () => {
   // Close user details panel
   const closeUserDetails = () => {
     setSelectedUser(null);
+  };
+  
+  // Handle apply filters
+  const handleApplyFilters = (newFilters: any) => {
+    setFilters(newFilters);
+    fetchUsers(1, 10, {
+      ...newFilters,
+      search: searchQuery,
+      status: selectedStatus !== 'all' ? [selectedStatus] : undefined
+    });
+    setIsFilterOpen(false);
   };
 
   // Handle export
@@ -153,7 +165,12 @@ const UsersList = () => {
                 </ToggleGroup>
               </div>
 
-              {isFilterOpen && <AdminUsersFilter />}
+              {isFilterOpen && (
+                <AdminUsersFilter
+                  onClose={() => setIsFilterOpen(false)}
+                  onApply={handleApplyFilters}
+                />
+              )}
 
               {/* Batch actions */}
               {selectedUsers.length > 0 && (
@@ -192,7 +209,10 @@ const UsersList = () => {
           <AdminUserDetails 
             userId={selectedUser} 
             onClose={closeUserDetails}
-            userData={users.find(u => u.id === selectedUser)!}
+            userData={{
+              ...users.find(u => u.id === selectedUser)!,
+              isAdmin: users.find(u => u.id === selectedUser)?.role === 'admin'
+            }}
           />
         )}
       </div>
