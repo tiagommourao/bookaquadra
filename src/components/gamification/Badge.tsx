@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 
 interface BadgeProps {
@@ -55,50 +55,47 @@ export const Badge = ({
       });
     }
   }, [isNew, isEarned, name, toast]);
+  
+  const tooltipContent = (
+    <div className="text-center space-y-1">
+      <p className="font-medium">{name}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
+      {earnedDate && isEarned && (
+        <p className="text-xs text-primary font-medium">Conquistado em: {earnedDate}</p>
+      )}
+      {isSeasonal && isEarned && (
+        <p className="text-xs bg-red-50 text-red-600 rounded px-1 py-0.5 inline-block">Edição Limitada</p>
+      )}
+      {!isEarned && (
+        <p className="text-xs italic">Complete os requisitos para desbloquear</p>
+      )}
+    </div>
+  );
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={cn(
-              'flex items-center justify-center rounded-full relative',
-              isEarned 
-                ? category 
-                  ? `${categoryColors[category]} text-foreground border`
-                  : 'bg-primary/10 text-primary'
-                : 'bg-gray-200 text-gray-400',
-              sizeClasses[size],
-              className
-            )}
-          >
-            {icon}
-            {isSeasonal && isEarned && (
-              <div className="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full border border-white"></div>
-            )}
-            {isNew && isEarned && (
-              <div className="absolute -top-1 -right-1 bg-yellow-400 text-xs text-white rounded-full h-4 w-4 flex items-center justify-center border border-white">
-                ✨
-              </div>
-            )}
+    <Tooltip content={tooltipContent}>
+      <div
+        className={cn(
+          'flex items-center justify-center rounded-full relative',
+          isEarned 
+            ? category 
+              ? `${categoryColors[category]} text-foreground border`
+              : 'bg-primary/10 text-primary'
+            : 'bg-gray-200 text-gray-400',
+          sizeClasses[size],
+          className
+        )}
+      >
+        {icon}
+        {isSeasonal && isEarned && (
+          <div className="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full border border-white"></div>
+        )}
+        {isNew && isEarned && (
+          <div className="absolute -top-1 -right-1 bg-yellow-400 text-xs text-white rounded-full h-4 w-4 flex items-center justify-center border border-white">
+            ✨
           </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="w-52">
-          <div className="text-center space-y-1">
-            <p className="font-medium">{name}</p>
-            <p className="text-xs text-muted-foreground">{description}</p>
-            {earnedDate && isEarned && (
-              <p className="text-xs text-primary font-medium">Conquistado em: {earnedDate}</p>
-            )}
-            {isSeasonal && isEarned && (
-              <p className="text-xs bg-red-50 text-red-600 rounded px-1 py-0.5 inline-block">Edição Limitada</p>
-            )}
-            {!isEarned && (
-              <p className="text-xs italic">Complete os requisitos para desbloquear</p>
-            )}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        )}
+      </div>
+    </Tooltip>
   );
 };
