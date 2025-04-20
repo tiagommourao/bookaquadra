@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,9 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Court } from "@/types";
+import { Court, EventType, EventStatus } from "@/types";
 import { useCreateEvent, useEvent, useUpdateEvent } from "@/hooks/admin/useEventsData";
 import { ptBR } from "date-fns/locale";
 
@@ -76,7 +77,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
 
   // Handle form submission
   const onSubmit = (values: EventFormValues) => {
-    const eventData: Omit<Event, 'id' | 'created_at' | 'updated_at'> = {
+    const eventData = {
       name: values.name,
       description: values.description || "",
       start_datetime: values.start_datetime.toISOString(),

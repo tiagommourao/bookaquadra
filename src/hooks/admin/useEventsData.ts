@@ -1,6 +1,7 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Event, EventType, EventStatus } from '@/types';
+import { Event, EventType, EventStatus, EventCourt } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -111,7 +112,7 @@ export const useEvent = (eventId: string | null) => {
         .single();
       
       if (error) throw error;
-      return data as Event & { events_courts: EventCourt[] };
+      return data as Event & { events_courts: Array<{court_id: string}> };
     },
     enabled: !!eventId,
   });

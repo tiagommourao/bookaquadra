@@ -1,3 +1,4 @@
+
 // Core type definitions for BookaQuadra application
 
 // User role types
@@ -415,6 +416,12 @@ export interface Event {
   events_courts?: { court_id: string; courts: { id: string, name: string } }[];
 }
 
+// Event Court relation interface
+export interface EventCourt {
+  event_id: string;
+  court_id: string;
+}
+
 // Event registration status
 export type EventRegistrationStatus = 'pending' | 'confirmed' | 'cancelled';
 
@@ -431,5 +438,22 @@ export interface EventRegistration {
   updated_at: string;
 }
 
+// Tipo para passo do onboarding
+export type OnboardingStep = 
+  | 'personal-info' 
+  | 'sports-selection' 
+  | 'skill-levels' 
+  | 'preferences' 
+  | 'terms';
+
+// Tipo para preferência de jogo
+export type GameTypePreference = 
+  | 'singles' 
+  | 'doubles' 
+  | 'mixed' 
+  | 'group_play' 
+  | 'lessons';
+
 // Re-export os novos tipos de pagamento
 export * from './payment';
+
