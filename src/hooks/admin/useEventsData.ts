@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Event, EventType } from '@/types/event';
+import { Event, EventType, EventStatus } from '@/types/event';
 
 export function useEventsData() {
   return useQuery({
@@ -20,13 +20,14 @@ export function useEventsData() {
       
       if (error) throw error;
       
-      // Map string event_type to enum EventType
+      // Map string event_type and status to enum types
       const typedData = data?.map(event => ({
         ...event,
-        event_type: event.event_type as EventType
+        event_type: event.event_type as EventType,
+        status: event.status as EventStatus
       })) || [];
       
-      return typedData;
+      return typedData as Event[];
     }
   });
 }
@@ -59,13 +60,14 @@ export function useEventDetails(eventId: string | null) {
       if (error) throw error;
       
       if (data) {
-        // Map string event_type to enum EventType
+        // Map string event_type and status to enum types
         const typedData = {
           ...data,
-          event_type: data.event_type as EventType
+          event_type: data.event_type as EventType,
+          status: data.status as EventStatus
         };
         
-        return typedData;
+        return typedData as Event;
       }
       
       return null;

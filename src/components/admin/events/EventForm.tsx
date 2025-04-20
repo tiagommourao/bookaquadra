@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Event, EventType } from '@/types/event';
+import { Event, EventType, EventStatus } from '@/types/event';
 
 const eventFormSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -63,8 +63,17 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
     try {
       // Ensure all required fields are present
       const eventData = {
-        ...values,
-        status: values.status || 'active',
+        name: values.name,
+        description: values.description,
+        start_datetime: values.start_datetime,
+        end_datetime: values.end_datetime,
+        event_type: values.event_type,
+        registration_fee: values.registration_fee,
+        max_capacity: values.max_capacity,
+        banner_url: values.banner_url,
+        block_courts: values.block_courts,
+        notify_clients: values.notify_clients,
+        status: values.status,
       };
       
       if (initialData?.id) {
