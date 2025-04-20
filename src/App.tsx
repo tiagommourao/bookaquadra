@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,7 +27,6 @@ import BookingsList from "./pages/admin/bookings/BookingsList";
 import UsersList from "./pages/admin/users/UsersList";
 import MercadoPagoIntegration from "./pages/admin/integrations/MercadoPagoIntegration";
 import PaymentsList from "./pages/admin/payments/PaymentsList";
-import EventsList from "./pages/admin/events/EventsList";
 
 import NotFound from "./pages/NotFound";
 
@@ -166,13 +166,6 @@ const App = () => (
               <Route path="/admin/integracoes/mercadopago" element={
                 <AdminProtectedRoute>
                   <MercadoPagoIntegration />
-                </AdminProtectedRoute>
-              } />
-              
-              {/* Admin Events Management */}
-              <Route path="/admin/eventos_torneios" element={
-                <AdminProtectedRoute>
-                  <EventsList />
                 </AdminProtectedRoute>
               } />
               

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Badge as UIBadge } from '@/components/ui/badge';
-import { Tooltip } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type LevelType = 'bronze' | 'silver' | 'gold' | 'legend';
 
@@ -44,28 +44,31 @@ export const UserLevel = ({ level, points, className, showDetails = false }: Use
   const capitalizedLevel = level.charAt(0).toUpperCase() + level.slice(1);
 
   if (showDetails) {
-    const tooltipContent = (
-      <div className="space-y-1.5">
-        <p className="font-medium">{capitalizedLevel} {levelEmoji[level]}</p>
-        <p className="text-xs text-muted-foreground">Requisitos: {levelRequirements[level]}</p>
-        <p className="text-xs text-muted-foreground">Benefícios: {levelBenefits[level]}</p>
-        {points !== undefined && (
-          <div className="text-xs">
-            Seus pontos: <span className="font-medium">{points}</span>
-          </div>
-        )}
-      </div>
-    );
-
     return (
-      <Tooltip content={tooltipContent}>
-        <UIBadge 
-          className={`${levelColors[level]} px-2 py-0.5 text-xs font-medium cursor-help ${className}`}
-          variant="outline"
-        >
-          {capitalizedLevel} {levelEmoji[level]} {points !== undefined && `(${points} pts)`}
-        </UIBadge>
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <UIBadge 
+              className={`${levelColors[level]} px-2 py-0.5 text-xs font-medium cursor-help ${className}`}
+              variant="outline"
+            >
+              {capitalizedLevel} {levelEmoji[level]} {points !== undefined && `(${points} pts)`}
+            </UIBadge>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="w-64">
+            <div className="space-y-1.5">
+              <p className="font-medium">{capitalizedLevel} {levelEmoji[level]}</p>
+              <p className="text-xs text-muted-foreground">Requisitos: {levelRequirements[level]}</p>
+              <p className="text-xs text-muted-foreground">Benefícios: {levelBenefits[level]}</p>
+              {points !== undefined && (
+                <div className="text-xs">
+                  Seus pontos: <span className="font-medium">{points}</span>
+                </div>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 
