@@ -12,19 +12,20 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Event } from '@/types/event';
+import { Event, EventType } from '@/types/event';
 
 const eventFormSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
   description: z.string().optional(),
   start_datetime: z.string(),
   end_datetime: z.string(),
-  event_type: z.string(),
+  event_type: z.enum(['tournament', 'special_class', 'day_use', 'private_event']),
   registration_fee: z.number().optional(),
   max_capacity: z.number().optional(),
   banner_url: z.string().optional(),
   block_courts: z.boolean(),
   notify_clients: z.boolean(),
+  status: z.enum(['active', 'inactive', 'finished']).default('active'),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -36,20 +37,40 @@ interface EventFormProps {
 
 export function EventForm({ onSuccess, initialData }: EventFormProps) {
   const { toast } = useToast();
+  
+  // Prepare default values for the form
+  const defaultValues: Partial<EventFormValues> = initialData 
+    ? {
+        ...initialData,
+        // Convert any nullable values to empty string if undefined
+        description: initialData.description || '',
+        banner_url: initialData.banner_url || '',
+        registration_fee: initialData.registration_fee || undefined,
+        max_capacity: initialData.max_capacity || undefined,
+      }
+    : {
+        block_courts: false,
+        notify_clients: false,
+        status: 'active',
+      };
+  
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
-    defaultValues: initialData || {
-      block_courts: false,
-      notify_clients: false,
-    }
+    defaultValues,
   });
 
   const onSubmit = async (values: EventFormValues) => {
     try {
+      // Ensure all required fields are present
+      const eventData = {
+        ...values,
+        status: values.status || 'active',
+      };
+      
       if (initialData?.id) {
         const { error } = await supabase
           .from('events')
-          .update(values)
+          .update(eventData)
           .eq('id', initialData.id);
         
         if (error) throw error;
@@ -61,7 +82,7 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
       } else {
         const { error } = await supabase
           .from('events')
-          .insert([values]);
+          .insert([eventData]);
         
         if (error) throw error;
         
@@ -111,7 +132,7 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea {...field} />
+                    <Textarea {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -172,6 +193,29 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
               )}
             />
             
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="inactive">Inativo</SelectItem>
+                      <SelectItem value="finished">Finalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -180,7 +224,13 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                   <FormItem>
                     <FormLabel>Valor da Inscrição</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        {...field} 
+                        value={field.value || ''} 
+                        onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -194,13 +244,32 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                   <FormItem>
                     <FormLabel>Capacidade Máxima</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        value={field.value || ''} 
+                        onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+            
+            <FormField
+              control={form.control}
+              name="banner_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL do Banner</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ''} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <FormField
               control={form.control}

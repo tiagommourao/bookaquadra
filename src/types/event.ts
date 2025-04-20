@@ -19,12 +19,15 @@ export interface Event {
   created_at: string;
   updated_at: string;
   created_by?: string;
+  events_courts?: EventCourt[];
+  event_registrations?: EventRegistration[];
 }
 
 export interface EventCourt {
   id: string;
   event_id: string;
   court_id: string;
+  courts?: { name: string };
   created_at: string;
 }
 
