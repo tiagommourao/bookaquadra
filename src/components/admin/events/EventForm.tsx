@@ -58,19 +58,27 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
 
   const onSubmit = async (values: EventFormValues) => {
     try {
-      const eventData: Event = {
-        ...values,
-        event_type: values.event_type,
+      const eventData = {
+        name: values.name,
+        description: values.description || null,
+        start_datetime: values.start_datetime,
+        end_datetime: values.end_datetime,
+        event_type: values.event_type as EventType,
+        registration_fee: values.registration_fee || null,
+        max_capacity: values.max_capacity || null,
+        banner_url: values.banner_url || null,
         block_courts: values.block_courts,
         notify_clients: values.notify_clients,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        status: values.status as EventStatus,
       };
       
       if (initialData?.id) {
         const { error } = await supabase
           .from('events')
-          .update(eventData)
+          .update({
+            ...eventData,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', initialData.id);
         
         if (error) throw error;
@@ -82,8 +90,11 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
       } else {
         const { error } = await supabase
           .from('events')
-          .insert([eventData])
-          .single();
+          .insert({
+            ...eventData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
         
         if (error) throw error;
         
