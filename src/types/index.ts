@@ -392,44 +392,43 @@ export interface UserChallenge {
   challenge?: Challenge;
 }
 
-// Event type interface
+// Event type definition
+export type EventStatus = 'active' | 'inactive' | 'completed';
+export type EventType = 'tournament' | 'class' | 'day_use' | 'private';
+
 export interface Event {
   id: string;
   name: string;
   description?: string;
-  start_datetime: string | Date;
-  end_datetime: string | Date;
-  event_type: string;
-  status: 'active' | 'inactive' | 'completed';
+  start_datetime: string;
+  end_datetime: string;
+  event_type: EventType;
   registration_fee?: number;
   max_capacity?: number;
-  banner_url?: string;
   block_courts: boolean;
   notify_clients: boolean;
-  created_at: string | Date;
-  updated_at: string | Date;
+  banner_url?: string;
+  status: EventStatus;
   created_by?: string;
+  created_at: string;
+  updated_at: string;
+  events_courts?: { court_id: string; courts: { id: string, name: string } }[];
 }
 
-// Event Court relation interface
-export interface EventCourt {
-  id: string;
-  event_id: string;
-  court_id: string;
-  created_at: string | Date;
-}
+// Event registration status
+export type EventRegistrationStatus = 'pending' | 'confirmed' | 'cancelled';
 
-// Event Registration interface
+// Event registration interface
 export interface EventRegistration {
   id: string;
   event_id: string;
   user_id: string;
-  registration_date: string | Date;
+  registration_date: string;
   payment_status: PaymentStatus;
-  attended: boolean;
+  attended?: boolean;
   notes?: string;
-  created_at: string | Date;
-  updated_at: string | Date;
+  created_at: string;
+  updated_at: string;
 }
 
 // Re-export os novos tipos de pagamento

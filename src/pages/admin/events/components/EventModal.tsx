@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,10 +35,10 @@ const eventSchema = z.object({
   end_datetime: z.date({
     required_error: "Data e hora de fim são obrigatórias",
   }),
-  event_type: z.string({
+  event_type: z.enum(['tournament', 'class', 'day_use', 'private'] as const, {
     required_error: "Tipo de evento é obrigatório",
   }),
-  status: z.string({
+  status: z.enum(['active', 'inactive', 'completed'] as const, {
     required_error: "Status é obrigatório",
   }),
   registration_fee: z.string().optional(),
@@ -55,8 +54,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
   const [startDatetime, setStartDatetime] = useState<Date | undefined>();
   const [endDatetime, setEndDatetime] = useState<Date | undefined>();
   const { data: event, isLoading: isLoadingEvent } = useEvent(eventId);
-  const { mutate: createEvent, isLoading: isCreating } = useCreateEvent();
-  const { mutate: updateEvent, isLoading: isUpdating } = useUpdateEvent();
+  const { mutate: createEvent, isPending: isCreating } = useCreateEvent();
+  const { mutate: updateEvent, isPending: isUpdating } = useUpdateEvent();
 
   const isLoading = isLoadingEvent || isCreating || isUpdating;
   const isEdit = !!eventId;
@@ -77,15 +76,15 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
 
   // Handle form submission
   const onSubmit = (values: EventFormValues) => {
-    const eventData = {
+    const eventData: Omit<Event, 'id' | 'created_at' | 'updated_at'> = {
       name: values.name,
       description: values.description || "",
       start_datetime: values.start_datetime.toISOString(),
       end_datetime: values.end_datetime.toISOString(),
       event_type: values.event_type,
       status: values.status,
-      registration_fee: values.registration_fee ? parseFloat(values.registration_fee) : null,
-      max_capacity: values.max_capacity ? parseInt(values.max_capacity, 10) : null,
+      registration_fee: values.registration_fee ? parseFloat(values.registration_fee) : undefined,
+      max_capacity: values.max_capacity ? parseInt(values.max_capacity, 10) : undefined,
       block_courts: values.block_courts,
       notify_clients: values.notify_clients,
     };
@@ -104,7 +103,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
     } else {
       createEvent(
         {
-          event: eventData as any,
+          event: eventData,
           courtIds: values.court_ids,
         },
         {

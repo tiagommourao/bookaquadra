@@ -1,7 +1,6 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Event, EventCourt } from '@/types';
+import { Event, EventType, EventStatus } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -20,6 +19,11 @@ export interface PaginationParams {
   page: number;
   limit: number;
 }
+
+// Helper to format dates for Supabase
+const formatDateForDB = (date: Date): string => {
+  return date.toISOString();
+};
 
 // Fetch events with filters and pagination
 export const useEvents = (filters: EventFilters = {}, pagination: PaginationParams = { page: 1, limit: 10 }) => {
@@ -144,22 +148,26 @@ export const useCreateEvent = () => {
       event, 
       courtIds 
     }: { 
-      event: Omit<Event, 'id' | 'created_at' | 'updated_at'>;
+      event: Omit<Event, 'id' | 'created_at' | 'updated_at'>; 
       courtIds: string[];
     }) => {
-      // 1. Insert event
-      const { data: eventData, error: eventError } = await supabase
+      const eventData = {
+        ...event,
+        start_datetime: formatDateForDB(new Date(event.start_datetime)),
+        end_datetime: formatDateForDB(new Date(event.end_datetime))
+      };
+
+      const { data: eventResult, error: eventError } = await supabase
         .from('events')
-        .insert(event)
+        .insert(eventData)
         .select()
         .single();
       
       if (eventError) throw eventError;
       
-      // 2. Link courts to event
       if (courtIds.length > 0) {
         const courtLinks = courtIds.map(courtId => ({
-          event_id: eventData.id,
+          event_id: eventResult.id,
           court_id: courtId
         }));
         
@@ -170,7 +178,7 @@ export const useCreateEvent = () => {
         if (courtsError) throw courtsError;
       }
       
-      return eventData;
+      return eventResult;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
@@ -204,17 +212,21 @@ export const useUpdateEvent = () => {
       event: Partial<Event>;
       courtIds: string[];
     }) => {
-      // 1. Update event
-      const { data: eventData, error: eventError } = await supabase
+      const eventData = {
+        ...event,
+        start_datetime: event.start_datetime ? formatDateForDB(new Date(event.start_datetime)) : undefined,
+        end_datetime: event.end_datetime ? formatDateForDB(new Date(event.end_datetime)) : undefined
+      };
+      
+      const { data: eventResult, error: eventError } = await supabase
         .from('events')
-        .update(event)
+        .update(eventData)
         .eq('id', eventId)
         .select()
         .single();
       
       if (eventError) throw eventError;
       
-      // 2. Delete existing court links
       const { error: deleteError } = await supabase
         .from('events_courts')
         .delete()
@@ -222,7 +234,6 @@ export const useUpdateEvent = () => {
       
       if (deleteError) throw deleteError;
       
-      // 3. Create new court links
       if (courtIds.length > 0) {
         const courtLinks = courtIds.map(courtId => ({
           event_id: eventId,
@@ -236,7 +247,7 @@ export const useUpdateEvent = () => {
         if (courtsError) throw courtsError;
       }
       
-      return eventData;
+      return eventResult;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
