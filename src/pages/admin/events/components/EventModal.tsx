@@ -67,8 +67,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
     defaultValues: {
       name: "",
       description: "",
-      event_type: "tournament",
-      status: "active",
+      event_type: "tournament" as EventType,
+      status: "active" as EventStatus,
       block_courts: true,
       notify_clients: false,
       court_ids: [],
@@ -104,7 +104,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
     } else {
       createEvent(
         {
-          event: eventData,
+          event: eventData as Omit<Event, 'id' | 'created_at' | 'updated_at'>,
           courtIds: values.court_ids,
         },
         {
@@ -131,8 +131,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
         description: event.description || "",
         start_datetime: startDate,
         end_datetime: endDate,
-        event_type: event.event_type,
-        status: event.status,
+        event_type: event.event_type as EventType,
+        status: event.status as EventStatus,
         registration_fee: event.registration_fee?.toString() || "",
         max_capacity: event.max_capacity?.toString() || "",
         block_courts: event.block_courts,
@@ -143,8 +143,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
       form.reset({
         name: "",
         description: "",
-        event_type: "tournament",
-        status: "active",
+        event_type: "tournament" as EventType,
+        status: "active" as EventStatus,
         block_courts: true,
         notify_clients: false,
         court_ids: [],
@@ -492,25 +492,17 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
               />
 
               {/* Banner URL - Can be implemented later with file upload */}
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Banner URL (Opcional)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="URL da imagem do banner" 
-                        disabled={true}
-                        {...field} 
-                        value=""
-                      />
-                    </FormControl>
-                    <FormDescription>Upload de imagens será implementado em breve</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormItem>
+                <FormLabel>Banner URL (Opcional)</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="URL da imagem do banner" 
+                    disabled={true}
+                    value=""
+                  />
+                </FormControl>
+                <FormDescription>Upload de imagens será implementado em breve</FormDescription>
+              </FormItem>
             </div>
 
             <div className="space-y-4">

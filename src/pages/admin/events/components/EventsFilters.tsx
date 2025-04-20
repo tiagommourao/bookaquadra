@@ -70,7 +70,7 @@ export const EventsFilters: React.FC<EventsFiltersProps> = ({
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os status</SelectItem>
+            <SelectItem value="all">Todos os status</SelectItem>
             <SelectItem value="active">Ativo</SelectItem>
             <SelectItem value="inactive">Inativo</SelectItem>
             <SelectItem value="completed">Finalizado</SelectItem>
@@ -83,7 +83,7 @@ export const EventsFilters: React.FC<EventsFiltersProps> = ({
             <SelectValue placeholder="Tipo de Evento" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos os tipos</SelectItem>
+            <SelectItem value="all">Todos os tipos</SelectItem>
             <SelectItem value="tournament">Torneio</SelectItem>
             <SelectItem value="class">Aula Especial</SelectItem>
             <SelectItem value="day_use">Day Use</SelectItem>
@@ -97,7 +97,7 @@ export const EventsFilters: React.FC<EventsFiltersProps> = ({
             <SelectValue placeholder="Quadra" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todas as quadras</SelectItem>
+            <SelectItem value="all">Todas as quadras</SelectItem>
             {courts.map((court) => (
               <SelectItem key={court.id} value={court.id}>
                 {court.name}

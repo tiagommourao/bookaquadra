@@ -39,17 +39,17 @@ export const useEvents = (filters: EventFilters = {}, pagination: PaginationPara
         .from('events')
         .select(`
           *,
-          events_courts(court_id, courts:court_id(name))
+          events_courts(court_id, courts:court_id(id, name))
         `)
         .order('start_datetime', { ascending: false })
         .range(from, to);
 
       // Apply filters
-      if (filters.status) {
+      if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status);
       }
 
-      if (filters.eventType) {
+      if (filters.eventType && filters.eventType !== 'all') {
         query = query.eq('event_type', filters.eventType);
       }
 
@@ -67,7 +67,7 @@ export const useEvents = (filters: EventFilters = {}, pagination: PaginationPara
         query = query.ilike('name', `%${filters.searchTerm}%`);
       }
 
-      if (filters.courtId) {
+      if (filters.courtId && filters.courtId !== 'all') {
         // Buscar eventos que estão vinculados à quadra especificada
         const { data: eventIds, error: eventIdsError } = await supabase
           .from('events_courts')
