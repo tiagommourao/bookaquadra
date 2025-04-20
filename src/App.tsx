@@ -27,6 +27,7 @@ import BookingsList from "./pages/admin/bookings/BookingsList";
 import UsersList from "./pages/admin/users/UsersList";
 import MercadoPagoIntegration from "./pages/admin/integrations/MercadoPagoIntegration";
 import PaymentsList from "./pages/admin/payments/PaymentsList";
+import EventsList from "./pages/admin/events/EventsList";
 
 import NotFound from "./pages/NotFound";
 
@@ -159,6 +160,13 @@ const App = () => (
               <Route path="/admin/pagamentos" element={
                 <AdminProtectedRoute>
                   <PaymentsList />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Events Management */}
+              <Route path="/admin/eventos_torneios" element={
+                <AdminProtectedRoute>
+                  <EventsList />
                 </AdminProtectedRoute>
               } />
               

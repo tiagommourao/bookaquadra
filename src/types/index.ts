@@ -392,16 +392,45 @@ export interface UserChallenge {
   challenge?: Challenge;
 }
 
-// Onboarding step type
-export type OnboardingStep = 
-  | 'personal-info'
-  | 'sports-selection'
-  | 'skill-levels'
-  | 'preferences'
-  | 'terms';
+// Event type interface
+export interface Event {
+  id: string;
+  name: string;
+  description?: string;
+  start_datetime: string | Date;
+  end_datetime: string | Date;
+  event_type: string;
+  status: 'active' | 'inactive' | 'completed';
+  registration_fee?: number;
+  max_capacity?: number;
+  banner_url?: string;
+  block_courts: boolean;
+  notify_clients: boolean;
+  created_at: string | Date;
+  updated_at: string | Date;
+  created_by?: string;
+}
 
-// Game type preferences
-export type GameTypePreference = 'individual' | 'doubles' | 'group';
+// Event Court relation interface
+export interface EventCourt {
+  id: string;
+  event_id: string;
+  court_id: string;
+  created_at: string | Date;
+}
+
+// Event Registration interface
+export interface EventRegistration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  registration_date: string | Date;
+  payment_status: PaymentStatus;
+  attended: boolean;
+  notes?: string;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
 
 // Re-export os novos tipos de pagamento
 export * from './payment';
