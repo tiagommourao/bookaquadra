@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -33,7 +34,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Quadras & Áreas', path: '/admin/quadras', icon: <Calendar className="h-5 w-5" /> },
     { name: 'Horários', path: '/admin/horarios', icon: <CalendarRange className="h-5 w-5" /> },
     { name: 'Reservas', path: '/admin/reservas', icon: <Clock className="h-5 w-5" /> },
-    { name: 'Eventos & Torneios', path: '/admin/eventos_torneios', icon: <Calendar className="h-5 w-5" /> },
+    { name: 'Eventos & Torneios', path: '/admin/eventos_torneios', icon: <CalendarRange className="h-5 w-5" /> },
     { name: 'Pagamentos', path: '/admin/pagamentos', icon: <CreditCard className="h-5 w-5" /> },
     { name: 'Usuários', path: '/admin/usuarios', icon: <UsersRound className="h-5 w-5" /> },
     { 

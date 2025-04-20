@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Event, EventType, EventStatus } from '@/types/event';
+import { useAvailableCourts } from '@/hooks/admin/useEventsData';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const eventFormSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -25,6 +30,7 @@ const eventFormSchema = z.object({
   block_courts: z.boolean(),
   notify_clients: z.boolean(),
   status: z.enum(['active', 'inactive', 'finished']).default('active'),
+  court_ids: z.array(z.string()).min(1, 'Selecione pelo menos uma quadra')
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -36,6 +42,14 @@ interface EventFormProps {
 
 export function EventForm({ onSuccess, initialData }: EventFormProps) {
   const { toast } = useToast();
+  const { data: courts, isLoading: isLoadingCourts } = useAvailableCourts();
+  
+  // Preparar valores iniciais das quadras selecionadas
+  const initialCourtIds = initialData?.events_courts 
+    ? initialData.events_courts.map(ec => 
+        typeof ec === 'object' && 'court_id' in ec ? ec.court_id : ''
+      ).filter(id => id !== '')
+    : [];
   
   const defaultValues: Partial<EventFormValues> = initialData 
     ? {
@@ -44,11 +58,13 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
         banner_url: initialData.banner_url || '',
         registration_fee: initialData.registration_fee || undefined,
         max_capacity: initialData.max_capacity || undefined,
+        court_ids: initialCourtIds
       }
     : {
         block_courts: false,
         notify_clients: false,
         status: 'active',
+        court_ids: []
       };
   
   const form = useForm<EventFormValues>({
@@ -72,7 +88,10 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
         status: values.status as EventStatus,
       };
       
+      let eventId = initialData?.id;
+      
       if (initialData?.id) {
+        // Atualizar evento existente
         const { error } = await supabase
           .from('events')
           .update({
@@ -83,25 +102,77 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
         
         if (error) throw error;
         
+        // Excluir relações de quadras existentes para atualizar
+        const { error: deleteError } = await supabase
+          .from('events_courts')
+          .delete()
+          .eq('event_id', initialData.id);
+        
+        if (deleteError) throw deleteError;
+        
         toast({
           title: "Evento atualizado com sucesso!",
           description: "As informações do evento foram atualizadas."
         });
       } else {
-        const { error } = await supabase
+        // Criar novo evento
+        const { data, error } = await supabase
           .from('events')
           .insert({
             ...eventData,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          });
+          })
+          .select('id')
+          .single();
         
         if (error) throw error;
+        eventId = data.id;
         
         toast({
           title: "Evento criado com sucesso!",
           description: "O novo evento foi cadastrado."
         });
+      }
+      
+      // Inserir relações de quadras
+      if (eventId) {
+        const courtRelations = values.court_ids.map(courtId => ({
+          event_id: eventId,
+          court_id: courtId,
+          created_at: new Date().toISOString()
+        }));
+        
+        const { error: courtError } = await supabase
+          .from('events_courts')
+          .insert(courtRelations);
+        
+        if (courtError) throw courtError;
+      }
+      
+      // Se a opção de bloquear quadras estiver ativada, criar bloqueios no schedule_blocks
+      if (values.block_courts && eventId) {
+        // Primeiro removemos bloqueios existentes caso seja uma edição
+        if (initialData?.id) {
+          await supabase
+            .from('schedule_blocks')
+            .delete()
+            .eq('reason', `Evento: ${values.name} (ID: ${eventId})`);
+        }
+        
+        // Criar bloqueios de agenda para cada quadra selecionada
+        for (const courtId of values.court_ids) {
+          await supabase
+            .from('schedule_blocks')
+            .insert({
+              court_id: courtId,
+              start_datetime: values.start_datetime,
+              end_datetime: values.end_datetime,
+              reason: `Evento: ${values.name} (ID: ${eventId})`,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+        }
       }
       
       if (onSuccess) onSuccess();
@@ -130,7 +201,7 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                 <FormItem>
                   <FormLabel>Nome do Evento</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input placeholder="Ex: Torneio de Tênis" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -144,7 +215,11 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea {...field} value={field.value || ''} />
+                    <Textarea 
+                      placeholder="Descreva os detalhes do evento" 
+                      {...field} 
+                      value={field.value || ''} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -207,6 +282,54 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
             
             <FormField
               control={form.control}
+              name="court_ids"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Quadras utilizadas</FormLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    {isLoadingCourts ? (
+                      <div>Carregando quadras...</div>
+                    ) : (
+                      courts?.map(court => (
+                        <FormField
+                          key={court.id}
+                          control={form.control}
+                          name="court_ids"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(court.id)}
+                                  onCheckedChange={(checked) => {
+                                    const currentValue = [...(field.value || [])];
+                                    if (checked) {
+                                      if (!currentValue.includes(court.id)) {
+                                        field.onChange([...currentValue, court.id]);
+                                      }
+                                    } else {
+                                      field.onChange(
+                                        currentValue.filter(value => value !== court.id)
+                                      );
+                                    }
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal cursor-pointer">
+                                {court.name}
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      ))
+                    )}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
               name="status"
               render={({ field }) => (
                 <FormItem>
@@ -239,6 +362,7 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                       <Input 
                         type="number" 
                         step="0.01" 
+                        placeholder="0.00" 
                         {...field} 
                         value={field.value || ''} 
                         onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)} 
@@ -258,6 +382,7 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                     <FormControl>
                       <Input 
                         type="number" 
+                        placeholder="Número máximo de participantes"
                         {...field} 
                         value={field.value || ''} 
                         onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)} 
@@ -276,7 +401,11 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
                 <FormItem>
                   <FormLabel>URL do Banner</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ''} />
+                    <Input 
+                      placeholder="URL da imagem do evento" 
+                      {...field} 
+                      value={field.value || ''} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -288,7 +417,12 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
               name="block_courts"
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between">
-                  <FormLabel>Bloquear Quadras</FormLabel>
+                  <div>
+                    <FormLabel>Bloquear Quadras</FormLabel>
+                    <p className="text-sm text-muted-foreground">
+                      Impede reservas comuns durante o período do evento
+                    </p>
+                  </div>
                   <FormControl>
                     <Switch
                       checked={field.value}
@@ -305,7 +439,12 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
               name="notify_clients"
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between">
-                  <FormLabel>Notificar Clientes</FormLabel>
+                  <div>
+                    <FormLabel>Notificar Clientes</FormLabel>
+                    <p className="text-sm text-muted-foreground">
+                      Envia notificações sobre o evento para os clientes
+                    </p>
+                  </div>
                   <FormControl>
                     <Switch
                       checked={field.value}

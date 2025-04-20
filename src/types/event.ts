@@ -20,6 +20,11 @@ export interface EventRegistration {
   notes?: string;
   created_at: string;
   updated_at: string;
+  user?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  };
 }
 
 export interface Event {
