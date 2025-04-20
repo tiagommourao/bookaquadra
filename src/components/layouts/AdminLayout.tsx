@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -29,7 +28,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Navigation items for sidebar
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="h-5 w-5" /> },
     { name: 'Quadras & Áreas', path: '/admin/quadras', icon: <Calendar className="h-5 w-5" /> },
@@ -47,6 +45,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     },
     { name: 'Personalização', path: '/admin/personalizacao', icon: <Settings className="h-5 w-5" /> },
     { name: 'Relatórios', path: '/admin/relatorios', icon: <PieChart className="h-5 w-5" /> },
+    { name: 'Eventos & Torneios', path: '/admin/eventos_torneios', icon: <Calendar className="h-5 w-5" /> },
   ];
 
   const isActiveOrSubActive = (item: any) => {
@@ -58,7 +57,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const handleLogout = async () => {
     try {
       await logout();
-      // Navigate to login page
       window.location.href = '/login';
     } catch (error) {
       console.error('Error logging out:', error);
@@ -67,7 +65,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
       <aside 
         className={cn(
           "bg-white border-r shadow-sm transition-all duration-300",
@@ -75,7 +72,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Logo and brand section */}
           <div className="p-4 flex items-center justify-between border-b">
             {!sidebarCollapsed && (
               <Link to="/admin" className="text-lg font-semibold text-primary">
@@ -92,7 +88,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </Button>
           </div>
           
-          {/* Navigation */}
           <nav className="flex-1 overflow-y-auto pt-5 pb-4">
             <ul className="space-y-1 px-2">
               {navItems.map((item) => {
@@ -111,7 +106,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       {!sidebarCollapsed && <span>{item.name}</span>}
                     </Link>
                     
-                    {/* Submenus */}
                     {!sidebarCollapsed && item.subItems && (
                       <ul className="ml-10 mt-1 space-y-1">
                         {item.subItems.map((subItem) => (
@@ -137,7 +131,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </ul>
           </nav>
           
-          {/* Bottom section - Logout */}
           <div className="p-4 border-t">
             <Button
               variant="ghost" 
@@ -154,14 +147,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </div>
       </aside>
       
-      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
         <header className="bg-white shadow-sm border-b h-16 flex items-center px-6">
           <h1 className="text-xl font-semibold text-gray-800">Admin Dashboard</h1>
         </header>
         
-        {/* Page content */}
         <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>

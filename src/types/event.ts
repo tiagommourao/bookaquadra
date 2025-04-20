@@ -1,10 +1,9 @@
 
 export type EventType = 'tournament' | 'special_class' | 'day_use' | 'private_event';
-
 export type EventStatus = 'active' | 'inactive' | 'finished';
 
 export interface Event {
-  id: string;
+  id?: string;
   name: string;
   description?: string;
   start_datetime: string;
@@ -16,8 +15,8 @@ export interface Event {
   status: EventStatus;
   block_courts: boolean;
   notify_clients: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   created_by?: string;
   events_courts?: EventCourt[];
   event_registrations?: EventRegistration[];

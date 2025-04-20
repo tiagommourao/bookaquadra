@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -166,6 +165,13 @@ const App = () => (
               <Route path="/admin/integracoes/mercadopago" element={
                 <AdminProtectedRoute>
                   <MercadoPagoIntegration />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Events Management */}
+              <Route path="/admin/eventos_torneios" element={
+                <AdminProtectedRoute>
+                  <EventsList />
                 </AdminProtectedRoute>
               } />
               

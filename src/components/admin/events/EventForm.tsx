@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,11 +37,9 @@ interface EventFormProps {
 export function EventForm({ onSuccess, initialData }: EventFormProps) {
   const { toast } = useToast();
   
-  // Prepare default values for the form
   const defaultValues: Partial<EventFormValues> = initialData 
     ? {
         ...initialData,
-        // Convert any nullable values to empty string if undefined
         description: initialData.description || '',
         banner_url: initialData.banner_url || '',
         registration_fee: initialData.registration_fee || undefined,
@@ -61,19 +58,13 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
 
   const onSubmit = async (values: EventFormValues) => {
     try {
-      // Ensure all required fields are present
-      const eventData = {
-        name: values.name,
-        description: values.description,
-        start_datetime: values.start_datetime,
-        end_datetime: values.end_datetime,
+      const eventData: Event = {
+        ...values,
         event_type: values.event_type,
-        registration_fee: values.registration_fee,
-        max_capacity: values.max_capacity,
-        banner_url: values.banner_url,
         block_courts: values.block_courts,
         notify_clients: values.notify_clients,
-        status: values.status,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       
       if (initialData?.id) {
@@ -91,7 +82,8 @@ export function EventForm({ onSuccess, initialData }: EventFormProps) {
       } else {
         const { error } = await supabase
           .from('events')
-          .insert([eventData]);
+          .insert([eventData])
+          .single();
         
         if (error) throw error;
         
