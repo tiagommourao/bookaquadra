@@ -1,8 +1,7 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailableTimeSlot, Schedule, ScheduleBlock, Holiday } from '@/types/court';
-import { format, addMinutes, isWeekend, parse, isAfter, isBefore } from 'date-fns';
+import { format, addMinutes, isWeekend, parse, isAfter, isBefore, parseISO } from 'date-fns';
 
 export function useSchedules(courtId: string | null) {
   return useQuery({
@@ -83,7 +82,6 @@ export function useBookingsForCourt(courtId: string | null, selectedDate: Date |
   });
 }
 
-// Nova função para buscar eventos que bloqueiam quadras em uma data específica
 export function useEventsForCourt(courtId: string | null, selectedDate: Date | null) {
   return useQuery({
     queryKey: ['eventsForCourt', courtId, selectedDate],
@@ -92,7 +90,6 @@ export function useEventsForCourt(courtId: string | null, selectedDate: Date | n
       
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Busca eventos que têm a quadra selecionada e que ocorrem na data selecionada
       const { data: eventCourtLinks, error: linksError } = await supabase
         .from('events_courts')
         .select('event_id')
@@ -103,7 +100,6 @@ export function useEventsForCourt(courtId: string | null, selectedDate: Date | n
       
       const eventIds = eventCourtLinks.map(link => link.event_id);
       
-      // Busca eventos ativos que bloqueiam quadras e estão programados para a data selecionada
       const { data: events, error: eventsError } = await supabase
         .from('events')
         .select('*')
@@ -125,7 +121,6 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
   const { data: blocks, isLoading: isLoadingBlocks } = useScheduleBlocks(courtId, selectedDate);
   const { data: bookings, isLoading: isLoadingBookings } = useBookingsForCourt(courtId, selectedDate);
   const { data: holidays, isLoading: isLoadingHolidays } = useHolidays();
-  // Adiciona a consulta de eventos
   const { data: events, isLoading: isLoadingEvents } = useEventsForCourt(courtId, selectedDate);
   
   return useQuery({
@@ -135,18 +130,13 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
         return [];
       }
       
-      // Determine day of week (0-6, where 0 is Sunday)
       const dayOfWeek = selectedDate.getDay();
-      
-      // Find applicable schedule for this day
       const daySchedule = schedules.find(s => s.day_of_week === dayOfWeek);
-      if (!daySchedule) return []; // No schedule for this day
+      if (!daySchedule) return [];
       
-      // Check if it's a holiday
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const isHoliday = holidays.some(h => h.date === dateStr);
       
-      // Determine price based on day type
       let basePrice = daySchedule.price;
       if (isHoliday && daySchedule.price_holiday) {
         basePrice = daySchedule.price_holiday;
@@ -154,9 +144,8 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
         basePrice = daySchedule.price_weekend;
       }
       
-      // Generate time slots
       const slots: AvailableTimeSlot[] = [];
-      const slotDuration = daySchedule.min_booking_time; // in minutes
+      const slotDuration = daySchedule.min_booking_time;
       
       const startTime = parse(daySchedule.start_time, 'HH:mm:ss', new Date());
       const endTime = parse(daySchedule.end_time, 'HH:mm:ss', new Date());
@@ -166,11 +155,9 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
         const slotStart = format(current, 'HH:mm');
         const slotEnd = format(addMinutes(current, slotDuration), 'HH:mm');
         
-        // Check if this slot is available
         let available = true;
         let blockReason = null;
         
-        // Check if blocked by admin
         for (const block of blocks) {
           const blockStart = new Date(block.start_datetime);
           const blockEnd = new Date(block.end_datetime);
@@ -189,7 +176,6 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
           }
         }
         
-        // Check if already booked
         if (available) {
           for (const booking of bookings) {
             if (booking.start_time <= slotStart && booking.end_time > slotStart) {
@@ -200,31 +186,22 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
           }
         }
         
-        // Verificar se está bloqueado por eventos
-        if (available) {
-          const slotStartHour = parseInt(slotStart.split(':')[0]);
-          const slotEndHour = parseInt(slotEnd.split(':')[0]);
+        for (const event of events) {
+          const eventStartDate = new Date(event.start_datetime);
+          const eventEndDate = new Date(event.end_datetime);
           
-          for (const event of events) {
-            const eventStartDate = new Date(event.start_datetime);
-            const eventEndDate = new Date(event.end_datetime);
-            
-            // Se o evento começa no mesmo dia
-            if (format(eventStartDate, 'yyyy-MM-dd') === dateStr) {
-              const eventStartHour = eventStartDate.getHours();
-              const eventEndHour = eventEndDate.getHours();
-              
-              // Verifica se o horário do slot está dentro do horário do evento
-              if (
-                (slotStartHour >= eventStartHour && slotStartHour < eventEndHour) ||
-                (slotEndHour > eventStartHour && slotEndHour <= eventEndHour) ||
-                (slotStartHour <= eventStartHour && slotEndHour >= eventEndHour)
-              ) {
-                available = false;
-                blockReason = `Quadra reservada para evento: ${event.name}`;
-                break;
-              }
-            }
+          const slotStartDate = parse(`${dateStr} ${slotStart}`, 'yyyy-MM-dd HH:mm', new Date());
+          const slotEndDate = parse(`${dateStr} ${slotEnd}`, 'yyyy-MM-dd HH:mm', new Date());
+          
+          if (
+            (isAfter(slotStartDate, eventStartDate) && isBefore(slotStartDate, eventEndDate)) ||
+            (isAfter(slotEndDate, eventStartDate) && isBefore(slotEndDate, eventEndDate)) ||
+            (isBefore(slotStartDate, eventStartDate) && isAfter(slotEndDate, eventEndDate)) ||
+            (isSameTime(slotStartDate, eventStartDate) || isSameTime(slotEndDate, eventEndDate))
+          ) {
+            available = false;
+            blockReason = `Quadra reservada para evento: ${event.name}`;
+            break;
           }
         }
         
@@ -244,4 +221,12 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
     },
     enabled: !!courtId && !!selectedDate && !isLoadingSchedules && !isLoadingBlocks && !isLoadingBookings && !isLoadingHolidays && !isLoadingEvents
   });
+}
+
+function isSameTime(date1: Date, date2: Date): boolean {
+  return date1.getHours() === date2.getHours() && 
+         date1.getMinutes() === date2.getMinutes() &&
+         date1.getDate() === date2.getDate() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getFullYear() === date2.getFullYear();
 }

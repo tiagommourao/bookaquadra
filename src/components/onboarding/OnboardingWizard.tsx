@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { PersonalInfoStep } from './PersonalInfoStep';
-import { SportsSelectionStep } from './SportsSelectionStep';
-import { SkillLevelsStep } from './SkillLevelsStep';
+import PersonalInfoStep from './PersonalInfoStep';
+import SportsSelectionStep from './SportsSelectionStep';
+import SkillLevelsStep from './SkillLevelsStep';
 import { PreferencesStep } from './PreferencesStep';
-import { TermsStep } from './TermsStep';
-import { OnboardingProgress } from './OnboardingProgress';
+import TermsStep from './TermsStep';
+import OnboardingProgress from './OnboardingProgress';
 import { Card, CardContent } from '@/components/ui/card';
 
 // Tipo para cada passo do onboarding
