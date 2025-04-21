@@ -26,6 +26,12 @@ interface EventModalProps {
   courts: Court[];
 }
 
+// Lista de horários disponíveis (apenas horas inteiras)
+const hoursOptions = Array.from({ length: 24 }, (_, i) => {
+  const hour = i.toString().padStart(2, '0');
+  return `${hour}:00`;
+});
+
 // Event form schema
 const eventSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
@@ -52,8 +58,11 @@ const eventSchema = z.object({
 type EventFormValues = z.infer<typeof eventSchema>;
 
 export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId, courts }) => {
-  const [startDatetime, setStartDatetime] = useState<Date | undefined>();
-  const [endDatetime, setEndDatetime] = useState<Date | undefined>();
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [startHour, setStartHour] = useState<string>("00:00");
+  const [endHour, setEndHour] = useState<string>("00:00");
+  
   const { data: event, isLoading: isLoadingEvent } = useEvent(eventId);
   const { mutate: createEvent, isPending: isCreating } = useCreateEvent();
   const { mutate: updateEvent, isPending: isUpdating } = useUpdateEvent();
@@ -74,6 +83,24 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
       court_ids: [],
     }
   });
+
+  // Atualiza o datetime no form quando a data ou hora mudar
+  const updateDatetime = (isStart: boolean) => {
+    const date = isStart ? startDate : endDate;
+    const hour = isStart ? startHour : endHour;
+    
+    if (date) {
+      const [hours, minutes] = hour.split(":").map(Number);
+      const newDate = new Date(date);
+      newDate.setHours(hours, minutes, 0, 0);
+      
+      if (isStart) {
+        form.setValue("start_datetime", newDate);
+      } else {
+        form.setValue("end_datetime", newDate);
+      }
+    }
+  };
 
   // Handle form submission
   const onSubmit = (values: EventFormValues) => {
@@ -119,19 +146,23 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
   useEffect(() => {
     if (event && isEdit) {
       // Set start and end datetime for the time picker inputs
-      const startDate = new Date(event.start_datetime);
-      const endDate = new Date(event.end_datetime);
+      const startDateTime = new Date(event.start_datetime);
+      const endDateTime = new Date(event.end_datetime);
       
-      setStartDatetime(startDate);
-      setEndDatetime(endDate);
+      setStartDate(startDateTime);
+      setEndDate(endDateTime);
+      
+      // Format hours for the time select
+      setStartHour(`${String(startDateTime.getHours()).padStart(2, '0')}:00`);
+      setEndHour(`${String(endDateTime.getHours()).padStart(2, '0')}:00`);
       
       const courtIds = event.events_courts?.map((ec: any) => ec.court_id) || [];
       
       form.reset({
         name: event.name,
         description: event.description || "",
-        start_datetime: startDate,
-        end_datetime: endDate,
+        start_datetime: startDateTime,
+        end_datetime: endDateTime,
         event_type: event.event_type as EventType,
         status: event.status as EventStatus,
         registration_fee: event.registration_fee?.toString() || "",
@@ -150,10 +181,25 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
         notify_clients: false,
         court_ids: [],
       });
-      setStartDatetime(undefined);
-      setEndDatetime(undefined);
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setStartHour("00:00");
+      setEndHour("00:00");
     }
   }, [event, isEdit, form]);
+
+  // Efeito para atualizar os datetimes quando as horas mudarem
+  useEffect(() => {
+    if (startDate) {
+      updateDatetime(true);
+    }
+  }, [startDate, startHour]);
+
+  useEffect(() => {
+    if (endDate) {
+      updateDatetime(false);
+    }
+  }, [endDate, endHour]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -165,7 +211,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Name */}
+              {/* Nome */}
               <FormField
                 control={form.control}
                 name="name"
@@ -184,7 +230,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
                 )}
               />
 
-              {/* Event Type */}
+              {/* Tipo de Evento */}
               <FormField
                 control={form.control}
                 name="event_type"
@@ -214,7 +260,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
               />
             </div>
 
-            {/* Description */}
+            {/* Descrição */}
             <FormField
               control={form.control}
               name="description"
@@ -235,141 +281,147 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Start Datetime */}
+              {/* Data e Hora de Início */}
               <FormField
                 control={form.control}
                 name="start_datetime"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Data e Hora de Início</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            disabled={isLoading}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP HH:mm", {
-                                locale: ptBR,
-                              })
-                            ) : (
-                              <span>Selecione a data e hora</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            if (date) {
-                              const newDate = new Date(date);
-                              if (startDatetime) {
-                                newDate.setHours(startDatetime.getHours());
-                                newDate.setMinutes(startDatetime.getMinutes());
+                    <div className="flex flex-col gap-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !startDate && "text-muted-foreground"
+                              )}
+                              disabled={isLoading}
+                            >
+                              {startDate ? (
+                                format(startDate, "PPP", {
+                                  locale: ptBR,
+                                })
+                              ) : (
+                                <span>Selecione a data</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={startDate}
+                            onSelect={(date) => {
+                              if (date) {
+                                setStartDate(date);
                               }
-                              field.onChange(newDate);
-                              setStartDatetime(newDate);
-                            }
-                          }}
-                          disabled={isLoading}
-                          initialFocus
-                          locale={ptBR}
-                        />
-                        <div className="p-3 border-t border-border">
-                          <Input
-                            type="time"
-                            value={startDatetime ? format(startDatetime, "HH:mm") : ""}
-                            onChange={(e) => {
-                              const [hours, minutes] = e.target.value.split(":");
-                              const newDate = field.value ? new Date(field.value) : new Date();
-                              newDate.setHours(parseInt(hours, 10));
-                              newDate.setMinutes(parseInt(minutes, 10));
-                              field.onChange(newDate);
-                              setStartDatetime(newDate);
                             }}
                             disabled={isLoading}
+                            initialFocus
+                            locale={ptBR}
                           />
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                        </PopoverContent>
+                      </Popover>
+                      
+                      {/* Seletor de Hora (apenas horas inteiras) */}
+                      <Select
+                        disabled={isLoading || !startDate}
+                        value={startHour}
+                        onValueChange={(value) => {
+                          setStartHour(value);
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Horário de início" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {hoursOptions.map((hour) => (
+                            <SelectItem key={`start-${hour}`} value={hour}>
+                              {hour}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* End Datetime */}
+              {/* Data e Hora de Término */}
               <FormField
                 control={form.control}
                 name="end_datetime"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Data e Hora de Término</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            disabled={isLoading}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP HH:mm", {
-                                locale: ptBR,
-                              })
-                            ) : (
-                              <span>Selecione a data e hora</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            if (date) {
-                              const newDate = new Date(date);
-                              if (endDatetime) {
-                                newDate.setHours(endDatetime.getHours());
-                                newDate.setMinutes(endDatetime.getMinutes());
+                    <div className="flex flex-col gap-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !endDate && "text-muted-foreground"
+                              )}
+                              disabled={isLoading}
+                            >
+                              {endDate ? (
+                                format(endDate, "PPP", {
+                                  locale: ptBR,
+                                })
+                              ) : (
+                                <span>Selecione a data</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={endDate}
+                            onSelect={(date) => {
+                              if (date) {
+                                setEndDate(date);
                               }
-                              field.onChange(newDate);
-                              setEndDatetime(newDate);
-                            }
-                          }}
-                          disabled={isLoading}
-                          initialFocus
-                          locale={ptBR}
-                        />
-                        <div className="p-3 border-t border-border">
-                          <Input
-                            type="time"
-                            value={endDatetime ? format(endDatetime, "HH:mm") : ""}
-                            onChange={(e) => {
-                              const [hours, minutes] = e.target.value.split(":");
-                              const newDate = field.value ? new Date(field.value) : new Date();
-                              newDate.setHours(parseInt(hours, 10));
-                              newDate.setMinutes(parseInt(minutes, 10));
-                              field.onChange(newDate);
-                              setEndDatetime(newDate);
                             }}
                             disabled={isLoading}
+                            initialFocus
+                            locale={ptBR}
                           />
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                        </PopoverContent>
+                      </Popover>
+                      
+                      {/* Seletor de Hora (apenas horas inteiras) */}
+                      <Select
+                        disabled={isLoading || !endDate}
+                        value={endHour}
+                        onValueChange={(value) => {
+                          setEndHour(value);
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Horário de término" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {hoursOptions.map((hour) => (
+                            <SelectItem key={`end-${hour}`} value={hour}>
+                              {hour}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -377,7 +429,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Registration Fee */}
+              {/* Valor da Inscrição */}
               <FormField
                 control={form.control}
                 name="registration_fee"
@@ -400,7 +452,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
                 )}
               />
 
-              {/* Max Capacity */}
+              {/* Capacidade Máxima */}
               <FormField
                 control={form.control}
                 name="max_capacity"
@@ -423,7 +475,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
               />
             </div>
 
-            {/* Court Selection */}
+            {/* Seleção de Quadras */}
             <FormField
               control={form.control}
               name="court_ids"
@@ -492,7 +544,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
                 )}
               />
 
-              {/* Banner URL - Can be implemented later with file upload */}
+              {/* Banner URL - Será implementado posteriormente */}
               <FormItem>
                 <FormLabel>Banner URL (Opcional)</FormLabel>
                 <FormControl>
@@ -507,7 +559,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
             </div>
 
             <div className="space-y-4">
-              {/* Block Courts */}
+              {/* Bloquear Quadras */}
               <FormField
                 control={form.control}
                 name="block_courts"
@@ -532,7 +584,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
                 )}
               />
 
-              {/* Notify Clients */}
+              {/* Notificar Clientes */}
               <FormField
                 control={form.control}
                 name="notify_clients"
@@ -558,7 +610,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
               />
             </div>
 
-            {/* Form Actions */}
+            {/* Botões de Ação */}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                 Cancelar
