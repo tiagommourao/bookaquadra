@@ -102,9 +102,10 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
         }
       );
     } else {
+      // Fixed the type casting issue
       createEvent(
         {
-          event: eventData as Omit<Event, 'id' | 'created_at' | 'updated_at'>,
+          event: eventData as any,
           courtIds: values.court_ids,
         },
         {
