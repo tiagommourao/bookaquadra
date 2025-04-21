@@ -4,19 +4,21 @@ import React from 'react';
 interface OnboardingProgressProps {
   currentStep: number;
   totalSteps: number;
+  completedSteps?: number; // Tornando opcional
 }
 
 const OnboardingProgress: React.FC<OnboardingProgressProps> = ({
   currentStep,
-  totalSteps
+  totalSteps,
+  completedSteps = 0 // Valor padrão
 }) => {
-  const progress = ((currentStep + 1) / totalSteps) * 100;
+  const progress = ((currentStep) / totalSteps) * 100;
 
   return (
     <div className="w-full">
       <div className="flex justify-between mb-2">
         <span className="text-sm font-medium">Configurando seu perfil</span>
-        <span className="text-sm font-medium">{`${currentStep + 1} de ${totalSteps}`}</span>
+        <span className="text-sm font-medium">{`${currentStep} de ${totalSteps}`}</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-2.5">
         <div
