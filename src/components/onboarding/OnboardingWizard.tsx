@@ -1,12 +1,13 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OnboardingStep } from '@/types';
-import { OnboardingProgress } from './OnboardingProgress';
-import { PersonalInfoStep } from './PersonalInfoStep';
-import { SportsSelectionStep } from './SportsSelectionStep';
-import { SkillLevelsStep } from './SkillLevelsStep';
+import OnboardingProgress from './OnboardingProgress';
+import PersonalInfoStep from './PersonalInfoStep';
+import SportsSelectionStep from './SportsSelectionStep';
+import SkillLevelsStep from './SkillLevelsStep';
 import { PreferencesStep } from './PreferencesStep';
-import { TermsStep } from './TermsStep';
+import TermsStep from './TermsStep';
 
 interface OnboardingWizardProps {
   initialStep?: OnboardingStep;
@@ -60,7 +61,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ initialStep 
   const renderStepContent = () => {
     switch (step) {
       case 'personal-info':
-        return <PersonalInfoStep onNext={nextStep} currentStep={step} />;
+        return <PersonalInfoStep onSubmit={nextStep} initialData={{}} />;
       case 'sports-selection':
         return <SportsSelectionStep onNext={nextStep} onBack={prevStep} currentStep={step} />;
       case 'skill-levels':
@@ -77,15 +78,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ initialStep 
   const stepNumber = () => {
     switch (step) {
       case 'personal-info':
-        return 1;
+        return 0;
       case 'sports-selection':
-        return 2;
+        return 1;
       case 'skill-levels':
-        return 3;
+        return 2;
       case 'preferences':
-        return 4;
+        return 3;
       case 'terms':
-        return 5;
+        return 4;
       default:
         return 0;
     }
@@ -97,9 +98,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ initialStep 
         <CardTitle>Bem-vindo! Complete seu cadastro</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <OnboardingProgress step={stepNumber()} />
+        <OnboardingProgress currentStep={stepNumber()} totalSteps={5} />
         {renderStepContent()}
       </CardContent>
     </Card>
   );
 };
+
+export default OnboardingWizard;
