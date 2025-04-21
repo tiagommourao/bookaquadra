@@ -1,3 +1,4 @@
+
 import { format, differenceInHours, isBefore, addHours, addDays, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -56,7 +57,7 @@ export const checkBookingConflict = async (
   try {
     const bookingDateStr = formatDateForDB(bookingDate);
     
-    // Modificado para não considerar reservas canceladas como conflitos
+    // Verificar reservas existentes no horário
     const { data: existingBookings, error } = await supabase
       .from('bookings')
       .select('*')
@@ -69,6 +70,60 @@ export const checkBookingConflict = async (
       return false;
     }
     
+    // Verificar se existe algum evento que bloqueia a quadra nesse horário
+    const { data: eventCourtLinks, error: linksError } = await supabase
+      .from('events_courts')
+      .select('event_id')
+      .eq('court_id', courtId);
+    
+    if (linksError) {
+      console.error('Error checking event court links:', linksError);
+      return false;
+    }
+    
+    let conflictWithEvent = false;
+    
+    if (eventCourtLinks && eventCourtLinks.length > 0) {
+      const eventIds = eventCourtLinks.map(link => link.event_id);
+      
+      const { data: events, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .in('id', eventIds)
+        .eq('status', 'active')
+        .eq('block_courts', true)
+        .lte('start_datetime', `${bookingDateStr}T23:59:59`)
+        .gte('end_datetime', `${bookingDateStr}T00:00:00`);
+      
+      if (eventsError) {
+        console.error('Error checking events conflicts:', eventsError);
+      } else if (events && events.length > 0) {
+        // Converter os horários de início e fim da reserva
+        const [startHour, startMin] = startTime.split(':').map(Number);
+        const [endHour, endMin] = endTime.split(':').map(Number);
+        
+        for (const event of events) {
+          const eventStart = new Date(event.start_datetime);
+          const eventEnd = new Date(event.end_datetime);
+          
+          // Se o evento começa no dia da reserva
+          if (format(eventStart, 'yyyy-MM-dd') === bookingDateStr) {
+            const eventStartHour = eventStart.getHours();
+            const eventEndHour = eventEnd.getHours();
+            
+            // Verificar se há sobreposição de horários
+            if ((startHour >= eventStartHour && startHour < eventEndHour) ||
+                (endHour > eventStartHour && endHour <= eventEndHour) ||
+                (startHour <= eventStartHour && endHour >= eventEndHour)) {
+              conflictWithEvent = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Verifica conflito com reservas existentes
     const conflict = existingBookings?.find(existingBooking => {
       if (currentBookingId && existingBooking.id === currentBookingId) return false;
       
@@ -101,7 +156,7 @@ export const checkBookingConflict = async (
       }
     });
     
-    return !!conflict;
+    return !!conflict || conflictWithEvent;
   } catch (error) {
     console.error('Error in checkBookingConflict:', error);
     return false;

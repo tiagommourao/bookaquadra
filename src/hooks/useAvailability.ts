@@ -83,16 +83,55 @@ export function useBookingsForCourt(courtId: string | null, selectedDate: Date |
   });
 }
 
+// Nova função para buscar eventos que bloqueiam quadras em uma data específica
+export function useEventsForCourt(courtId: string | null, selectedDate: Date | null) {
+  return useQuery({
+    queryKey: ['eventsForCourt', courtId, selectedDate],
+    queryFn: async () => {
+      if (!courtId || !selectedDate) return [];
+      
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Busca eventos que têm a quadra selecionada e que ocorrem na data selecionada
+      const { data: eventCourtLinks, error: linksError } = await supabase
+        .from('events_courts')
+        .select('event_id')
+        .eq('court_id', courtId);
+      
+      if (linksError) throw linksError;
+      if (!eventCourtLinks || eventCourtLinks.length === 0) return [];
+      
+      const eventIds = eventCourtLinks.map(link => link.event_id);
+      
+      // Busca eventos ativos que bloqueiam quadras e estão programados para a data selecionada
+      const { data: events, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .in('id', eventIds)
+        .eq('status', 'active')
+        .eq('block_courts', true)
+        .lte('start_datetime', `${dateStr}T23:59:59`)
+        .gte('end_datetime', `${dateStr}T00:00:00`);
+      
+      if (eventsError) throw eventsError;
+      return events || [];
+    },
+    enabled: !!courtId && !!selectedDate
+  });
+}
+
 export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date | null) {
   const { data: schedules, isLoading: isLoadingSchedules } = useSchedules(courtId);
   const { data: blocks, isLoading: isLoadingBlocks } = useScheduleBlocks(courtId, selectedDate);
   const { data: bookings, isLoading: isLoadingBookings } = useBookingsForCourt(courtId, selectedDate);
   const { data: holidays, isLoading: isLoadingHolidays } = useHolidays();
+  // Adiciona a consulta de eventos
+  const { data: events, isLoading: isLoadingEvents } = useEventsForCourt(courtId, selectedDate);
   
   return useQuery({
-    queryKey: ['availableTimeSlots', courtId, selectedDate, schedules, blocks, bookings, holidays],
+    queryKey: ['availableTimeSlots', courtId, selectedDate, schedules, blocks, bookings, holidays, events],
     queryFn: (): AvailableTimeSlot[] => {
-      if (!courtId || !selectedDate || !schedules || !blocks || !bookings || !holidays) {
+      if (!courtId || !selectedDate || !schedules || !blocks || !bookings || !holidays || !events) {
         return [];
       }
       
@@ -161,6 +200,34 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
           }
         }
         
+        // Verificar se está bloqueado por eventos
+        if (available) {
+          const slotStartHour = parseInt(slotStart.split(':')[0]);
+          const slotEndHour = parseInt(slotEnd.split(':')[0]);
+          
+          for (const event of events) {
+            const eventStartDate = new Date(event.start_datetime);
+            const eventEndDate = new Date(event.end_datetime);
+            
+            // Se o evento começa no mesmo dia
+            if (format(eventStartDate, 'yyyy-MM-dd') === dateStr) {
+              const eventStartHour = eventStartDate.getHours();
+              const eventEndHour = eventEndDate.getHours();
+              
+              // Verifica se o horário do slot está dentro do horário do evento
+              if (
+                (slotStartHour >= eventStartHour && slotStartHour < eventEndHour) ||
+                (slotEndHour > eventStartHour && slotEndHour <= eventEndHour) ||
+                (slotStartHour <= eventStartHour && slotEndHour >= eventEndHour)
+              ) {
+                available = false;
+                blockReason = `Quadra reservada para evento: ${event.name}`;
+                break;
+              }
+            }
+          }
+        }
+        
         slots.push({
           id: `${courtId}-${slotStart}`,
           startTime: slotStart,
@@ -175,6 +242,6 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
       
       return slots;
     },
-    enabled: !!courtId && !!selectedDate && !isLoadingSchedules && !isLoadingBlocks && !isLoadingBookings && !isLoadingHolidays
+    enabled: !!courtId && !!selectedDate && !isLoadingSchedules && !isLoadingBlocks && !isLoadingBookings && !isLoadingHolidays && !isLoadingEvents
   });
 }
