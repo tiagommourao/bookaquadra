@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, ArrowRight, Trophy, Users, Medal, Racket } from 'lucide-react';
+import { Calendar, Clock, ArrowRight, Trophy, Users, Medal, Activity } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { UserLayout } from '@/components/layouts/UserLayout';
@@ -11,14 +11,12 @@ import { Badge } from '@/components/gamification/Badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-// Mock data for available courts
 const availableCourts = [
   { id: '1', name: 'Quadra Beach Tennis 01', type: 'beach-tennis', nextAvailable: '14:00 hoje' },
   { id: '2', name: 'Quadra Padel 01', type: 'padel', nextAvailable: '15:30 hoje' },
   { id: '3', name: 'Quadra Tênis 01', type: 'tennis', nextAvailable: '16:00 hoje' },
 ];
 
-// Mock data for upcoming bookings
 const upcomingBookings = [
   { 
     id: '1', 
@@ -29,19 +27,16 @@ const upcomingBookings = [
   },
 ];
 
-// Mock data for achievements
 const recentAchievements = [
   { id: '1', name: 'Fair Play', icon: <Medal className="h-4 w-4" /> },
   { id: '2', name: '10 Jogos', icon: <Trophy className="h-4 w-4" /> }
 ];
 
-// Hook para buscar eventos e torneios ativos
 const useActiveEvents = () => {
   return useQuery({
     queryKey: ['active-events'],
     queryFn: async () => {
       const today = new Date();
-      // Buscar eventos ativos e futuros
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -59,14 +54,11 @@ const Dashboard = () => {
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
 
-  // Mock gamification data (mantém)
   const userLevel = 'silver';
   const frameType = 'silver';
 
-  // Eventos e torneios do banco (produtivo)
   const { data: events, isLoading: eventsLoading } = useActiveEvents();
 
-  // Format date for display
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('pt-BR', {
       weekday: 'short',
@@ -92,7 +84,6 @@ const Dashboard = () => {
 
   return (
     <UserLayout>
-      {/* Hero/Welcome Section with Gamification */}
       <section className="bg-primary text-primary-foreground p-6">
         <div className="max-w-lg mx-auto flex items-center gap-4">
           <AvatarFrame
@@ -112,7 +103,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Quick Actions */}
       <section className="py-6 px-4">
         <div className="max-w-lg mx-auto grid grid-cols-2 gap-4">
           <Button 
@@ -135,7 +125,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Bloco de Eventos & Torneios */}
       <section className="py-2 px-4">
         <div className="max-w-lg mx-auto">
           <Card className="border-primary/50 shadow-sm">
@@ -160,7 +149,6 @@ const Dashboard = () => {
                       key={event.id}
                       className="flex items-center rounded border border-primary/20 bg-white hover:bg-primary/5 transition p-2 gap-3"
                     >
-                      {/* Exibe imagem se houver, senão ícone padel destacado */}
                       {event.image_url ? (
                         <img
                           src={event.image_url}
@@ -169,8 +157,7 @@ const Dashboard = () => {
                         />
                       ) : (
                         <div className="h-14 w-14 flex items-center justify-center rounded bg-gradient-to-tr from-blue-400 via-blue-600 to-blue-300">
-                          {/* "Racket" é o ícone mais próximo de uma raquete de padel do Lucide */}
-                          <Racket className="h-7 w-7 text-white" />
+                          <Activity className="h-7 w-7 text-white" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
@@ -196,7 +183,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Recent Achievements - mantém */}
       {recentAchievements.length > 0 && (
         <section className="py-2 px-4">
           <div className="max-w-lg mx-auto">
@@ -232,7 +218,6 @@ const Dashboard = () => {
         </section>
       )}
 
-      {/* Available Courts - mantém */}
       <section className="py-4 px-4">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -279,7 +264,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Upcoming Bookings - mantém */}
       <section className="py-4 px-4 pb-20">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -332,7 +316,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Community Highlight - mantém */}
       <section className="py-4 px-4 pb-20">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
