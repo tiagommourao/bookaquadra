@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Calendar, Clock, ArrowRight, Trophy, Users, Medal } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,15 +8,16 @@ import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { useNavigate } from 'react-router-dom';
 import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { Badge } from '@/components/gamification/Badge';
+import { useEvents } from "@/hooks/useEvents";
+import { EventDetailsModal } from "./components/EventDetailsModal";
+import { Activity, DollarSign, Calendar as CalendarIcon } from "lucide-react";
 
-// Mock data for available courts
 const availableCourts = [
   { id: '1', name: 'Quadra Beach Tennis 01', type: 'beach-tennis', nextAvailable: '14:00 hoje' },
   { id: '2', name: 'Quadra Padel 01', type: 'padel', nextAvailable: '15:30 hoje' },
   { id: '3', name: 'Quadra Tênis 01', type: 'tennis', nextAvailable: '16:00 hoje' },
 ];
 
-// Mock data for upcoming bookings
 const upcomingBookings = [
   { 
     id: '1', 
@@ -28,7 +28,6 @@ const upcomingBookings = [
   },
 ];
 
-// Mock data for achievements
 const recentAchievements = [
   { id: '1', name: 'Fair Play', icon: <Medal className="h-4 w-4" /> },
   { id: '2', name: '10 Jogos', icon: <Trophy className="h-4 w-4" /> }
@@ -39,11 +38,11 @@ const Dashboard = () => {
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
   
-  // Mock gamification data
-  const userLevel = 'silver';
-  const frameType = 'silver';
+  const { data: events, isLoading: loadingEvents } = useEvents();
 
-  // Format date for display
+  const [selectedEvent, setSelectedEvent] = React.useState<any | null>(null);
+  const [modalOpen, setModalOpen] = React.useState(false);
+
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('pt-BR', {
       weekday: 'short',
@@ -56,13 +55,12 @@ const Dashboard = () => {
 
   return (
     <UserLayout>
-      {/* Hero/Welcome Section with Gamification */}
       <section className="bg-primary text-primary-foreground p-6">
         <div className="max-w-lg mx-auto flex items-center gap-4">
           <AvatarFrame
             src={user?.avatarUrl}
             fallback={user?.name?.charAt(0) || 'U'}
-            frameType={frameType as any}
+            frameType="silver"
             size="md"
           />
           <div>
@@ -76,7 +74,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Quick Actions */}
       <section className="py-6 px-4">
         <div className="max-w-lg mx-auto grid grid-cols-2 gap-4">
           <Button 
@@ -99,7 +96,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Recent Achievements - New Section */}
       {recentAchievements.length > 0 && (
         <section className="py-2 px-4">
           <div className="max-w-lg mx-auto">
@@ -135,7 +131,6 @@ const Dashboard = () => {
         </section>
       )}
 
-      {/* Available Courts */}
       <section className="py-4 px-4">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -182,7 +177,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Upcoming Bookings */}
       <section className="py-4 px-4 pb-20">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -235,7 +229,6 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {/* Community Highlight - New Section */}
       <section className="py-4 px-4 pb-20">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -280,6 +273,69 @@ const Dashboard = () => {
           </Card>
         </div>
       </section>
+
+      <section className="py-4 px-4">
+        <div className="max-w-lg mx-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" /> Eventos &amp; Torneios
+            </h2>
+          </div>
+          {loadingEvents ? (
+            <p className="text-gray-500 text-center">Carregando eventos...</p>
+          ) : !events || events.length === 0 ? (
+            <p className="text-gray-500 text-center">Nenhum evento disponível no momento.</p>
+          ) : (
+            <div className="space-y-3">
+              {events.map((event: any) => (
+                <div key={event.id} className="bg-white rounded-lg shadow border border-primary/10 overflow-hidden flex flex-col md:flex-row">
+                  <div className="flex-1 p-4">
+                    <div className="flex flex-col gap-1">
+                      <h3 className="font-bold text-base flex items-center gap-2">
+                        <Activity className="h-4 w-4 inline text-primary" />
+                        {event.name}
+                      </h3>
+                      <div className="text-sm mt-1 flex items-center gap-2 text-primary font-semibold">
+                        <DollarSign className="h-4 w-4" />
+                        {event.registration_fee ? `R$ ${Number(event.registration_fee).toFixed(2)}` : "Grátis"}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                        <CalendarIcon className="h-4 w-4" />
+                        {event.start_datetime
+                          ? `${new Date(event.start_datetime).toLocaleDateString("pt-BR")} ${new Date(event.start_datetime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                          : "Data não informada"}
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-3 mb-1">
+                      <button
+                        className="text-primary hover:underline text-sm"
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setModalOpen(true);
+                        }}
+                        >
+                        Detalhes
+                      </button>
+                      <a
+                        href={`/reservar?evento=${event.id}`}
+                        className="ml-2 text-sm text-primary font-semibold underline hover:text-primary/80"
+                      >
+                        Pagar
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <EventDetailsModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        event={selectedEvent}
+      />
     </UserLayout>
   );
 };
