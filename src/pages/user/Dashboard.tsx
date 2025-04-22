@@ -10,6 +10,8 @@ import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { Badge } from '@/components/gamification/Badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { EventDetailsModal } from './components/EventDetailsModal';
+import { useState } from 'react';
 
 const availableCourts = [
   { id: '1', name: 'Quadra Beach Tennis 01', type: 'beach-tennis', nextAvailable: '14:00 hoje' },
@@ -81,6 +83,9 @@ const Dashboard = () => {
       return '';
     }
   };
+
+  const [modalEvent, setModalEvent] = useState<any>(null);
+  const [showEventModal, setShowEventModal] = useState(false);
 
   return (
     <UserLayout>
@@ -166,14 +171,29 @@ const Dashboard = () => {
                           {formatEventDate(event.start_datetime, event.end_datetime)}
                         </div>
                       </div>
-                      <Button
-                        onClick={() => navigate(`/eventos/${event.id}`)}
-                        size="sm"
-                        variant="outline"
-                        className="whitespace-nowrap"
-                      >
-                        Detalhes
-                      </Button>
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          onClick={() => {
+                            setModalEvent(event);
+                            setShowEventModal(true);
+                          }}
+                          size="sm"
+                          variant="outline"
+                          className="whitespace-nowrap"
+                        >
+                          Detalhes
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="whitespace-nowrap"
+                          onClick={() => {
+                            window.location.href = `/eventos/${event.id}?action=reservar`;
+                          }}
+                        >
+                          Reservar
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -360,6 +380,16 @@ const Dashboard = () => {
           </Card>
         </div>
       </section>
+
+      <EventDetailsModal
+        open={showEventModal}
+        event={modalEvent}
+        onOpenChange={setShowEventModal}
+        onClickReserve={() => {
+          setShowEventModal(false);
+          if (modalEvent?.id) window.location.href = `/eventos/${modalEvent.id}?action=reservar`;
+        }}
+      />
     </UserLayout>
   );
 };
