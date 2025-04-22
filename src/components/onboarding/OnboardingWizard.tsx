@@ -13,19 +13,6 @@ type Step = 'personal-info' | 'sports-selection' | 'skill-levels' | 'preferences
 const OnboardingWizard = () => {
   const [currentStep, setCurrentStep] = useState<Step>('personal-info');
   const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set());
-  const [selectedSports, setSelectedSports] = useState<string[]>([]);
-  const [skillLevels, setSkillLevels] = useState<Record<string, string>>({});
-  const [skillNotes, setSkillNotes] = useState<Record<string, string>>({});
-  const [personalInfo, setPersonalInfo] = useState({
-    firstName: '',
-    lastName: '',
-    avatarUrl: '',
-    city: '',
-    neighborhood: '',
-    zipcode: ''
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleNext = () => {
     setCompletedSteps(prev => {
@@ -70,6 +57,7 @@ const OnboardingWizard = () => {
     }
   };
 
+  // Determinar o número do passo atual
   const getStepNumber = (): number => {
     switch (currentStep) {
       case 'personal-info': return 1;
@@ -78,34 +66,6 @@ const OnboardingWizard = () => {
       case 'preferences': return 4;
       case 'terms': return 5;
     }
-  };
-
-  // Handlers para cada componente
-  const handlePersonalInfoSubmit = (data: typeof personalInfo) => {
-    setPersonalInfo(data);
-    handleNext();
-  };
-
-  const handleSportsSubmit = (sports: string[]) => {
-    setSelectedSports(sports);
-    handleNext();
-  };
-
-  const handleSkillLevelsSubmit = (levels: Record<string, string>, notes: Record<string, string>) => {
-    setSkillLevels(levels);
-    setSkillNotes(notes);
-    handleNext();
-  };
-
-  const handleTermsSubmit = (accepted: boolean) => {
-    setTermsAccepted(accepted);
-    setIsSubmitting(true);
-    // Aqui você pode adicionar o código para finalizar o onboarding
-    // Por exemplo: salvar todos os dados no banco de dados
-    setTimeout(() => {
-      setIsSubmitting(false);
-      // Redirecionar ou fazer outra ação após a conclusão
-    }, 1000);
   };
 
   return (
@@ -118,37 +78,19 @@ const OnboardingWizard = () => {
       <Card className="mt-6">
         <CardContent className="p-6">
           {currentStep === 'personal-info' && (
-            <PersonalInfoStep 
-              initialData={personalInfo}
-              onSubmit={handlePersonalInfoSubmit}
-            />
+            <PersonalInfoStep onNext={handleNext} />
           )}
           {currentStep === 'sports-selection' && (
-            <SportsSelectionStep 
-              selectedSports={selectedSports}
-              onSubmit={handleSportsSubmit}
-              onBack={handleBack} 
-            />
+            <SportsSelectionStep onNext={handleNext} onBack={handleBack} />
           )}
           {currentStep === 'skill-levels' && (
-            <SkillLevelsStep 
-              selectedSports={selectedSports}
-              skillLevels={skillLevels}
-              skillNotes={skillNotes}
-              onSubmit={handleSkillLevelsSubmit}
-              onBack={handleBack} 
-            />
+            <SkillLevelsStep onNext={handleNext} onBack={handleBack} />
           )}
           {currentStep === 'preferences' && (
             <PreferencesStep onNext={handleNext} onBack={handleBack} currentStep={currentStep} />
           )}
           {currentStep === 'terms' && (
-            <TermsStep 
-              termsAccepted={termsAccepted}
-              onSubmit={handleTermsSubmit}
-              onBack={handleBack}
-              isSubmitting={isSubmitting}
-            />
+            <TermsStep onNext={handleNext} onBack={handleBack} />
           )}
         </CardContent>
       </Card>

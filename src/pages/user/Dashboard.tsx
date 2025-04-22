@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Calendar, Clock, ArrowRight, Trophy, Users, Medal, Activity } from 'lucide-react';
+import { Calendar, Clock, ArrowRight, Trophy, Users, Medal } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { UserLayout } from '@/components/layouts/UserLayout';
@@ -8,17 +9,15 @@ import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { useNavigate } from 'react-router-dom';
 import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { Badge } from '@/components/gamification/Badge';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { EventDetailsModal } from './components/EventDetailsModal';
-import { useState } from 'react';
 
+// Mock data for available courts
 const availableCourts = [
   { id: '1', name: 'Quadra Beach Tennis 01', type: 'beach-tennis', nextAvailable: '14:00 hoje' },
   { id: '2', name: 'Quadra Padel 01', type: 'padel', nextAvailable: '15:30 hoje' },
   { id: '3', name: 'Quadra Tênis 01', type: 'tennis', nextAvailable: '16:00 hoje' },
 ];
 
+// Mock data for upcoming bookings
 const upcomingBookings = [
   { 
     id: '1', 
@@ -29,38 +28,22 @@ const upcomingBookings = [
   },
 ];
 
+// Mock data for achievements
 const recentAchievements = [
   { id: '1', name: 'Fair Play', icon: <Medal className="h-4 w-4" /> },
   { id: '2', name: '10 Jogos', icon: <Trophy className="h-4 w-4" /> }
 ];
 
-const useActiveEvents = () => {
-  return useQuery({
-    queryKey: ['active-events'],
-    queryFn: async () => {
-      const today = new Date();
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('status', 'active')
-        .gte('end_datetime', today.toISOString())
-        .order('start_datetime', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    }
-  });
-};
-
 const Dashboard = () => {
   const { user } = useAuth();
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
-
+  
+  // Mock gamification data
   const userLevel = 'silver';
   const frameType = 'silver';
 
-  const { data: events, isLoading: eventsLoading } = useActiveEvents();
-
+  // Format date for display
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('pt-BR', {
       weekday: 'short',
@@ -71,24 +54,9 @@ const Dashboard = () => {
     }).format(date);
   };
 
-  const formatEventDate = (start: string, end: string) => {
-    try {
-      const startAt = new Date(start);
-      const endAt = new Date(end);
-      const options: Intl.DateTimeFormatOptions = {
-        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-      };
-      return `De ${startAt.toLocaleDateString('pt-BR', options)} às ${startAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} até ${endAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-    } catch {
-      return '';
-    }
-  };
-
-  const [modalEvent, setModalEvent] = useState<any>(null);
-  const [showEventModal, setShowEventModal] = useState(false);
-
   return (
     <UserLayout>
+      {/* Hero/Welcome Section with Gamification */}
       <section className="bg-primary text-primary-foreground p-6">
         <div className="max-w-lg mx-auto flex items-center gap-4">
           <AvatarFrame
@@ -108,6 +76,7 @@ const Dashboard = () => {
         </div>
       </section>
 
+      {/* Quick Actions */}
       <section className="py-6 px-4">
         <div className="max-w-lg mx-auto grid grid-cols-2 gap-4">
           <Button 
@@ -130,79 +99,7 @@ const Dashboard = () => {
         </div>
       </section>
 
-      <section className="py-2 px-4">
-        <div className="max-w-lg mx-auto">
-          <Card className="border-primary/50 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Trophy className="h-5 w-5 text-primary" />
-                Eventos & Torneios
-              </CardTitle>
-              <CardDescription>
-                Confira os próximos eventos e torneios abertos no clube!
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {eventsLoading ? (
-                <div className="text-center text-sm text-muted-foreground py-6">Carregando eventos...</div>
-              ) : events && events.length === 0 ? (
-                <div className="text-center text-gray-400 py-6">Nenhum evento ou torneio cadastrado.</div>
-              ) : (
-                <div className="grid gap-3">
-                  {events?.slice(0, 3).map((event: any) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center rounded border border-primary/20 bg-white hover:bg-primary/5 transition p-2 gap-3"
-                    >
-                      {event.image_url ? (
-                        <img
-                          src={event.image_url}
-                          alt={event.name}
-                          className="h-14 w-14 rounded object-cover border border-gray-100"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 flex items-center justify-center rounded bg-gradient-to-tr from-blue-400 via-blue-600 to-blue-300">
-                          <Activity className="h-7 w-7 text-white" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold truncate">{event.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {formatEventDate(event.start_datetime, event.end_datetime)}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Button
-                          onClick={() => {
-                            setModalEvent(event);
-                            setShowEventModal(true);
-                          }}
-                          size="sm"
-                          variant="outline"
-                          className="whitespace-nowrap"
-                        >
-                          Detalhes
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="whitespace-nowrap"
-                          onClick={() => {
-                            window.location.href = `/eventos/${event.id}?action=reservar`;
-                          }}
-                        >
-                          Reservar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
+      {/* Recent Achievements - New Section */}
       {recentAchievements.length > 0 && (
         <section className="py-2 px-4">
           <div className="max-w-lg mx-auto">
@@ -238,6 +135,7 @@ const Dashboard = () => {
         </section>
       )}
 
+      {/* Available Courts */}
       <section className="py-4 px-4">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -284,6 +182,7 @@ const Dashboard = () => {
         </div>
       </section>
 
+      {/* Upcoming Bookings */}
       <section className="py-4 px-4 pb-20">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -336,6 +235,7 @@ const Dashboard = () => {
         </div>
       </section>
 
+      {/* Community Highlight - New Section */}
       <section className="py-4 px-4 pb-20">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -380,16 +280,6 @@ const Dashboard = () => {
           </Card>
         </div>
       </section>
-
-      <EventDetailsModal
-        open={showEventModal}
-        event={modalEvent}
-        onOpenChange={setShowEventModal}
-        onClickReserve={() => {
-          setShowEventModal(false);
-          if (modalEvent?.id) window.location.href = `/eventos/${modalEvent.id}?action=reservar`;
-        }}
-      />
     </UserLayout>
   );
 };
