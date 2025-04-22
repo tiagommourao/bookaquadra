@@ -1,7 +1,8 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailableTimeSlot, Schedule, ScheduleBlock, Holiday } from '@/types/court';
-import { format, addMinutes, isWeekend, parse, isAfter, isBefore, parseISO } from 'date-fns';
+import { format, addMinutes, isWeekend, parse, isAfter, isBefore, parseISO, isSameDay } from 'date-fns';
 
 export function useSchedules(courtId: string | null) {
   return useQuery({
@@ -90,6 +91,7 @@ export function useEventsForCourt(courtId: string | null, selectedDate: Date | n
       
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
+      // Melhorado para buscar eventos que têm essa quadra associada
       const { data: eventCourtLinks, error: linksError } = await supabase
         .from('events_courts')
         .select('event_id')
@@ -110,6 +112,7 @@ export function useEventsForCourt(courtId: string | null, selectedDate: Date | n
         .gte('end_datetime', `${dateStr}T00:00:00`);
       
       if (eventsError) throw eventsError;
+      console.log('Eventos encontrados para bloqueio:', events);
       return events || [];
     },
     enabled: !!courtId && !!selectedDate
@@ -129,6 +132,8 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
       if (!courtId || !selectedDate || !schedules || !blocks || !bookings || !holidays || !events) {
         return [];
       }
+      
+      console.log('Calculando slots disponíveis com eventos:', events);
       
       const dayOfWeek = selectedDate.getDay();
       const daySchedule = schedules.find(s => s.day_of_week === dayOfWeek);
@@ -158,6 +163,7 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
         let available = true;
         let blockReason = null;
         
+        // Verificar bloqueios de horário configurados
         for (const block of blocks) {
           const blockStart = new Date(block.start_datetime);
           const blockEnd = new Date(block.end_datetime);
@@ -168,14 +174,18 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
           if (
             (isAfter(slotStartDate, blockStart) && isBefore(slotStartDate, blockEnd)) ||
             (isAfter(slotEndDate, blockStart) && isBefore(slotEndDate, blockEnd)) ||
-            (isBefore(slotStartDate, blockStart) && isAfter(slotEndDate, blockEnd))
+            (isBefore(slotStartDate, blockStart) && isAfter(slotEndDate, blockEnd)) ||
+            isSameTimeExact(slotStartDate, blockStart) ||
+            isSameTimeExact(slotEndDate, blockEnd)
           ) {
             available = false;
             blockReason = block.reason;
+            console.log(`Horário ${slotStart}-${slotEnd} bloqueado: ${blockReason}`);
             break;
           }
         }
         
+        // Verificar reservas existentes
         if (available) {
           for (const booking of bookings) {
             if (booking.start_time <= slotStart && booking.end_time > slotStart) {
@@ -186,22 +196,34 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
           }
         }
         
-        for (const event of events) {
-          const eventStartDate = new Date(event.start_datetime);
-          const eventEndDate = new Date(event.end_datetime);
-          
-          const slotStartDate = parse(`${dateStr} ${slotStart}`, 'yyyy-MM-dd HH:mm', new Date());
-          const slotEndDate = parse(`${dateStr} ${slotEnd}`, 'yyyy-MM-dd HH:mm', new Date());
-          
-          if (
-            (isAfter(slotStartDate, eventStartDate) && isBefore(slotStartDate, eventEndDate)) ||
-            (isAfter(slotEndDate, eventStartDate) && isBefore(slotEndDate, eventEndDate)) ||
-            (isBefore(slotStartDate, eventStartDate) && isAfter(slotEndDate, eventEndDate)) ||
-            (isSameTime(slotStartDate, eventStartDate) || isSameTime(slotEndDate, eventEndDate))
-          ) {
-            available = false;
-            blockReason = `Quadra reservada para evento: ${event.name}`;
-            break;
+        // Verificar eventos - Melhorado para considerar bloqueios de eventos corretamente
+        if (available && events.length > 0) {
+          for (const event of events) {
+            const eventStartDateTime = new Date(event.start_datetime);
+            const eventEndDateTime = new Date(event.end_datetime);
+            
+            // Convertendo o slot para datetime completo para comparação precisa
+            const slotStartDate = parse(`${dateStr} ${slotStart}`, 'yyyy-MM-dd HH:mm', new Date());
+            const slotEndDate = parse(`${dateStr} ${slotEnd}`, 'yyyy-MM-dd HH:mm', new Date());
+            
+            // Verificar se o slot está dentro do período do evento
+            if (
+              // O início do slot está dentro do evento
+              (isAfter(slotStartDate, eventStartDateTime) && isBefore(slotStartDate, eventEndDateTime)) ||
+              // O fim do slot está dentro do evento
+              (isAfter(slotEndDate, eventStartDateTime) && isBefore(slotEndDate, eventEndDateTime)) ||
+              // O slot cobre todo o evento
+              (isBefore(slotStartDate, eventStartDateTime) && isAfter(slotEndDate, eventEndDateTime)) ||
+              // O slot começa exatamente no início do evento
+              isSameTimeExact(slotStartDate, eventStartDateTime) ||
+              // O slot termina exatamente no fim do evento
+              isSameTimeExact(slotEndDate, eventEndDateTime)
+            ) {
+              available = false;
+              blockReason = `Quadra reservada para evento: ${event.name}`;
+              console.log(`Horário ${slotStart}-${slotEnd} bloqueado por evento: ${event.name}`);
+              break;
+            }
           }
         }
         
@@ -217,15 +239,18 @@ export function useAvailableTimeSlots(courtId: string | null, selectedDate: Date
         current = addMinutes(current, slotDuration);
       }
       
+      console.log(`Slots disponíveis gerados: ${slots.length}, disponíveis: ${slots.filter(s => s.available).length}`);
       return slots;
     },
     enabled: !!courtId && !!selectedDate && !isLoadingSchedules && !isLoadingBlocks && !isLoadingBookings && !isLoadingHolidays && !isLoadingEvents
   });
 }
 
-function isSameTime(date1: Date, date2: Date): boolean {
+// Função auxiliar para comparar precisamente datas e horas
+function isSameTimeExact(date1: Date, date2: Date): boolean {
   return date1.getHours() === date2.getHours() && 
          date1.getMinutes() === date2.getMinutes() &&
+         date1.getSeconds() === date2.getSeconds() &&
          date1.getDate() === date2.getDate() &&
          date1.getMonth() === date2.getMonth() &&
          date1.getFullYear() === date2.getFullYear();

@@ -87,7 +87,7 @@ const OnboardingWizard = () => {
             <SkillLevelsStep onNext={handleNext} onBack={handleBack} />
           )}
           {currentStep === 'preferences' && (
-            <PreferencesStep onNext={handleNext} onBack={handleBack} />
+            <PreferencesStep onNext={handleNext} onBack={handleBack} currentStep={currentStep} />
           )}
           {currentStep === 'terms' && (
             <TermsStep onNext={handleNext} onBack={handleBack} />
