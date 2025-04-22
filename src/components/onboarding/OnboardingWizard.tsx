@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import PersonalInfoStep from './PersonalInfoStep';
-import SportsSelectionStep from './SportsSelectionStep';
-import SkillLevelsStep from './SkillLevelsStep';
-import { PreferencesStep } from './PreferencesStep';
-import TermsStep from './TermsStep';
+// Ajuste para importar os tipos corretos das props dos steps
+import PersonalInfoStep, { PersonalInfoStepProps } from './PersonalInfoStep';
+import SportsSelectionStep, { SportsSelectionStepProps } from './SportsSelectionStep';
+import SkillLevelsStep, { SkillLevelsStepProps } from './SkillLevelsStep';
+import { PreferencesStep, PreferencesStepProps } from './PreferencesStep';
+import TermsStep, { TermsStepProps } from './TermsStep';
 import OnboardingProgress from './OnboardingProgress';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -78,19 +79,19 @@ const OnboardingWizard = () => {
       <Card className="mt-6">
         <CardContent className="p-6">
           {currentStep === 'personal-info' && (
-            <PersonalInfoStep onNext={handleNext} />
+            <PersonalInfoStep onNext={handleNext as PersonalInfoStepProps['onNext']} />
           )}
           {currentStep === 'sports-selection' && (
-            <SportsSelectionStep onNext={handleNext} onBack={handleBack} />
+            <SportsSelectionStep onNext={handleNext as SportsSelectionStepProps['onNext']} onBack={handleBack as SportsSelectionStepProps['onBack']} />
           )}
           {currentStep === 'skill-levels' && (
-            <SkillLevelsStep onNext={handleNext} onBack={handleBack} />
+            <SkillLevelsStep onNext={handleNext as SkillLevelsStepProps['onNext']} onBack={handleBack as SkillLevelsStepProps['onBack']} />
           )}
           {currentStep === 'preferences' && (
-            <PreferencesStep onNext={handleNext} onBack={handleBack} currentStep={currentStep} />
+            <PreferencesStep onNext={handleNext as PreferencesStepProps['onNext']} onBack={handleBack as PreferencesStepProps['onBack']} currentStep={currentStep} />
           )}
           {currentStep === 'terms' && (
-            <TermsStep onNext={handleNext} onBack={handleBack} />
+            <TermsStep onNext={handleNext as TermsStepProps['onNext']} onBack={handleBack as TermsStepProps['onBack']} />
           )}
         </CardContent>
       </Card>
