@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Calendar, Clock, ArrowRight, Trophy, Users, Medal } from 'lucide-react';
+import { Calendar, Clock, ArrowRight, Trophy, Users, Medal, Activity, DollarSign, Calendar as CalendarIcon, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { UserLayout } from '@/components/layouts/UserLayout';
@@ -10,7 +11,6 @@ import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { Badge } from '@/components/gamification/Badge';
 import { useEvents } from "@/hooks/useEvents";
 import { EventDetailsModal } from "./components/EventDetailsModal";
-import { Activity, DollarSign, Calendar as CalendarIcon } from "lucide-react";
 
 const availableCourts = [
   { id: '1', name: 'Quadra Beach Tennis 01', type: 'beach-tennis', nextAvailable: '14:00 hoje' },
@@ -53,6 +53,7 @@ const Dashboard = () => {
     }).format(date);
   };
 
+  // ------ Renderiza o dashboard com Eventos & Torneios logo após conquistas recentes ------
   return (
     <UserLayout>
       <section className="bg-primary text-primary-foreground p-6">
@@ -73,7 +74,6 @@ const Dashboard = () => {
           </div>
         </div>
       </section>
-
       <section className="py-6 px-4">
         <div className="max-w-lg mx-auto grid grid-cols-2 gap-4">
           <Button 
@@ -95,7 +95,6 @@ const Dashboard = () => {
           </Button>
         </div>
       </section>
-
       {recentAchievements.length > 0 && (
         <section className="py-2 px-4">
           <div className="max-w-lg mx-auto">
@@ -131,6 +130,72 @@ const Dashboard = () => {
         </section>
       )}
 
+      {/* == NOVA ORDEM: Eventos & Torneios antes de Quadras Disponíveis == */}
+      <section className="py-4 px-4">
+        <div className="max-w-lg mx-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" /> Eventos &amp; Torneios
+            </h2>
+          </div>
+          {loadingEvents ? (
+            <p className="text-gray-500 text-center">Carregando eventos...</p>
+          ) : !events || events.length === 0 ? (
+            <p className="text-gray-500 text-center">Nenhum evento disponível no momento.</p>
+          ) : (
+            <div className="space-y-3">
+              {events.map((event: any) => (
+                <div key={event.id} className="bg-white rounded-lg shadow border border-primary/10 overflow-hidden flex flex-col md:flex-row">
+                  <div className="flex-1 p-4">
+                    <div className="flex flex-col gap-1">
+                      <h3 className="font-bold text-base flex items-center gap-2">
+                        <Activity className="h-4 w-4 inline text-primary" />
+                        {event.name}
+                      </h3>
+                      <div className="text-sm mt-1 flex items-center gap-2 text-primary font-semibold">
+                        <DollarSign className="h-4 w-4" />
+                        {event.registration_fee ? `R$ ${Number(event.registration_fee).toFixed(2)}` : "Grátis"}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                        <CalendarIcon className="h-4 w-4" />
+                        {event.start_datetime
+                          ? `${new Date(event.start_datetime).toLocaleDateString("pt-BR")} ${new Date(event.start_datetime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                          : "Data não informada"}
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-3 mb-1">
+                      <Button
+                        variant="link"
+                        className="text-primary text-sm px-0"
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setModalOpen(true);
+                        }}
+                        >
+                        Detalhes
+                      </Button>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="ml-2 text-sm"
+                      >
+                        <a
+                          href={`/reservar?evento=${event.id}`}
+                        >
+                          Pagar
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Quadras Disponíveis agora vem após Eventos & Torneios */}
       <section className="py-4 px-4">
         <div className="max-w-lg mx-auto">
           <div className="flex justify-between items-center mb-4">
@@ -143,7 +208,6 @@ const Dashboard = () => {
               Ver todas <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
-          
           <div className="space-y-3">
             {availableCourts.map(court => (
               <Card key={court.id} className="overflow-hidden">
