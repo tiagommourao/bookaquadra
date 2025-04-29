@@ -1,73 +1,133 @@
-# Welcome to your Lovable project
+# BookaQuadra 🎾
 
-## Project info
+## Sobre o Projeto
 
-**URL**: https://lovable.dev/projects/a7fc8c4e-d98d-46cb-87fd-2466b7c8192a
+BookaQuadra é uma aplicação web moderna desenvolvida para facilitar o agendamento e gerenciamento de quadras esportivas. Construída com tecnologias de ponta, a aplicação oferece uma interface intuitiva e responsiva para usuários e administradores.
 
-## How can I edit this code?
+## 🚀 Tecnologias Utilizadas
 
-There are several ways of editing your application.
+- **Frontend:**
+  - React 18.3
+  - TypeScript
+  - Vite
+  - Tailwind CSS
+  - shadcn/ui (componentes)
+  - React Router DOM
+  - React Query
+  - React Hook Form
+  - Zod (validação)
 
-**Use Lovable**
+- **Backend:**
+  - Supabase
+  - Stripe (pagamentos)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a7fc8c4e-d98d-46cb-87fd-2466b7c8192a) and start prompting.
+- **Estilização:**
+  - Tailwind CSS
+  - Radix UI
+  - Lucide Icons
+  - Tailwind Merge
+  - Class Variance Authority
 
-Changes made via Lovable will be committed automatically to this repo.
+## 📁 Estrutura do Projeto
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+src/
+├── components/     # Componentes reutilizáveis
+├── contexts/      # Contextos React
+├── hooks/         # Hooks customizados
+├── integrations/  # Integrações com serviços externos
+├── lib/          # Utilitários e configurações
+├── pages/        # Páginas da aplicação
+└── types/        # Definições de tipos TypeScript
 ```
 
-**Edit a file directly in GitHub**
+## 🛠️ Configuração do Ambiente de Desenvolvimento
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Pré-requisitos
 
-**Use GitHub Codespaces**
+- Node.js (versão LTS recomendada)
+- npm ou bun
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Instalação
 
-## What technologies are used for this project?
+1. Clone o repositório:
+```bash
+git clone <URL_DO_REPOSITÓRIO>
+cd bookaquadra
+```
 
-This project is built with:
+2. Instale as dependências:
+```bash
+npm install
+# ou
+bun install
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+3. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+```
 
-## How can I deploy this project?
+4. Inicie o servidor de desenvolvimento:
+```bash
+npm run dev
+# ou
+bun dev
+```
 
-Simply open [Lovable](https://lovable.dev/projects/a7fc8c4e-d98d-46cb-87fd-2466b7c8192a) and click on Share -> Publish.
+## 🔧 Scripts Disponíveis
 
-## Can I connect a custom domain to my Lovable project?
+- `npm run dev` - Inicia o servidor de desenvolvimento
+- `npm run build` - Cria a build de produção
+- `npm run build:dev` - Cria a build de desenvolvimento
+- `npm run lint` - Executa o linter
+- `npm run preview` - Visualiza a build de produção localmente
 
-Yes, you can!
+## 📦 Funcionalidades Principais
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- 🔐 Autenticação de usuários
+- 📅 Sistema de agendamento de quadras
+- 💳 Integração com pagamentos (Stripe)
+- 📱 Interface responsiva
+- 🌓 Modo escuro/claro
+- 📊 Dashboard administrativo
+- 🔔 Sistema de notificações
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 🔒 Integração com Supabase
+
+O projeto utiliza Supabase para:
+- Autenticação de usuários
+- Banco de dados
+- Armazenamento de arquivos
+- Funções serverless
+- Real-time subscriptions
+
+## 💅 Componentes UI
+
+Utilizamos shadcn/ui para componentes base, que incluem:
+- Formulários
+- Modais
+- Menus
+- Tabelas
+- Toasts
+- e muito mais...
+
+## 🤝 Contribuindo
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📝 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+## 📫 Contato
+
+Para mais informações sobre o projeto, entre em contato através das issues do GitHub ou via email.
+
+---
+
+Desenvolvido com ❤️ pela equipe BookaQuadra
