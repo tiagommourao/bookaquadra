@@ -1,4 +1,3 @@
-
 // Definição dos tipos relacionados a pagamentos
 
 export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'expired' | 'refunded' | 'cancelled' | 'failed';
@@ -82,4 +81,17 @@ export interface MercadoPagoPaymentResponse {
 export interface TestConnectionResult {
   success: boolean;
   message: string;
+}
+
+// Interface para configuração do método de pagamento
+export interface PaymentMethodConfig {
+  default: 'mercadopago' | 'stripe';
+  mercadopago: {
+    enabled: boolean;
+    environment: 'sandbox' | 'production';
+  };
+  stripe: {
+    enabled: boolean;
+    environment: 'test' | 'production';
+  };
 }

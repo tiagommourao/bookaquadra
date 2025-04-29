@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -43,10 +42,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       path: '/admin/integracoes', 
       icon: <ClipboardList className="h-5 w-5" />,
       subItems: [
-        { name: 'Mercado Pago', path: '/admin/integracoes/mercadopago' }
+        { name: 'Mercado Pago', path: '/admin/integracoes/mercadopago' },
+        { name: 'Stripe', path: '/admin/integracoes/stripe' }
       ]
     },
-    { name: 'Personalização', path: '/admin/personalizacao', icon: <Settings className="h-5 w-5" /> },
+    { 
+      name: 'Personalização', 
+      path: '/admin/personalizacao', 
+      icon: <Settings className="h-5 w-5" />,
+      subItems: [
+        { name: 'Configurações Gerais', path: '/admin/personalizacao' },
+        { name: 'Métodos de Pagamento', path: '/admin/configuracoes/pagamentos' }
+      ]
+    },
     { name: 'Relatórios', path: '/admin/relatorios', icon: <PieChart className="h-5 w-5" /> },
   ];
 

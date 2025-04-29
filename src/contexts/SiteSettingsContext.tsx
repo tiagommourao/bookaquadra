@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { SiteSettings } from '@/types';
 
@@ -20,7 +19,18 @@ const defaultSettings: SiteSettings = {
   contactPhone: '+55 11 99999-9999',
   cancellationPolicy: 'Cancelamentos devem ser feitos com pelo menos 24 horas de antecedência para reembolso integral.',
   mercadoPagoKey: '',
-  googleCalendarIntegration: false
+  googleCalendarIntegration: false,
+  paymentMethod: {
+    default: 'mercadopago',
+    mercadopago: {
+      enabled: true,
+      environment: 'sandbox'
+    },
+    stripe: {
+      enabled: false,
+      environment: 'test'
+    }
+  }
 };
 
 export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

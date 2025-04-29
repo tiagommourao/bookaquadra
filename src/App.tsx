@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,6 +27,8 @@ import UsersList from "./pages/admin/users/UsersList";
 import MercadoPagoIntegration from "./pages/admin/integrations/MercadoPagoIntegration";
 import PaymentsList from "./pages/admin/payments/PaymentsList";
 import EventsList from "./pages/admin/events/EventsList";
+import StripeIntegration from "./pages/admin/integrations/StripeIntegration";
+import PaymentMethodSettings from "./pages/admin/settings/PaymentMethodSettings";
 
 import NotFound from "./pages/NotFound";
 
@@ -174,6 +175,20 @@ const App = () => (
               <Route path="/admin/integracoes/mercadopago" element={
                 <AdminProtectedRoute>
                   <MercadoPagoIntegration />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Stripe Integration */}
+              <Route path="/admin/integracoes/stripe" element={
+                <AdminProtectedRoute>
+                  <StripeIntegration />
+                </AdminProtectedRoute>
+              } />
+              
+              {/* Admin Payment Method Settings */}
+              <Route path="/admin/configuracoes/pagamentos" element={
+                <AdminProtectedRoute>
+                  <PaymentMethodSettings />
                 </AdminProtectedRoute>
               } />
               
