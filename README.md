@@ -128,6 +128,57 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 Para mais informações sobre o projeto, entre em contato através das issues do GitHub ou via email.
 
+## 🐳 Rodando com Docker
+
+### Pré-requisitos
+- Docker
+- Docker Compose
+
+### Ambiente de Desenvolvimento
+
+1. Clone o repositório:
+```bash
+git clone <URL_DO_REPOSITÓRIO>
+cd bookaquadra
+```
+
+2. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+# Edite o arquivo .env com suas credenciais
+```
+
+3. Inicie o container de desenvolvimento:
+```bash
+docker compose up app-dev
+```
+A aplicação estará disponível em `http://localhost:5173`
+
+### Ambiente de Produção
+
+1. Build e inicialização:
+```bash
+docker compose up app-prod
+```
+A aplicação estará disponível em `http://localhost:80`
+
+### Comandos Úteis
+
+- Parar os containers:
+```bash
+docker compose down
+```
+
+- Reconstruir os containers:
+```bash
+docker compose build
+```
+
+- Ver logs:
+```bash
+docker compose logs -f [app-dev|app-prod]
+```
+
 ---
 
 Desenvolvido com ❤️ pela equipe BookaQuadra

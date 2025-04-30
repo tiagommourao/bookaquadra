@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Serviço de desenvolvimento
+  app-dev:
+    build:
+      context: .
+      target: development
+    container_name: bookaquadra-dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_STRIPE_PUBLIC_KEY=${VITE_STRIPE_PUBLIC_KEY}
+    command: npm run dev -- --host
+
+  # Serviço de produção
+  app-prod:
+    build:
+      context: .
+      target: production
+    container_name: bookaquadra-prod
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped 
