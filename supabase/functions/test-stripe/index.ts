@@ -1,92 +1,126 @@
 
-// Supabase Edge Function para testar a integração com o Stripe
-// supabase/functions/test-stripe/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.5.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Stripe from 'https://esm.sh/stripe@12.4.0?target=deno';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+interface StripeConfig {
+  id: string;
+  environment: 'test' | 'production';
+  publishable_key: string;
+  secret_key: string;
+}
 
 serve(async (req) => {
-  // Lidar com solicitação de OPTIONS para CORS
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   try {
-    // Extrair token de autorização
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("Autorização ausente");
-    }
-
-    // Inicializar cliente Supabase
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    // Verificar token e obter usuário
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-
-    if (userError || !user) {
-      throw new Error("Usuário não autenticado");
-    }
-
-    // Obter os dados da requisição
-    const { integration_id } = await req.json();
-    if (!integration_id) {
-      throw new Error("ID da integração não fornecido");
-    }
-
-    // Obter configuração da integração do Stripe
-    const { data: stripeConfig, error: configError } = await supabase
-      .from("integrations_stripe")
-      .select("*")
-      .eq("id", integration_id)
-      .single();
-
-    if (configError || !stripeConfig) {
-      throw new Error("Configuração do Stripe não encontrada");
-    }
-
-    // Inicializar Stripe com a chave API
-    const stripe = new Stripe(stripeConfig.secret_key, {
-      apiVersion: "2023-10-16",
-    });
-
-    // Testar a conexão obtendo informações da conta
-    const account = await stripe.balance.retrieve();
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Conexão com o Stripe estabelecida com sucesso!",
-        data: {
-          available: account.available,
-          pending: account.pending,
-        }
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
+    // Criar cliente Supabase usando as credenciais de serviço
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-  } catch (error) {
-    console.error("Erro no teste de conexão do Stripe:", error);
-
-    return new Response(
-      JSON.stringify({
-        success: false,
-        message: `Erro ao testar conexão com o Stripe: ${error.message}`,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+    
+    // Obter informações do usuário a partir do token JWT
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, message: 'Não autorizado. Token ausente.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, message: 'Usuário não encontrado ou token inválido.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Verificar se o usuário é administrador
+    const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin');
+    
+    if (adminError || !isAdmin) {
+      return new Response(
+        JSON.stringify({ success: false, message: 'Acesso negado. Permissões insuficientes.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Parse body request
+    const { id } = await req.json();
+    
+    if (!id) {
+      return new Response(
+        JSON.stringify({ success: false, message: 'ID da configuração não fornecido.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Get Stripe integration
+    const { data: stripeConfig, error: stripeError } = await supabaseClient
+      .from('integrations_stripe')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (stripeError || !stripeConfig) {
+      return new Response(
+        JSON.stringify({ success: false, message: 'Configuração do Stripe não encontrada.' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Test Stripe connection
+    let testResult = {
+      success: false,
+      message: 'Configuração incompleta.'
+    };
+    
+    if (stripeConfig.secret_key) {
+      try {
+        // Inicializa o cliente Stripe com a chave secreta
+        const stripe = new Stripe(stripeConfig.secret_key, {
+          apiVersion: '2023-10-16',
+        });
+        
+        // Tenta obter o account balance para testar a conexão
+        await stripe.balance.retrieve();
+        
+        testResult = {
+          success: true,
+          message: 'Conexão com o Stripe estabelecida com sucesso!'
+        };
+      } catch (error) {
+        console.error('Erro ao conectar com o Stripe:', error);
+        testResult = {
+          success: false,
+          message: `Erro ao conectar com o Stripe: ${error.message}`
+        };
       }
+    }
+    
+    // Atualiza o status do teste na base de dados
+    await supabaseClient
+      .from('integrations_stripe')
+      .update({
+        last_tested_at: new Date().toISOString(),
+        last_test_success: testResult.success,
+        test_result_message: testResult.message,
+        updated_by: user.id
+      })
+      .eq('id', id);
+      
+    return new Response(
+      JSON.stringify(testResult),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+    
+  } catch (error) {
+    console.error('Erro na função test-stripe:', error);
+    return new Response(
+      JSON.stringify({ success: false, message: `Erro interno: ${error.message}` }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 });

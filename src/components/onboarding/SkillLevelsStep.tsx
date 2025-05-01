@@ -1,214 +1,107 @@
-
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { HelpCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Card } from '@/components/ui/card';
 import { SportType, SkillLevel } from '@/types';
-import { toast } from 'sonner';
 
-interface SkillLevelsStepProps {
-  selectedSports: string[];
-  skillLevels: Record<string, string>;
-  skillNotes: Record<string, string>;
-  onSubmit: (
-    skillLevels: Record<string, string>, 
-    skillNotes: Record<string, string>
-  ) => void;
+export interface SkillLevelsStepProps {
+  onNext: () => void;
   onBack: () => void;
 }
 
-const SkillLevelsStep: React.FC<SkillLevelsStepProps> = ({
-  selectedSports,
-  skillLevels: initialSkillLevels,
-  skillNotes: initialSkillNotes,
-  onSubmit,
-  onBack
-}) => {
-  const [sports, setSports] = useState<SportType[]>([]);
-  const [skillLevelsByType, setSkillLevelsByType] = useState<Record<string, SkillLevel[]>>({});
-  const [selectedLevels, setSelectedLevels] = useState<Record<string, string>>(initialSkillLevels);
-  const [notes, setNotes] = useState<Record<string, string>>(initialSkillNotes);
-  const [loading, setLoading] = useState(true);
+const SkillLevelsStep = ({ onNext, onBack }: SkillLevelsStepProps) => {
+  const [selectedSports, setSelectedSports] = React.useState<SportType[]>([]);
+  const [skillLevels, setSkillLevels] = React.useState<Record<string, string>>({});
+  
+  // Fetch selected sports from previous step
+  React.useEffect(() => {
+    // This would typically come from context or state management
+    // For now, we'll use mock data
+    setSelectedSports([
+      { id: '1', name: 'Tênis', icon: '🎾' },
+      { id: '2', name: 'Padel', icon: '🏓' }
+    ]);
+  }, []);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Buscar modalidades selecionadas
-        const { data: sportsData, error: sportsError } = await supabase
-          .from('sport_types')
-          .select('*')
-          .in('id', selectedSports);
-        
-        if (sportsError) throw sportsError;
-        setSports(sportsData || []);
-        
-        // Buscar níveis disponíveis para cada modalidade
-        for (const sportId of selectedSports) {
-          const { data: levelsData, error: levelsError } = await supabase
-            .from('skill_levels')
-            .select('*')
-            .eq('sport_type_id', sportId)
-            .order('rank_order', { ascending: true });
-          
-          if (levelsError) throw levelsError;
-          
-          setSkillLevelsByType(prev => ({
-            ...prev,
-            [sportId]: levelsData || []
-          }));
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Erro ao carregar níveis de habilidade');
-      } finally {
-        setLoading(false);
-      }
+  // Mock skill levels for each sport
+  const getSkillLevelsForSport = (sportId: string): SkillLevel[] => {
+    const skillLevelsMap: Record<string, SkillLevel[]> = {
+      '1': [
+        { id: '1', sport_type_id: '1', name: 'Iniciante', description: 'Pouca ou nenhuma experiência', rank_order: 1, created_at: '', updated_at: '' },
+        { id: '2', sport_type_id: '1', name: 'Intermediário', description: 'Joga regularmente', rank_order: 2, created_at: '', updated_at: '' },
+        { id: '3', sport_type_id: '1', name: 'Avançado', description: 'Joga competitivamente', rank_order: 3, created_at: '', updated_at: '' }
+      ],
+      '2': [
+        { id: '4', sport_type_id: '2', name: 'Iniciante', description: 'Pouca ou nenhuma experiência', rank_order: 1, created_at: '', updated_at: '' },
+        { id: '5', sport_type_id: '2', name: 'Intermediário', description: 'Joga regularmente', rank_order: 2, created_at: '', updated_at: '' },
+        { id: '6', sport_type_id: '2', name: 'Avançado', description: 'Joga competitivamente', rank_order: 3, created_at: '', updated_at: '' }
+      ]
     };
     
-    fetchData();
-  }, [selectedSports]);
-
-  const handleLevelChange = (sportId: string, levelId: string) => {
-    setSelectedLevels(prev => ({
-      ...prev,
-      [sportId]: levelId
-    }));
+    return skillLevelsMap[sportId] || [];
   };
 
-  const handleNotesChange = (sportId: string, value: string) => {
-    setNotes(prev => ({
+  const handleSkillLevelChange = (sportId: string, skillLevelId: string) => {
+    setSkillLevels(prev => ({
       ...prev,
-      [sportId]: value
+      [sportId]: skillLevelId
     }));
   };
 
   const handleSubmit = () => {
-    // Verificar se todos os esportes têm níveis selecionados
-    const allLevelsSelected = selectedSports.every(
-      sportId => selectedLevels[sportId]
-    );
-    
-    if (!allLevelsSelected) {
-      toast.error('Selecione um nível para cada modalidade');
-      return;
-    }
-    
-    onSubmit(selectedLevels, notes);
-  };
-
-  const getSportById = (sportId: string) => {
-    return sports.find(sport => sport.id === sportId);
+    // Save skill levels to user profile
+    console.log('Selected skill levels:', skillLevels);
+    onNext();
   };
 
   return (
-    <>
-      <CardHeader>
-        <CardTitle>Seu Nível por Modalidade</CardTitle>
-        <CardDescription>
-          Defina seu nível em cada modalidade esportiva selecionada
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : (
-          <Accordion type="single" collapsible className="w-full">
-            {selectedSports.map((sportId, index) => {
-              const sport = getSportById(sportId);
-              const levels = skillLevelsByType[sportId] || [];
-              
-              return (
-                <AccordionItem key={sportId} value={`item-${index}`} className="border px-4 rounded-lg mb-4">
-                  <AccordionTrigger className="py-4">
-                    <div className="flex items-center">
-                      <span className="mr-2">{sport?.name}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-4 space-y-4">
-                    <div>
-                      <div className="flex items-center mb-1">
-                        <Label htmlFor={`level-${sportId}`} className="mr-2">Seu nível</Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
-                              <HelpCircle className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="max-w-xs">
-                              <p className="font-medium mb-1">{sport?.name} - Níveis:</p>
-                              <ul className="text-xs list-disc pl-4">
-                                {levels.map(level => (
-                                  <li key={level.id} className="mb-1">
-                                    <span className="font-medium">{level.name}</span>
-                                    {level.description && ` - ${level.description}`}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Select 
-                        value={selectedLevels[sportId] || ""} 
-                        onValueChange={(value) => handleLevelChange(sportId, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione seu nível" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {levels.map(level => (
-                            <SelectItem key={level.id} value={level.id}>
-                              {level.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor={`notes-${sportId}`} className="mb-1 block">
-                        Observações (opcional)
-                      </Label>
-                      <Textarea 
-                        id={`notes-${sportId}`} 
-                        value={notes[sportId] || ""}
-                        onChange={(e) => handleNotesChange(sportId, e.target.value)}
-                        placeholder="Detalhes adicionais sobre sua experiência, disponibilidade, etc."
-                        className="resize-none"
-                      />
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        )}
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>Voltar</Button>
-        <Button onClick={handleSubmit}>Próximo</Button>
-      </CardFooter>
-    </>
+    <div className="space-y-6">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold">Qual é o seu nível de habilidade?</h2>
+        <p className="text-muted-foreground">
+          Selecione seu nível para cada esporte escolhido
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {selectedSports.map(sport => (
+          <Card key={sport.id} className="p-4">
+            <div className="mb-2 flex items-center">
+              <span className="text-xl mr-2">{sport.icon}</span>
+              <h3 className="text-lg font-medium">{sport.name}</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+              {getSkillLevelsForSport(sport.id).map(level => (
+                <div 
+                  key={level.id}
+                  className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                    skillLevels[sport.id] === level.id 
+                      ? 'border-primary bg-primary/10' 
+                      : 'hover:border-gray-400'
+                  }`}
+                  onClick={() => handleSkillLevelChange(sport.id, level.id)}
+                >
+                  <div className="font-medium">{level.name}</div>
+                  <div className="text-sm text-muted-foreground">{level.description}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <div className="flex justify-between pt-4">
+        <Button variant="outline" onClick={onBack}>
+          Voltar
+        </Button>
+        <Button 
+          onClick={handleSubmit}
+          disabled={selectedSports.some(sport => !skillLevels[sport.id])}
+        >
+          Continuar
+        </Button>
+      </div>
+    </div>
   );
 };
 

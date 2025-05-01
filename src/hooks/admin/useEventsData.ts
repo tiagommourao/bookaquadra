@@ -345,11 +345,17 @@ export const useDuplicateEvent = () => {
       
       // 3. Create new event (copy)
       const newEvent = {
-        ...eventData,
         name: `${eventData.name} (Cópia)`,
-        id: undefined,
-        created_at: undefined,
-        updated_at: undefined
+        description: eventData.description,
+        banner_url: eventData.banner_url,
+        start_datetime: eventData.start_datetime,
+        end_datetime: eventData.end_datetime,
+        registration_fee: eventData.registration_fee,
+        max_capacity: eventData.max_capacity,
+        block_courts: eventData.block_courts,
+        notify_clients: eventData.notify_clients,
+        status: eventData.status,
+        event_type: eventData.event_type,
       };
       
       const { data: newEventData, error: newEventError } = await supabase
