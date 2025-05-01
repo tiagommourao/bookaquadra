@@ -1,50 +1,43 @@
 
-import { useState } from 'react';
-import { Booking, BookingStatus } from '@/types';
+import { useEffect } from 'react';
+import { Control } from 'react-hook-form';
+import { Booking } from '@/types';
+import { BookingFormValues } from '../booking-schema';
+import { parseISO } from 'date-fns';
 
-interface BookingFormData {
-  userId: string;
-  courtId: string;
-  bookingDate: Date;
-  startTime: string;
-  endTime: string;
-  amount: number;
-  status: BookingStatus;
-  paymentStatus: string;
-  isMonthly: boolean;
-  subscriptionEndDate?: Date;
-  notes: string;
-}
+export const useBookingFormValues = ({ 
+  booking, 
+  form 
+}: { 
+  booking: Booking | null; 
+  form: Control<BookingFormValues>;
+}) => {
+  const setValue = (form as any)._formState.setValue;
+  
+  // Preencher o formulário com valores iniciais do booking (se existir)
+  useEffect(() => {
+    if (booking) {
+      // Garantir que temos uma função setValue válida
+      if (typeof setValue === 'function') {
+        // Definir valores iniciais baseados no booking existente
+        setValue('user_id', booking.user_id);
+        setValue('court_id', booking.court_id);
+        setValue('booking_date', parseISO(booking.booking_date.toString()));
+        setValue('start_time', booking.start_time);
+        setValue('end_time', booking.end_time);
+        setValue('amount', booking.amount);
+        setValue('status', booking.status || 'pending');
+        setValue('payment_status', booking.payment_status || 'pending');
+        setValue('notes', booking.notes || '');
+        setValue('is_monthly', booking.is_monthly || false);
+        
+        // Definir data final da assinatura se for mensal
+        if (booking.subscription_end_date) {
+          setValue('subscription_end_date', parseISO(booking.subscription_end_date.toString()));
+        }
+      }
+    }
+  }, [booking, setValue]);
 
-export const useBookingFormValues = (booking?: Booking | null) => {
-  const [bookingData, setBookingData] = useState<BookingFormData>({
-    userId: booking?.user_id || '',
-    courtId: booking?.court_id || '',
-    bookingDate: booking?.booking_date ? new Date(booking.booking_date) : new Date(),
-    startTime: booking?.start_time || '08:00',
-    endTime: booking?.end_time || '09:00',
-    amount: booking?.amount || 0,
-    status: (booking?.status as BookingStatus) || 'pending',
-    paymentStatus: booking?.payment_status || 'pending',
-    isMonthly: booking?.is_monthly || false,
-    subscriptionEndDate: booking?.subscription_end_date
-      ? new Date(booking.subscription_end_date)
-      : undefined,
-    notes: booking?.notes || '',
-  });
-
-  const setFieldValue = <K extends keyof BookingFormData>(
-    key: K,
-    value: BookingFormData[K]
-  ) => {
-    setBookingData((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  return {
-    bookingData,
-    setFieldValue,
-  };
+  return {};
 };

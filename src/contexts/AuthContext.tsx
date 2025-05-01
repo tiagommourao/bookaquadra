@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,8 +42,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const mapUserToCustomUser = (supabaseUser: any): User | null => {
     if (!supabaseUser) return null;
     
-    console.log('Mapeando usuário:', supabaseUser);
-    
     return {
       id: supabaseUser.id,
       email: supabaseUser.email,
@@ -58,8 +57,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Função para verificar se o usuário é admin
   const checkUserRole = async (userId: string) => {
     try {
-      console.log('Verificando papel do usuário:', userId);
-      
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
@@ -67,8 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
 
       if (error) throw error;
-      
-      console.log('Resultado da verificação de papel:', data);
       
       return data?.role === 'admin';
     } catch (error) {
@@ -80,8 +75,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Função para carregar o perfil do usuário
   const loadUserProfile = async (userId: string) => {
     try {
-      console.log('Carregando perfil do usuário:', userId);
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -90,8 +83,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
       
-      console.log('Perfil carregado:', data);
-      
       return data;
     } catch (error) {
       console.error('Erro ao carregar perfil do usuário:', error);
@@ -99,11 +90,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Função para atualizar o estado do usuário
+  // Função para atualizar o estado do usuário - simplificada para evitar loop
   const updateUserState = async (sessionUser: any) => {
     try {
-      console.log('Atualizando estado do usuário:', sessionUser);
-      
       if (!sessionUser) {
         setUser(null);
         setProfile(null);
@@ -115,24 +104,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const customUser = mapUserToCustomUser(sessionUser);
       
-      // Carregar dados do usuário em paralelo
-      const [userProfile, userIsAdmin] = await Promise.all([
-        loadUserProfile(sessionUser.id),
-        checkUserRole(sessionUser.id)
-      ]);
-
+      // Definir o usuário imediatamente para evitar loop infinito
       setUser(customUser);
-      setProfile(userProfile);
-      setIsAdmin(userIsAdmin);
       setIsAuthenticated(true);
-      setError(null);
       
-      console.log('Estado do usuário atualizado:', {
-        user: customUser,
-        profile: userProfile,
-        isAdmin: userIsAdmin
-      });
-    } catch (error) {
+      // Carregamento assíncrono adicional com setTimeout para evitar deadlocks
+      setTimeout(async () => {
+        try {
+          // Carregar dados do usuário em paralelo
+          const [userProfile, userIsAdmin] = await Promise.all([
+            loadUserProfile(sessionUser.id),
+            checkUserRole(sessionUser.id)
+          ]);
+  
+          setProfile(userProfile);
+          setIsAdmin(userIsAdmin);
+          
+        } catch (err: any) {
+          console.error('Erro ao carregar dados adicionais do usuário:', err);
+          setError(err.message);
+        }
+      }, 0);
+      
+    } catch (error: any) {
       console.error('Erro ao atualizar estado do usuário:', error);
       setError(error.message);
     }
@@ -161,7 +155,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (mounted) {
           await updateUserState(null);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao verificar sessão:', error);
         if (mounted) {
           setError(error.message);
@@ -176,30 +170,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // Verificar sessão inicial
-    checkSession();
-
-    // Configurar listener para mudanças de autenticação
+    // Primeiro, configurar o listener de eventos de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
         console.log('Evento de autenticação:', event, session);
 
-        try {
-          if (event === 'SIGNED_IN' && session?.user) {
-            await updateUserState(session.user);
-          } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-            await updateUserState(null);
-          }
-        } catch (error) {
-          console.error('Erro ao processar mudança de autenticação:', error);
-          if (mounted) {
-            setError(error.message);
-          }
+        // Apenas mudanças síncronas aqui
+        if (session?.user) {
+          const customUser = mapUserToCustomUser(session.user);
+          setUser(customUser);
+          setIsAuthenticated(true);
+          
+          // Adiar operações assíncronas para evitar deadlocks
+          setTimeout(async () => {
+            if (mounted) {
+              try {
+                // Carregar dados do usuário em paralelo
+                const [userProfile, userIsAdmin] = await Promise.all([
+                  loadUserProfile(session.user.id),
+                  checkUserRole(session.user.id)
+                ]);
+        
+                setProfile(userProfile);
+                setIsAdmin(userIsAdmin);
+              } catch (err: any) {
+                console.error('Erro ao processar mudança de autenticação:', err);
+                setError(err.message);
+              }
+            }
+          }, 0);
+        } else {
+          setUser(null);
+          setProfile(null);
+          setIsAdmin(false);
+          setIsAuthenticated(false);
         }
       }
     );
+
+    // Em seguida, verificar a sessão inicial
+    checkSession();
 
     return () => {
       console.log('Limpando efeito de autenticação');
@@ -221,12 +233,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
 
-      if (data?.user) {
-        await updateUserState(data.user);
-      }
-
+      // Não fazer nada aqui, o evento onAuthStateChange irá atualizar o estado
+      
       return { success: true, error: null };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao fazer login:', error);
       return { success: false, error: error.message };
     } finally {
@@ -263,8 +273,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('Iniciando logout');
       setIsLoading(true);
       await supabase.auth.signOut();
-      await updateUserState(null);
-    } catch (error) {
+      
+      // Não fazer nada aqui, o evento onAuthStateChange irá atualizar o estado
+    } catch (error: any) {
       console.error('Erro ao fazer logout:', error);
       setError(error.message);
     } finally {
@@ -286,8 +297,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login: signIn,
     logout: signOut,
   };
-
-  console.log('Estado atual do contexto:', contextValue);
 
   return (
     <AuthContext.Provider value={contextValue}>

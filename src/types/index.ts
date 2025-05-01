@@ -1,3 +1,4 @@
+
 import { PaymentMethodConfig } from './payment';
 
 // Tipos de autenticação e usuário
@@ -167,23 +168,21 @@ import {
   TestConnectionResult
 } from './payment';
 
-// Reexportar para compatibilidade - sem criar conflitos
-export {
-  Booking,
-  BookingRequest,
-  BookingResponse,
-  AvailableTimeSlot,
-  Schedule,
-  ScheduleBlock,
-  Holiday,
-  PaymentStatus,
-  Payment,
-  PaymentStatusLog,
-  PaymentStatistics,
-  MercadoPagoNotification,
-  MercadoPagoPaymentResponse,
-  TestConnectionResult
-};
+// Reexportar para compatibilidade - usando export type para resolver o erro TS1205
+export type { Booking } from './booking';
+export type { BookingRequest } from './booking';
+export type { BookingResponse } from './booking';
+export type { AvailableTimeSlot } from './court';
+export type { Schedule } from './court';
+export type { ScheduleBlock } from './court';
+export type { Holiday } from './court';
+export type { PaymentStatus } from './payment';
+export type { Payment } from './payment';
+export type { PaymentStatusLog } from './payment';
+export type { PaymentStatistics } from './payment';
+export type { MercadoPagoNotification } from './payment';
+export type { MercadoPagoPaymentResponse } from './payment';
+export type { TestConnectionResult } from './payment';
 
 // Export do tipo PaymentMethodConfig
 export type { PaymentMethodConfig } from './payment';

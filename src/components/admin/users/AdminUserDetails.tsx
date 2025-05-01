@@ -82,7 +82,7 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
         ) : (
           <div className="space-y-6">
             <UserProfileHeader 
-              user={userDetails}
+              userData={userDetails}
               onBlockUser={blockUser}
               onUnblockUser={unblockUser}
               onMakeAdmin={makeAdmin}
@@ -114,12 +114,12 @@ export const AdminUserDetails = ({ userId, onClose, userData }: AdminUserDetails
 
             {currentTab === 'info' ? (
               <UserContactInfo 
-                user={userDetails} 
+                userData={userDetails} 
                 onUpdateName={updateUserName}
                 onUpdateContact={updateUserContact} 
               />
             ) : (
-              <UserPreferences user={userDetails} />
+              <UserPreferences userData={userDetails} />
             )}
           </div>
         )}

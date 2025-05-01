@@ -1,16 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { PaymentMethodConfig } from '@/types/payment';
+import { SiteSettings } from '@/types';
 import { Loader2 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { PaymentMethodConfig, SiteSettings } from '@/types';
 
-// Interface para representar os dados que buscamos da tabela site_settings
+// Interface para corresponder exatamente ao formato do banco de dados
 interface SiteSettingsRow {
   id: string;
   company_name: string;
@@ -22,270 +24,309 @@ interface SiteSettingsRow {
   cancellation_policy: string;
   mercado_pago_key: string;
   google_calendar_integration: boolean;
-  payment_method: PaymentMethodConfig | null;
+  payment_method: PaymentMethodConfig;
   created_at: string;
   updated_at: string;
 }
 
-export const PaymentMethodSettings = () => {
-  const queryClient = useQueryClient();
-  const [selectedMethod, setSelectedMethod] = useState<'mercadopago' | 'stripe'>('mercadopago');
+const PaymentMethodSettings = () => {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
 
-  // Buscar a configuração atual
-  const { data: settings, isLoading: isLoadingSettings } = useQuery({
-    queryKey: ['site-settings'],
-    queryFn: async () => {
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setIsLoading(true);
       try {
         const { data, error } = await supabase
           .from('site_settings')
           .select('*')
-          .maybeSingle();
-        
-        if (error) {
-          console.error('Erro ao carregar configurações:', error);
-          return null;
-        }
-        
-        return data as SiteSettingsRow | null;
-      } catch (error) {
-        console.error('Erro ao buscar configurações:', error);
-        return null;
-      }
-    },
-  });
+          .single();
 
-  // Buscar configurações do Mercado Pago
-  const { data: mercadoPagoConfig, isLoading: isLoadingMercadoPago } = useQuery({
-    queryKey: ['mercado-pago-config'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('integrations_mercadopago')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
-        
-        if (error) {
-          // Se não encontrar, retorna objeto vazio
-          if (error.code === 'PGRST116') {
-            return { status: 'inactive' } as const;
-          }
-          throw error;
-        }
-        
-        return data;
-      } catch (error) {
-        console.error('Erro ao buscar configuração do Mercado Pago:', error);
-        return { status: 'inactive' } as const;
-      }
-    },
-  });
-
-  // Buscar configurações do Stripe
-  const { data: stripeConfig, isLoading: isLoadingStripe } = useQuery({
-    queryKey: ['stripe-config'],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('integrations_stripe')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
-        
-        if (error) {
-          // Se não encontrar, retorna objeto vazio
-          if (error.code === 'PGRST116') {
-            return { status: 'inactive' } as const;
-          }
-          throw error;
-        }
-        
-        return data;
-      } catch (error) {
-        console.error('Erro ao buscar configuração do Stripe:', error);
-        return { status: 'inactive' } as const;
-      }
-    },
-  });
-
-  // Mutação para salvar as configurações
-  const updateSettings = useMutation({
-    mutationFn: async () => {
-      // Verifica se o mercadoPagoConfig e stripeConfig estão disponíveis
-      const mercadoPagoEnvironment = typeof mercadoPagoConfig === 'object' && mercadoPagoConfig && 
-                                     'environment' in mercadoPagoConfig ? 
-                                     mercadoPagoConfig.environment : 'sandbox';
-      
-      const stripeEnvironment = typeof stripeConfig === 'object' && stripeConfig && 
-                               'environment' in stripeConfig ? 
-                               stripeConfig.environment : 'test';
-
-      const paymentMethod: PaymentMethodConfig = {
-        default: selectedMethod,
-        mercadopago: {
-          enabled: typeof mercadoPagoConfig === 'object' && mercadoPagoConfig && mercadoPagoConfig.status === 'active',
-          environment: mercadoPagoEnvironment as 'sandbox' | 'production'
-        },
-        stripe: {
-          enabled: typeof stripeConfig === 'object' && stripeConfig && stripeConfig.status === 'active',
-          environment: stripeEnvironment as 'test' | 'production'
-        }
-      };
-
-      // Verifica se settings existe para decidir entre atualizar ou inserir
-      if (settings && settings.id) {
-        const { data, error } = await supabase
-          .from('site_settings')
-          .update({
-            payment_method: paymentMethod
-          })
-          .eq('id', settings.id)
-          .select();
-        
         if (error) throw error;
-        return data;
-      } else {
-        // Se não existir, cria um novo registro
-        const { data, error } = await supabase
-          .from('site_settings')
-          .insert([{
-            company_name: 'BookaQuadra',
+
+        if (data) {
+          // Converter os nomes das colunas para camelCase e garantir tipagem correta
+          const dbData = data as unknown as SiteSettingsRow;
+          
+          // Converter do formato do banco para o formato da aplicação
+          const appSettings: SiteSettings = {
+            id: dbData.id,
+            companyName: dbData.company_name,
+            logo: dbData.logo,
+            primaryColor: dbData.primary_color,
+            secondaryColor: dbData.secondary_color,
+            contactEmail: dbData.contact_email,
+            contactPhone: dbData.contact_phone,
+            cancellationPolicy: dbData.cancellation_policy,
+            mercadoPagoKey: dbData.mercado_pago_key,
+            googleCalendarIntegration: dbData.google_calendar_integration,
+            paymentMethod: dbData.payment_method || {
+              default: 'manual',
+              mercadopago: { enabled: false },
+              stripe: { enabled: false },
+              manual: { enabled: true }
+            }
+          };
+          
+          setSettings(appSettings);
+        } else {
+          // Configurações padrão se não houver nenhum registro
+          setSettings({
+            companyName: 'BookaQuadra',
             logo: '',
-            primary_color: '#06b6d4',
-            secondary_color: '#0891b2',
-            contact_email: '',
-            contact_phone: '',
-            cancellation_policy: '',
-            mercado_pago_key: '',
-            google_calendar_integration: false,
-            payment_method: paymentMethod
-          }])
-          .select();
-        
-        if (error) throw error;
-        return data;
+            primaryColor: '#06b6d4',
+            secondaryColor: '#0891b2',
+            contactEmail: '',
+            contactPhone: '',
+            cancellationPolicy: '',
+            mercadoPagoKey: '',
+            googleCalendarIntegration: false,
+            paymentMethod: {
+              default: 'manual',
+              mercadopago: { enabled: false },
+              stripe: { enabled: false },
+              manual: { enabled: true }
+            }
+          });
+        }
+      } catch (error: any) {
+        console.error('Erro ao buscar configurações:', error);
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar as configurações',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
       }
-    },
-    onSuccess: () => {
+    };
+
+    fetchSettings();
+  }, [toast]);
+
+  const handleSaveSettings = async () => {
+    if (!settings) return;
+    
+    setIsSaving(true);
+    try {
+      // Converter de volta para o formato do banco de dados
+      const dbSettings = {
+        company_name: settings.companyName,
+        logo: settings.logo,
+        primary_color: settings.primaryColor,
+        secondary_color: settings.secondaryColor,
+        contact_email: settings.contactEmail,
+        contact_phone: settings.contactPhone,
+        cancellation_policy: settings.cancellationPolicy,
+        mercado_pago_key: settings.mercadoPagoKey,
+        google_calendar_integration: settings.googleCalendarIntegration,
+        payment_method: settings.paymentMethod
+      };
+      
+      let query;
+      if (settings.id) {
+        // Atualizar configurações existentes
+        query = supabase
+          .from('site_settings')
+          .update(dbSettings)
+          .eq('id', settings.id);
+      } else {
+        // Inserir novas configurações
+        query = supabase
+          .from('site_settings')
+          .insert([dbSettings]);
+      }
+      
+      const { error } = await query;
+      if (error) throw error;
+      
       toast({
-        title: 'Configurações salvas',
-        description: 'Método de pagamento atualizado com sucesso.',
+        title: 'Sucesso',
+        description: 'Configurações salvas com sucesso',
       });
-      queryClient.invalidateQueries({ queryKey: ['site-settings'] });
-    },
-    onError: (error) => {
+    } catch (error: any) {
       console.error('Erro ao salvar configurações:', error);
       toast({
-        title: 'Erro ao salvar configurações',
-        description: 'Não foi possível atualizar o método de pagamento.',
+        title: 'Erro',
+        description: 'Não foi possível salvar as configurações',
         variant: 'destructive',
       });
-    },
-  });
-
-  // Configurar o método inicial assim que os dados forem carregados
-  useEffect(() => {
-    if (settings?.payment_method?.default) {
-      setSelectedMethod(settings.payment_method.default);
+    } finally {
+      setIsSaving(false);
     }
-  }, [settings]);
+  };
 
-  const isLoading = isLoadingSettings || isLoadingMercadoPago || isLoadingStripe;
-  const isMercadoPagoAvailable = typeof mercadoPagoConfig === 'object' && mercadoPagoConfig && mercadoPagoConfig.status === 'active';
-  const isStripeAvailable = typeof stripeConfig === 'object' && stripeConfig && stripeConfig.status === 'active';
+  const handlePaymentMethodChange = (key: string, enabled: boolean) => {
+    if (!settings || !settings.paymentMethod) return;
+    
+    // Criar uma cópia profunda do objeto
+    const updatedPaymentMethod = {
+      ...settings.paymentMethod,
+      [key]: { 
+        ...settings.paymentMethod[key as keyof typeof settings.paymentMethod],
+        enabled 
+      }
+    };
+    
+    // Se a opção estiver sendo habilitada, definir como padrão
+    if (enabled) {
+      updatedPaymentMethod.default = key;
+    } 
+    // Se a opção estiver sendo desabilitada e era padrão, definir outro método como padrão
+    else if (settings.paymentMethod.default === key) {
+      const enabledMethods = ['manual', 'mercadopago', 'stripe'].filter(
+        method => method !== key && !!updatedPaymentMethod[method as keyof typeof updatedPaymentMethod]?.enabled
+      );
+      if (enabledMethods.length > 0) {
+        updatedPaymentMethod.default = enabledMethods[0];
+      }
+    }
+    
+    setSettings({
+      ...settings,
+      paymentMethod: updatedPaymentMethod as PaymentMethodConfig
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Carregando configurações...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-6">
-      <h2 className="text-3xl font-bold mb-6">Configurações de Pagamento</h2>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Método de Pagamento Padrão</CardTitle>
-          <CardDescription>
-            Selecione qual método de pagamento será usado por padrão no sistema.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center p-6">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">Carregando configurações...</span>
-            </div>
-          ) : (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">Métodos de Pagamento</h1>
+        <Button onClick={handleSaveSettings} disabled={isSaving}>
+          {isSaving ? (
             <>
-              <RadioGroup 
-                value={selectedMethod}
-                onValueChange={(value) => setSelectedMethod(value as 'mercadopago' | 'stripe')}
-                className="space-y-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem 
-                    value="mercadopago" 
-                    id="mercadopago" 
-                    disabled={!isMercadoPagoAvailable} 
-                  />
-                  <Label 
-                    htmlFor="mercadopago" 
-                    className={!isMercadoPagoAvailable ? "text-gray-400" : ""}
-                  >
-                    Mercado Pago
-                  </Label>
-                  {!isMercadoPagoAvailable && (
-                    <span className="text-sm text-red-500 ml-2">
-                      (Não configurado)
-                    </span>
-                  )}
-                </div>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            'Salvar Configurações'
+          )}
+        </Button>
+      </div>
 
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem 
-                    value="stripe" 
-                    id="stripe" 
-                    disabled={!isStripeAvailable}
-                  />
-                  <Label 
-                    htmlFor="stripe" 
-                    className={!isStripeAvailable ? "text-gray-400" : ""}
-                  >
-                    Stripe
-                  </Label>
-                  {!isStripeAvailable && (
-                    <span className="text-sm text-red-500 ml-2">
-                      (Não configurado)
-                    </span>
-                  )}
-                </div>
-              </RadioGroup>
+      <Tabs defaultValue="payment-methods">
+        <TabsList>
+          <TabsTrigger value="payment-methods">Métodos de Pagamento</TabsTrigger>
+          <TabsTrigger value="providers">Integrações</TabsTrigger>
+        </TabsList>
+        <TabsContent value="payment-methods" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Métodos de Pagamento Aceitos</CardTitle>
+              <CardDescription>
+                Configure os métodos de pagamento que serão aceitos na plataforma.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {settings && settings.paymentMethod && (
+                <div className="space-y-6">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="payment-manual" 
+                      checked={!!settings.paymentMethod.manual?.enabled}
+                      onCheckedChange={(checked) => handlePaymentMethodChange('manual', checked === true)}
+                    />
+                    <Label htmlFor="payment-manual" className="font-medium">
+                      Pagamento Manual / Presencial
+                    </Label>
+                    {settings.paymentMethod.default === 'manual' && (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Padrão</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="payment-mercadopago" 
+                      checked={!!settings.paymentMethod.mercadopago?.enabled}
+                      onCheckedChange={(checked) => handlePaymentMethodChange('mercadopago', checked === true)}
+                    />
+                    <Label htmlFor="payment-mercadopago" className="font-medium">
+                      Mercado Pago
+                    </Label>
+                    {settings.paymentMethod.default === 'mercadopago' && (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Padrão</span>
+                    )}
+                  </div>
 
-              <div className="pt-4">
-                <Button 
-                  onClick={() => updateSettings.mutate()}
-                  disabled={updateSettings.isPending || (!isMercadoPagoAvailable && !isStripeAvailable)}
-                >
-                  {updateSettings.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    'Salvar Configurações'
-                  )}
-                </Button>
-              </div>
-
-              {!isMercadoPagoAvailable && !isStripeAvailable && (
-                <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mt-4">
-                  <p className="text-amber-800">
-                    Nenhum método de pagamento está configurado. 
-                    Por favor, configure pelo menos um método de pagamento 
-                    em Integrações &gt; Mercado Pago ou Integrações &gt; Stripe.
-                  </p>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="payment-stripe" 
+                      checked={!!settings.paymentMethod.stripe?.enabled}
+                      onCheckedChange={(checked) => handlePaymentMethodChange('stripe', checked === true)}
+                    />
+                    <Label htmlFor="payment-stripe" className="font-medium">
+                      Stripe
+                    </Label>
+                    {settings.paymentMethod.default === 'stripe' && (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Padrão</span>
+                    )}
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-medium">Método de pagamento padrão</h3>
+                    <p className="text-sm text-muted-foreground">
+                      O método marcado como padrão será selecionado automaticamente durante o processo de reserva.
+                    </p>
+                  </div>
                 </div>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="providers" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Provedores de Pagamento</CardTitle>
+              <CardDescription>
+                Gerencie a configuração de integração com os provedores de pagamento.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-medium">Mercado Pago</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Gerencie as chaves e configurações do Mercado Pago.
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => window.location.href = '/admin/integracoes/mercadopago'}>
+                    Configurar
+                  </Button>
+                </div>
+                
+                <Separator />
+                
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-medium">Stripe</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Gerencie as chaves e configurações do Stripe.
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => window.location.href = '/admin/integracoes/stripe'}>
+                    Configurar
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
