@@ -1,221 +1,169 @@
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole, Profile } from '@/types';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Session, User as SupabaseUser, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { Session } from '@supabase/supabase-js';
+import { Profile, User } from '@/types';
+import { Provider } from '@supabase/supabase-js';
 
 interface AuthContextType {
+  session: Session | null;
   user: User | null;
   profile: Profile | null;
-  session: Session | null;
-  isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  signInWithOAuth: (provider: Provider) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Função para converter do formato do Supabase para o formato User do nosso app
-  const formatUser = (session: Session | null): User | null => {
-    if (!session?.user) return null;
-    
-    return {
-      id: session.user.id,
-      name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuário',
-      email: session.user.email || '',
-      role: session.user.app_metadata?.role || 'user',
-      avatarUrl: session.user.user_metadata?.avatar_url,
-      createdAt: new Date(session.user.created_at),
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+        setSession(session);
+      });
+    }
+
+    getSession();
+  }, []);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const fetchUser = async () => {
+      if (session?.user) {
+        const formattedUser = formatUserData(session.user);
+        setUser(formattedUser);
+        await fetchProfile(formattedUser.id);
+        await checkAdminRole(formattedUser.id);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setIsAdmin(false);
+      }
+      setIsLoading(false);
     };
-  };
 
-  // Função para buscar perfil do usuário
+    fetchUser();
+  }, [session]);
+
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
-      
-      if (error) throw error;
-      
-      if (data) {
-        const profileData: Profile = {
-          ...data,
-          created_at: new Date(data.created_at),
-          updated_at: new Date(data.updated_at)
-        };
-        setProfile(profileData);
+
+      if (error) {
+        console.error("Erro ao buscar perfil:", error);
+        setProfile(null);
       }
-    } catch (error) {
-      console.error('Erro ao carregar perfil do usuário:', error);
+
+      setProfile(profileData || null);
+    } catch (error: any) {
+      console.error("Erro ao buscar perfil:", error);
+      setProfile(null);
     }
   };
 
-  // Verificar status da autenticação ao montar o componente
-  useEffect(() => {
-    const initialize = async () => {
-      setIsLoading(true);
-      
-      try {
-        // Primeiro configurar o listener para mudanças no estado de auth
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          (event, currentSession) => {
-            setSession(currentSession);
-            setUser(formatUser(currentSession));
-            
-            if (currentSession?.user) {
-              // Usar setTimeout para evitar deadlocks e garantir que os demais estados sejam atualizados primeiro
-              setTimeout(() => {
-                fetchProfile(currentSession.user.id);
-              }, 0);
-            } else {
-              setProfile(null);
-            }
-          }
-        );
-        
-        // Então verificar se já existe uma sessão ativa
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        setSession(currentSession);
-        setUser(formatUser(currentSession));
-        
-        if (currentSession?.user) {
-          await fetchProfile(currentSession.user.id);
-        }
-        
-        return () => {
-          subscription.unsubscribe();
-        };
-      } catch (error) {
-        console.error('Erro ao inicializar autenticação:', error);
-      } finally {
-        setIsLoading(false);
+  const checkAdminRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .single();
+
+      if (error) {
+        setIsAdmin(false);
+      } else {
+        setIsAdmin(!!data);
       }
+    } catch (error: any) {
+      console.error("Erro ao verificar role de admin:", error);
+      setIsAdmin(false);
+    }
+  };
+
+  // Corrigir o método de formatação de usuário para lidar corretamente com os tipos
+  const formatUserData = (userData: any): User => {
+    return {
+      id: userData.id,
+      email: userData.email,
+      created_at: userData.created_at || new Date().toISOString(),
+      app_metadata: userData.app_metadata || {},
+      user_metadata: userData.user_metadata || {},
+      role: userData.role || 'user'
     };
-    
-    initialize();
-  }, []);
-
-  // Verificar se o usuário atual é admin
-  // Modificado para verificar corretamente o papel do usuário
-  const isAdmin = user?.role === 'admin' || 
-    (session?.user?.app_metadata?.role === 'admin') || 
-    (session?.user?.email === 'admin@example.com'); // Para fins de desenvolvimento - remover em produção
-
-  // Login com email e senha
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) throw error;
-      
-      // onAuthStateChange vai atualizar o estado
-    } catch (error: any) {
-      console.error('Login error:', error);
-      toast.error(error.message || 'Erro ao realizar login');
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
   };
 
-  // Login com Google
-  const loginWithGoogle = async () => {
-    setIsLoading(true);
+  const signInWithOAuth = async (provider: Provider) => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
         }
       });
-      
-      if (error) throw error;
-      
-      // Redirecionamento acontece, então não atualizamos o estado aqui
+
+      if (error) {
+        throw error;
+      }
     } catch (error: any) {
-      console.error('Google login error:', error);
-      toast.error(error.message || 'Erro ao realizar login com Google');
-      setIsLoading(false);
-      throw error;
+      console.error("Erro ao fazer login com OAuth:", error);
     }
   };
 
-  // Logout
-  const logout = async () => {
-    setIsLoading(true);
+  const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      // onAuthStateChange vai atualizar o estado
+      if (error) {
+        throw error;
+      }
+      setUser(null);
+      setProfile(null);
+      setIsAdmin(false);
     } catch (error: any) {
-      console.error('Logout error:', error);
-      toast.error(error.message || 'Erro ao realizar logout');
-      throw error;
-    } finally {
-      setIsLoading(false);
+      console.error("Erro ao fazer logout:", error);
     }
   };
 
-  // Função para atualizar dados do usuário e perfil
-  const refreshUser = async () => {
-    if (!session?.user) return;
-    
-    try {
-      const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
-      setSession(refreshedSession);
-      setUser(formatUser(refreshedSession));
-      
-      if (refreshedSession?.user) {
-        await fetchProfile(refreshedSession.user.id);
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar dados do usuário:', error);
-    }
+  const value: AuthContextType = {
+    session,
+    user,
+    profile,
+    isLoading,
+    isAdmin,
+    signInWithOAuth,
+    signOut,
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        session,
-        isAuthenticated: !!user,
-        isLoading,
-        isAdmin,
-        login,
-        loginWithGoogle,
-        logout,
-        refreshUser
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
+const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
+
+export { AuthProvider, useAuth };

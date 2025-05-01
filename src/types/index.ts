@@ -1,4 +1,3 @@
-
 import { PaymentMethodConfig } from './payment';
 import { Booking, BookingStatus, BookingRequest, BookingResponse } from './booking';
 import { Court, AvailableTimeSlot, Schedule, ScheduleBlock, Holiday } from './court';
@@ -16,6 +15,7 @@ export interface User {
     [key: string]: any;
   };
   created_at: string;
+  role?: string; // Adicionado role para corrigir erros
 }
 
 export interface Profile {
@@ -56,8 +56,8 @@ export interface Event {
   events_courts?: EventCourt[];
 }
 
-export type EventStatus = 'active' | 'cancelled' | 'completed' | 'draft';
-export type EventType = 'tournament' | 'class' | 'practice' | 'social' | 'other';
+export type EventStatus = 'active' | 'cancelled' | 'completed' | 'draft' | 'inactive';
+export type EventType = 'tournament' | 'class' | 'practice' | 'social' | 'other' | 'day_use' | 'private';
 
 export interface EventCourt {
   id: string;
@@ -76,6 +76,26 @@ export interface CourtType {
   description?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Adicionar propriedades faltantes em Court
+export interface Court {
+  id: string;
+  name: string;
+  description?: string;
+  type_id: string;
+  image_url?: string;
+  surface_type?: string;
+  has_cover: boolean;
+  has_lighting: boolean;
+  is_active: boolean;
+  capacity?: number;
+  created_at: string;
+  updated_at: string;
+  maintenance_info?: string;
+  location_info?: string;
+  dimensions?: string;
+  accessibility_features?: string;
 }
 
 // Tipos para onboarding
@@ -106,6 +126,9 @@ export interface GameTypePreference {
   description?: string;
   selected: boolean;
 }
+
+// Atualizar o tipo BookingStatus
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
 
 // Reexportar os tipos de outros arquivos
 export type { 

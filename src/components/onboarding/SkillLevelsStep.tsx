@@ -1,107 +1,103 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { SportType, SkillLevel } from '@/types';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  SportType,
+  SkillLevel,
+} from '@/types';
 
 export interface SkillLevelsStepProps {
   onNext: () => void;
-  onBack: () => void;
+  onPrev: () => void;
+  selectedSports: SportType[];
+  availableLevels: SkillLevel[];
+  onSelectLevels: (levels: SkillLevel[]) => void;
 }
 
-const SkillLevelsStep = ({ onNext, onBack }: SkillLevelsStepProps) => {
-  const [selectedSports, setSelectedSports] = React.useState<SportType[]>([]);
-  const [skillLevels, setSkillLevels] = React.useState<Record<string, string>>({});
-  
-  // Fetch selected sports from previous step
-  React.useEffect(() => {
-    // This would typically come from context or state management
-    // For now, we'll use mock data
-    setSelectedSports([
-      { id: '1', name: 'Tênis', icon: '🎾' },
-      { id: '2', name: 'Padel', icon: '🏓' }
-    ]);
-  }, []);
+const SkillLevelsStep = ({
+  onNext,
+  onPrev,
+  selectedSports,
+  availableLevels,
+  onSelectLevels,
+}: SkillLevelsStepProps) => {
+  const [selectedLevels, setSelectedLevels] = useState<SkillLevel[]>([]);
 
-  // Mock skill levels for each sport
-  const getSkillLevelsForSport = (sportId: string): SkillLevel[] => {
-    const skillLevelsMap: Record<string, SkillLevel[]> = {
-      '1': [
-        { id: '1', sport_type_id: '1', name: 'Iniciante', description: 'Pouca ou nenhuma experiência', rank_order: 1, created_at: '', updated_at: '' },
-        { id: '2', sport_type_id: '1', name: 'Intermediário', description: 'Joga regularmente', rank_order: 2, created_at: '', updated_at: '' },
-        { id: '3', sport_type_id: '1', name: 'Avançado', description: 'Joga competitivamente', rank_order: 3, created_at: '', updated_at: '' }
-      ],
-      '2': [
-        { id: '4', sport_type_id: '2', name: 'Iniciante', description: 'Pouca ou nenhuma experiência', rank_order: 1, created_at: '', updated_at: '' },
-        { id: '5', sport_type_id: '2', name: 'Intermediário', description: 'Joga regularmente', rank_order: 2, created_at: '', updated_at: '' },
-        { id: '6', sport_type_id: '2', name: 'Avançado', description: 'Joga competitivamente', rank_order: 3, created_at: '', updated_at: '' }
-      ]
-    };
-    
-    return skillLevelsMap[sportId] || [];
+  // Corrigir os tipos ao mapear os esportes
+  const selectedSportsWithLevels = selectedSports.map(sport => ({
+    id: sport.id,
+    name: sport.name,
+    icon: sport.icon || '',
+    created_at: sport.created_at || new Date().toISOString(),
+    updated_at: sport.updated_at || new Date().toISOString(),
+    levels: availableLevels.filter(
+      level => level.sport_type_id === sport.id
+    ),
+  }));
+
+  const toggleLevel = (level: SkillLevel) => {
+    const isSelected = selectedLevels.some((selectedLevel) => selectedLevel.id === level.id);
+
+    if (isSelected) {
+      setSelectedLevels(prevLevels => prevLevels.filter(selectedLevel => selectedLevel.id !== level.id));
+    } else {
+      setSelectedLevels(prevLevels => [...prevLevels, level]);
+    }
   };
 
-  const handleSkillLevelChange = (sportId: string, skillLevelId: string) => {
-    setSkillLevels(prev => ({
-      ...prev,
-      [sportId]: skillLevelId
-    }));
-  };
-
-  const handleSubmit = () => {
-    // Save skill levels to user profile
-    console.log('Selected skill levels:', skillLevels);
-    onNext();
-  };
+  useEffect(() => {
+    onSelectLevels(selectedLevels);
+  }, [selectedLevels, onSelectLevels]);
 
   return (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold">Qual é o seu nível de habilidade?</h2>
-        <p className="text-muted-foreground">
-          Selecione seu nível para cada esporte escolhido
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        {selectedSports.map(sport => (
-          <Card key={sport.id} className="p-4">
-            <div className="mb-2 flex items-center">
-              <span className="text-xl mr-2">{sport.icon}</span>
-              <h3 className="text-lg font-medium">{sport.name}</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-              {getSkillLevelsForSport(sport.id).map(level => (
-                <div 
-                  key={level.id}
-                  className={`border rounded-md p-3 cursor-pointer transition-colors ${
-                    skillLevels[sport.id] === level.id 
-                      ? 'border-primary bg-primary/10' 
-                      : 'hover:border-gray-400'
-                  }`}
-                  onClick={() => handleSkillLevelChange(sport.id, level.id)}
-                >
-                  <div className="font-medium">{level.name}</div>
-                  <div className="text-sm text-muted-foreground">{level.description}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack}>
-          Voltar
-        </Button>
-        <Button 
-          onClick={handleSubmit}
-          disabled={selectedSports.some(sport => !skillLevels[sport.id])}
-        >
-          Continuar
-        </Button>
-      </div>
-    </div>
+    <Card>
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="skill-levels">Selecione seus níveis de habilidade:</Label>
+          <p className="text-sm text-muted-foreground">
+            Para cada esporte selecionado, indique seu nível de habilidade.
+          </p>
+        </div>
+        <ScrollArea className="h-[400px] w-full rounded-md border">
+          <div className="p-4">
+            {selectedSportsWithLevels.map((sport) => (
+              <div key={sport.id} className="mb-4">
+                <h3 className="text-lg font-semibold">{sport.name}</h3>
+                {sport.levels.length > 0 ? (
+                  <div className="grid gap-2">
+                    {sport.levels.map((level) => (
+                      <div key={level.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`level-${level.id}`}
+                          checked={selectedLevels.some((selectedLevel) => selectedLevel.id === level.id)}
+                          onCheckedChange={() => toggleLevel(level)}
+                        />
+                        <Label htmlFor={`level-${level.id}`} className="cursor-pointer">
+                          {level.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum nível de habilidade disponível para este esporte.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+        <div className="flex justify-between">
+          <Button variant="secondary" onClick={onPrev}>
+            Anterior
+          </Button>
+          <Button onClick={onNext}>Próximo</Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

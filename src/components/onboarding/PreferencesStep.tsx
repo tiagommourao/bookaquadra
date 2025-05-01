@@ -1,144 +1,89 @@
-
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { OnboardingStep, GameTypePreference } from '@/types';
 
-interface PreferencesStepProps {
+export interface PreferencesStepProps {
   onNext: () => void;
-  onBack: () => void;
-  currentStep: OnboardingStep;
 }
 
-interface PreferencesFormValues {
-  gameTypes: GameTypePreference[];
-  preferredDays: number[];
+export interface GameTypePreference {
+  id: string;
+  name: string;
+  description?: string;
+  selected: boolean;
 }
 
-export const PreferencesStep: React.FC<PreferencesStepProps> = ({ onNext, onBack, currentStep }) => {
-  const { handleSubmit, setValue, watch } = useForm<PreferencesFormValues>({
-    defaultValues: {
-      gameTypes: [],
-      preferredDays: [],
-    },
-  });
+const gameTypeOptions = [
+  { id: 'competitive', name: 'Competitivo', description: 'Focado em vencer e melhorar o desempenho.' },
+  { id: 'social', name: 'Social', description: 'Prioriza a diversão e o contato com outras pessoas.' },
+  { id: 'exercise', name: 'Exercício', description: 'Busca a prática esportiva como forma de se exercitar.' },
+  { id: 'relaxation', name: 'Relaxamento', description: 'Utiliza o esporte para relaxar e aliviar o estresse.' },
+];
 
-  const selectedGameTypes = watch('gameTypes') || [];
-  const selectedPreferredDays = watch('preferredDays') || [];
+const PreferencesStep = ({ onNext }: PreferencesStepProps) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [gameTypes, setGameTypes] = useState<GameTypePreference[]>(gameTypeOptions);
 
-  const gameTypeOptions = [
-    { id: 'singles', label: 'Singles (1v1)' },
-    { id: 'doubles', label: 'Doubles (2v2)' },
-    { id: 'mixed', label: 'Mixed Doubles' },
-    { id: 'group_play', label: 'Group Play' },
-    { id: 'lessons', label: 'Lessons/Training' },
-  ] as const;
+  const filteredGameTypes = gameTypes.filter(type =>
+    type.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const daysOfWeekOptions = [
-    { id: 0, label: 'Domingo' },
-    { id: 1, label: 'Segunda-feira' },
-    { id: 2, label: 'Terça-feira' },
-    { id: 3, label: 'Quarta-feira' },
-    { id: 4, label: 'Quinta-feira' },
-    { id: 5, label: 'Sexta-feira' },
-    { id: 6, label: 'Sábado' },
-  ] as const;
-
-  const handleGameTypeChange = (gameType: GameTypePreference) => {
-    const current = [...selectedGameTypes];
-    const index = current.indexOf(gameType);
-    
-    if (index === -1) {
-      setValue('gameTypes', [...current, gameType]);
-    } else {
-      current.splice(index, 1);
-      setValue('gameTypes', current);
-    }
-  };
-
-  const handleDayChange = (day: number) => {
-    const current = [...selectedPreferredDays];
-    const index = current.indexOf(day);
-    
-    if (index === -1) {
-      setValue('preferredDays', [...current, day]);
-    } else {
-      current.splice(index, 1);
-      setValue('preferredDays', current);
-    }
-  };
-
-  const onSubmit = (data: PreferencesFormValues) => {
-    console.log('Preferences data:', data);
-    onNext();
+  const updateGameTypePreference = (id: string, selected: boolean) => {
+    setGameTypes(prev => 
+      prev.map(item => {
+        if (typeof item === 'string') {
+          // Lidar com entradas string (convertendo para objeto)
+          const preference = gameTypeOptions.find(opt => opt.id === item) || {
+            id: item,
+            name: item,
+            selected: false,
+          };
+          return preference.id === id ? { ...preference, selected } : preference;
+        } else {
+          // Lidar com objetos GameTypePreference
+          return item.id === id ? { ...item, selected } : item;
+        }
+      })
+    );
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Preferências de Jogo</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Quais tipos de jogos você prefere?</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {gameTypeOptions.map((option) => (
-                <div key={option.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={`game-type-${option.id}`}
-                    checked={selectedGameTypes.includes(option.id as GameTypePreference)}
-                    onCheckedChange={() => handleGameTypeChange(option.id as GameTypePreference)}
-                  />
-                  <Label 
-                    htmlFor={`game-type-${option.id}`}
-                    className="cursor-pointer"
-                  >
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
+    <Card>
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="search">Buscar Modalidades</Label>
+          <Input
+            type="search"
+            id="search"
+            placeholder="Buscar por tipo de jogo"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label>Preferências de Jogo</Label>
+          <div className="flex flex-col space-y-2">
+            {filteredGameTypes.map((type) => (
+              <div key={type.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={type.id}
+                  checked={type.selected}
+                  onCheckedChange={(checked) => updateGameTypePreference(type.id, !!checked)}
+                />
+                <Label htmlFor={type.id} className="cursor-pointer">
+                  {type.name} - {type.description}
+                </Label>
+              </div>
+            ))}
           </div>
-          
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Em quais dias você geralmente prefere jogar?</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {daysOfWeekOptions.map((day) => (
-                <div key={day.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={`day-${day.id}`}
-                    checked={selectedPreferredDays.includes(day.id)}
-                    onCheckedChange={() => handleDayChange(day.id)}
-                  />
-                  <Label 
-                    htmlFor={`day-${day.id}`}
-                    className="cursor-pointer"
-                  >
-                    {day.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-between">
-        <Button 
-          type="button" 
-          variant="outline"
-          onClick={onBack}
-        >
-          Voltar
-        </Button>
-        <Button type="submit">
-          Continuar
-        </Button>
-      </div>
-    </form>
+        </div>
+        <Button onClick={onNext}>Próximo</Button>
+      </CardContent>
+    </Card>
   );
 };
+
+export default PreferencesStep;

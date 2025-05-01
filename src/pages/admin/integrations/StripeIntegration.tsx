@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,16 +37,14 @@ export const StripeIntegrationPage = () => {
           .single();
 
         if (error) {
-          // Se a tabela não existir, retorna um config padrão
-          if (error.code === "PGRST116") { // Código para relação/tabela não existente
-            return {
-              id: null,
-              environment: 'test' as const,
-              publishable_key: '',
-              status: 'inactive' as const
-            };
-          }
-          throw error;
+          // Se houver erro, retorna um config padrão
+          console.error('Erro ao buscar config do Stripe:', error);
+          return {
+            id: null,
+            environment: 'test' as const,
+            publishable_key: '',
+            status: 'inactive' as const
+          };
         }
 
         return data;

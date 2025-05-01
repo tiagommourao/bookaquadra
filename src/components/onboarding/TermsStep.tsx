@@ -9,7 +9,11 @@ export interface TermsStepProps {
 }
 
 const TermsStep = ({ onNext, onBack }: TermsStepProps) => {
-  const [acceptedTerms, setAcceptedTerms] = React.useState(false);
+  const [acceptedTerms, setAcceptTerms] = React.useState(false);
+
+  const handleAcceptTerms = (checked: boolean) => {
+    setAcceptTerms(checked);
+  };
 
   return (
     <Card className="w-full">
@@ -28,7 +32,7 @@ const TermsStep = ({ onNext, onBack }: TermsStepProps) => {
               checked={acceptedTerms}
               onCheckedChange={(checked) => {
                 if (checked !== undefined) {
-                  setAcceptedTerms(checked);
+                  handleAcceptTerms(checked);
                 }
               }}
             />

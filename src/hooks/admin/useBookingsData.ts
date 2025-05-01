@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -89,7 +88,8 @@ export function useBookingsData() {
       
       if (error) throw error;
       
-      return data as (Booking & {
+      // Converter explicitamente para o tipo correto
+      return data as unknown as (Booking & {
         profiles: { first_name: string | null; last_name: string | null; phone: string | null };
         court: { name: string };
       })[];
@@ -200,4 +200,3 @@ export function useBookingsData() {
     selectedDayBookings
   };
 }
-

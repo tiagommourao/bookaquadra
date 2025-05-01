@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types';
@@ -6,6 +5,7 @@ import { toast } from 'sonner';
 
 export interface AdminUser extends Omit<User, 'id'> {
   id: string;
+  name?: string; // Adicionado name
   phone?: string;
   city?: string;
   neighborhood?: string;
@@ -17,6 +17,7 @@ export interface AdminUser extends Omit<User, 'id'> {
   badges?: string[];
   lastLogin?: Date | string;
   createdAt: string;
+  created_at: string; // Adicionado para compatibilidade
   role: 'user' | 'admin';
 }
 
@@ -132,6 +133,7 @@ export const useAdminUsers = () => {
           badges: profile.user_achievements?.map((achievement: any) => achievement.achievement_type_id?.name).filter(Boolean) || [],
           lastLogin: authUser?.last_sign_in_at,
           createdAt: profile.created_at,
+          created_at: profile.created_at, // Adicionado para compatibilidade
           role: adminIds.has(profile.id) ? 'admin' : 'user'
         };
       }) || [];

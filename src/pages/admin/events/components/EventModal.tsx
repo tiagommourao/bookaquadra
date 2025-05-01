@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,10 +41,10 @@ const eventSchema = z.object({
   end_datetime: z.date({
     required_error: "Data e hora de fim são obrigatórias",
   }),
-  event_type: z.enum(['tournament', 'class', 'day_use', 'private'] as const, {
+  event_type: z.enum(['tournament', 'class', 'day_use', 'private', 'practice', 'social', 'other'] as const, {
     required_error: "Tipo de evento é obrigatório",
   }),
-  status: z.enum(['active', 'inactive', 'completed'] as const, {
+  status: z.enum(['active', 'inactive', 'completed', 'cancelled', 'draft'] as const, {
     required_error: "Status é obrigatório",
   }),
   registration_fee: z.string().optional(),
@@ -76,8 +75,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
     defaultValues: {
       name: "",
       description: "",
-      event_type: "tournament" as EventType,
-      status: "active" as EventStatus,
+      event_type: "tournament", 
+      status: "active",
       block_courts: true,
       notify_clients: false,
       court_ids: [],
@@ -121,7 +120,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
       updateEvent(
         {
           eventId,
-          event: eventData,
+          event: eventData as any,
           courtIds: values.court_ids,
         },
         {
@@ -129,7 +128,6 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
         }
       );
     } else {
-      // Fixed the type casting issue
       createEvent(
         {
           event: eventData as any,
@@ -163,8 +161,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
         description: event.description || "",
         start_datetime: startDateTime,
         end_datetime: endDateTime,
-        event_type: event.event_type as EventType,
-        status: event.status as EventStatus,
+        event_type: event.event_type as any,
+        status: event.status as any,
         registration_fee: event.registration_fee?.toString() || "",
         max_capacity: event.max_capacity?.toString() || "",
         block_courts: event.block_courts,
@@ -175,8 +173,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
       form.reset({
         name: "",
         description: "",
-        event_type: "tournament" as EventType,
-        status: "active" as EventStatus,
+        event_type: "tournament", 
+        status: "active",
         block_courts: true,
         notify_clients: false,
         court_ids: [],
@@ -252,6 +250,9 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
                         <SelectItem value="class">Aula Especial</SelectItem>
                         <SelectItem value="day_use">Day Use</SelectItem>
                         <SelectItem value="private">Evento Privado</SelectItem>
+                        <SelectItem value="practice">Prática</SelectItem>
+                        <SelectItem value="social">Social</SelectItem>
+                        <SelectItem value="other">Outro</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -537,6 +538,8 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, eventId
                         <SelectItem value="active">Ativo</SelectItem>
                         <SelectItem value="inactive">Inativo</SelectItem>
                         <SelectItem value="completed">Finalizado</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
+                        <SelectItem value="draft">Rascunho</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
