@@ -1,54 +1,39 @@
-
 // Tipos para pagamentos
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'rejected' | 'expired';
+export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'refunded';
 
 export interface Payment {
   id: string;
-  user_id?: string;
-  booking_id?: string;
+  booking_id: string;
   amount: number;
   status: PaymentStatus;
-  payment_method?: string;
-  mercadopago_payment_id?: string;
-  expiration_date?: string;
-  raw_response?: any;
-  admin_modified_by?: string;
-  admin_modification_reason?: string;
+  provider: 'mercadopago' | 'stripe';
+  provider_payment_id?: string;
   created_at: string;
   updated_at: string;
-  // Campos adicionais para visualização
-  first_name?: string;
-  last_name?: string;
-  court_name?: string;
-  booking_date?: string;
-  start_time?: string;
-  end_time?: string;
 }
 
 export interface PaymentStatusLog {
   id: string;
   payment_id: string;
-  previous_status: string;
-  new_status: string;
-  created_by?: string;
-  reason?: string;
+  status: PaymentStatus;
   created_at: string;
 }
 
 export interface PaymentStatistics {
-  totalPayments: number;
-  paidAmount: number;
-  pendingAmount: number;
-  cancelledAmount: number;
+  total_payments: number;
+  total_amount: number;
+  approved_payments: number;
+  pending_payments: number;
+  rejected_payments: number;
 }
 
 export interface MercadoPagoNotification {
-  id: number;
+  id: string;
   live_mode: boolean;
   type: string;
   date_created: string;
-  application_id: number;
-  user_id: number;
+  application_id: string;
+  user_id: string;
   version: number;
   api_version: string;
   action: string;
@@ -58,28 +43,19 @@ export interface MercadoPagoNotification {
 }
 
 export interface MercadoPagoPaymentResponse {
-  id: number;
+  id: string;
   status: string;
   status_detail: string;
-  external_reference: string;
   transaction_amount: number;
-  payment_method: {
-    id: string;
-    type: string;
-  };
-  date_created: string;
-  date_approved: string;
-  payer: {
-    id: number;
-    email: string;
-    first_name: string;
-    last_name: string;
-  };
+  payment_method_id: string;
+  payment_type_id: string;
+  external_reference?: string;
 }
 
 export interface TestConnectionResult {
   success: boolean;
   message: string;
+  details?: any;
 }
 
 export interface PaymentMethodConfig {

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -45,7 +44,7 @@ export function useBookingForm({ booking, onClose }: {
   const watchSubscriptionEndDate = form.watch('subscription_end_date');
   
   // Use specialized hooks for different aspects of booking form functionality
-  useBookingFormValues({ booking, form });
+  const formValues = useBookingFormValues({ booking, form: form.control });
   
   const { scheduleConflict, isValidatingSchedule } = useBookingAvailability({
     watchCourtId,

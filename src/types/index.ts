@@ -1,4 +1,3 @@
-
 import { PaymentMethodConfig } from './payment';
 
 // Tipos de autenticação e usuário
@@ -183,9 +182,11 @@ export {
   PaymentStatistics,
   MercadoPagoNotification,
   MercadoPagoPaymentResponse,
-  TestConnectionResult,
-  PaymentMethodConfig
+  TestConnectionResult
 };
 
-// Export do tipo BookingStatus do arquivo booking.ts
+// Export do tipo PaymentMethodConfig
+export type { PaymentMethodConfig } from './payment';
+
+// Export do tipo BookingStatus
 export type { BookingStatus } from './booking';

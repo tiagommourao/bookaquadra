@@ -1,15 +1,24 @@
-
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { AvatarFrame } from '@/components/gamification/AvatarFrame';
 import { UserLevel } from '@/components/gamification/UserLevel';
 import { UserData } from '../AdminUserDetails';
 
-interface UserProfileHeaderProps {
-  userData: UserData;
+export interface UserProfileHeaderProps {
+  user: UserData;
+  onBlockUser: (reason: string) => Promise<boolean>;
+  onUnblockUser: () => Promise<boolean>;
+  onMakeAdmin: () => Promise<boolean>;
+  onRemoveAdmin: () => Promise<boolean>;
 }
 
-export function UserProfileHeader({ userData }: UserProfileHeaderProps) {
+export const UserProfileHeader: React.FC<UserProfileHeaderProps> = ({
+  user,
+  onBlockUser,
+  onUnblockUser,
+  onMakeAdmin,
+  onRemoveAdmin
+}) => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'active':
@@ -26,22 +35,22 @@ export function UserProfileHeader({ userData }: UserProfileHeaderProps) {
   return (
     <div className="flex items-center space-x-4">
       <AvatarFrame
-        src={userData.avatarUrl || undefined}
-        fallback={userData.name.charAt(0)}
-        frameType={userData.level as any}
+        src={user.avatarUrl || undefined}
+        fallback={user.name.charAt(0)}
+        frameType={user.level as any}
         size="lg"
       />
       <div>
-        <h3 className="text-xl font-semibold">{userData.name}</h3>
+        <h3 className="text-xl font-semibold">{user.name}</h3>
         <div className="flex items-center mt-1 space-x-2">
-          <UserLevel level={userData.level as any} points={userData.points} showDetails />
-          {userData.status !== 'active' && (
+          <UserLevel level={user.level as any} points={user.points} showDetails />
+          {user.status !== 'active' && (
             <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-              {getStatusLabel(userData.status)}
+              {getStatusLabel(user.status)}
             </Badge>
           )}
         </div>
       </div>
     </div>
   );
-}
+};

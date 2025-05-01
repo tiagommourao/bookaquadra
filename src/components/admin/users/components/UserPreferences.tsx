@@ -1,20 +1,22 @@
-
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { getDayName } from '@/lib/utils';
+import { UserData } from '../AdminUserDetails';
 
-interface UserPreferencesProps {
-  userPreferences: any;
+export interface UserPreferencesProps {
+  user: UserData;
 }
 
-export function UserPreferences({ userPreferences }: UserPreferencesProps) {
+export const UserPreferences: React.FC<UserPreferencesProps> = ({
+  user
+}) => {
   const getPreferredGameTypes = () => {
-    if (!userPreferences?.preferred_game_types || userPreferences.preferred_game_types.length === 0) {
+    if (!user?.preferred_game_types || user.preferred_game_types.length === 0) {
       return 'Não informado';
     }
     
-    return userPreferences.preferred_game_types.map((type: string) => {
+    return user.preferred_game_types.map((type: string) => {
       switch (type) {
         case 'singles':
           return 'Individual';
@@ -29,31 +31,31 @@ export function UserPreferences({ userPreferences }: UserPreferencesProps) {
   };
   
   const getPreferredDays = () => {
-    if (!userPreferences?.preferred_days || userPreferences.preferred_days.length === 0) {
+    if (!user?.preferred_days || user.preferred_days.length === 0) {
       return 'Não informado';
     }
     
-    return userPreferences.preferred_days
+    return user.preferred_days
       .map((day: number) => getDayName(day))
       .join(', ');
   };
   
   const getPreferredTimes = () => {
-    if (!userPreferences?.preferred_times) {
+    if (!user?.preferred_times) {
       return 'Não informado';
     }
     
     const times: string[] = [];
     
-    if (userPreferences.preferred_times.morning) {
+    if (user.preferred_times.morning) {
       times.push('Manhã');
     }
     
-    if (userPreferences.preferred_times.afternoon) {
+    if (user.preferred_times.afternoon) {
       times.push('Tarde');
     }
     
-    if (userPreferences.preferred_times.evening) {
+    if (user.preferred_times.evening) {
       times.push('Noite');
     }
     
@@ -81,20 +83,20 @@ export function UserPreferences({ userPreferences }: UserPreferencesProps) {
       </div>
       <div className="flex justify-between items-center">
         <div className="text-sm">Receber notificações por e-mail</div>
-        <Switch checked={userPreferences?.wants_notifications || false} disabled />
+        <Switch checked={user?.wants_notifications || false} disabled />
       </div>
       <div className="flex justify-between items-center">
         <div className="text-sm">Status do onboarding</div>
-        <Badge variant={userPreferences?.onboarding_completed ? "secondary" : "outline"} className={userPreferences?.onboarding_completed ? "bg-green-100 text-green-800" : ""}>
-          {userPreferences?.onboarding_completed ? "Completo" : "Pendente"}
+        <Badge variant={user?.onboarding_completed ? "secondary" : "outline"} className={user?.onboarding_completed ? "bg-green-100 text-green-800" : ""}>
+          {user?.onboarding_completed ? "Completo" : "Pendente"}
         </Badge>
       </div>
       <div className="flex justify-between items-center">
         <div className="text-sm">Termos aceitos</div>
-        <Badge variant={userPreferences?.terms_accepted ? "secondary" : "outline"} className={userPreferences?.terms_accepted ? "bg-green-100 text-green-800" : ""}>
-          {userPreferences?.terms_accepted ? "Sim" : "Não"}
+        <Badge variant={user?.terms_accepted ? "secondary" : "outline"} className={user?.terms_accepted ? "bg-green-100 text-green-800" : ""}>
+          {user?.terms_accepted ? "Sim" : "Não"}
         </Badge>
       </div>
     </div>
   );
-}
+};
