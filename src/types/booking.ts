@@ -1,8 +1,7 @@
-
 // Tipos para reservas
 import { PaymentStatus } from './payment';
 
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
 
 export interface Booking {
   id: string;

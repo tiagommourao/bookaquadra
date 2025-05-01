@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,6 @@ export const StripeIntegrationPage = () => {
     queryKey: ['stripe-config'],
     queryFn: async () => {
       try {
-        // Tenta buscar na tabela integrations_stripe
         const { data, error } = await supabase
           .from('integrations_stripe')
           .select('*')
@@ -38,12 +37,13 @@ export const StripeIntegrationPage = () => {
           .maybeSingle();
 
         if (error) {
-          // Se houver erro, retorna um config padrão
           console.error('Erro ao buscar config do Stripe:', error);
           return {
             id: null,
             environment: 'test' as const,
             publishable_key: '',
+            secret_key: '',
+            webhook_secret: '',
             status: 'inactive' as const
           };
         }
@@ -55,6 +55,8 @@ export const StripeIntegrationPage = () => {
           id: null,
           environment: 'test' as const,
           publishable_key: '',
+          secret_key: '',
+          webhook_secret: '',
           status: 'inactive' as const
         };
       }
@@ -62,12 +64,12 @@ export const StripeIntegrationPage = () => {
   });
 
   // Efeito para atualizar os campos quando o stripeConfig for carregado
-  React.useEffect(() => {
+  useEffect(() => {
     if (stripeConfig) {
       setEnvironment(stripeConfig.environment as 'test' | 'production');
       setPublishableKey(stripeConfig.publishable_key || "");
-      if (stripeConfig.secret_key) setSecretKey(stripeConfig.secret_key);
-      if (stripeConfig.webhook_secret) setWebhookSecret(stripeConfig.webhook_secret);
+      setSecretKey(stripeConfig.secret_key || "");
+      setWebhookSecret(stripeConfig.webhook_secret || "");
       setIsActive(stripeConfig.status === 'active');
     }
   }, [stripeConfig]);
@@ -128,14 +130,17 @@ export const StripeIntegrationPage = () => {
     setIsLoading(true);
 
     try {
-      // Aqui você pode implementar uma verificação real com a API do Stripe
-      // Por enquanto, apenas simulamos uma verificação básica
-      const result: StripeTestConnectionResult = {
-        success: !!publishableKey && !!secretKey,
-        message: !!publishableKey && !!secretKey
-          ? 'Conexão com o Stripe estabelecida com sucesso.'
-          : 'Falha na conexão. Verifique suas chaves API.'
-      };
+      // Chamada para o edge function que testa a conexão com o Stripe
+      const response = await fetch('https://yvgdtiuhrticewtlutio.supabase.co/functions/v1/test-stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({ secretKey })
+      });
+
+      const result: StripeTestConnectionResult = await response.json();
 
       if (result.success) {
         toast({

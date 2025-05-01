@@ -568,6 +568,75 @@ export type Database = {
           },
         ]
       }
+      integrations_stripe: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          environment: string
+          id: string
+          last_test_success: boolean | null
+          last_tested_at: string | null
+          name: string
+          publishable_key: string | null
+          secret_key: string | null
+          status: string
+          test_result_message: string | null
+          updated_at: string
+          updated_by: string | null
+          webhook_secret: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          last_test_success?: boolean | null
+          last_tested_at?: string | null
+          name?: string
+          publishable_key?: string | null
+          secret_key?: string | null
+          status?: string
+          test_result_message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          last_test_success?: boolean | null
+          last_tested_at?: string | null
+          name?: string
+          publishable_key?: string | null
+          secret_key?: string | null
+          status?: string
+          test_result_message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_stripe_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_stripe_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_status_logs: {
         Row: {
           created_at: string

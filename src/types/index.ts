@@ -6,7 +6,7 @@ import { PaymentStatus, Payment, PaymentStatusLog, PaymentStatistics, MercadoPag
 // Tipos de autenticação e usuário
 export interface User {
   id: string;
-  email: string;
+  email: string | null; // Alterado para permitir null
   app_metadata?: {
     provider?: string;
     [key: string]: any;
@@ -15,7 +15,7 @@ export interface User {
     [key: string]: any;
   };
   created_at: string;
-  role?: string; // Adicionado role para corrigir erros
+  role?: string;
 }
 
 export interface Profile {
