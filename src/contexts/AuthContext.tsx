@@ -18,6 +18,12 @@ interface AuthContextType {
     error: string | null;
   }>;
   signOut: () => Promise<void>;
+  // Aliases para compatibilidade com código existente
+  login: (email: string, password: string) => Promise<{
+    success: boolean;
+    error: string | null;
+  }>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,7 +43,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       created_at: supabaseUser.created_at,
       app_metadata: supabaseUser.app_metadata,
       user_metadata: supabaseUser.user_metadata,
-      role: null // Será definido posteriormente
+      role: null, // Será definido posteriormente
+      // Adicionado para compatibilidade com o código existente
+      name: supabaseUser.user_metadata?.full_name || '',
+      avatarUrl: supabaseUser.user_metadata?.avatar_url || null
     };
   };
 
@@ -224,6 +233,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signIn,
         signUp,
         signOut,
+        // Aliases para compatibilidade com código existente
+        login: signIn,
+        logout: signOut,
       }}
     >
       {children}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Search, FilterIcon, Download, Mail, UserX } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AdminUsersFilter } from '@/components/admin/users/AdminUsersFilter';
-import { AdminUserDetails } from '@/components/admin/users/AdminUserDetails';
+import { AdminUserDetails, UserData } from '@/components/admin/users/AdminUserDetails';
 import { useAdminUsers } from '@/hooks/admin/useAdminUsers';
 import { UsersTable } from '@/components/admin/users/UsersTable';
 import { toast } from 'sonner';
@@ -210,7 +209,20 @@ const UsersList = () => {
             userId={selectedUser} 
             onClose={closeUserDetails}
             userData={{
-              ...users.find(u => u.id === selectedUser)!,
+              id: users.find(u => u.id === selectedUser)?.id || selectedUser,
+              name: users.find(u => u.id === selectedUser)?.name || 'Usuário',
+              email: users.find(u => u.id === selectedUser)?.email || '',
+              phone: users.find(u => u.id === selectedUser)?.phone || '',
+              city: users.find(u => u.id === selectedUser)?.city || '',
+              neighborhood: users.find(u => u.id === selectedUser)?.neighborhood || '',
+              level: users.find(u => u.id === selectedUser)?.level || 'Iniciante',
+              points: users.find(u => u.id === selectedUser)?.points || 0,
+              sports: users.find(u => u.id === selectedUser)?.sports || [],
+              status: users.find(u => u.id === selectedUser)?.status || 'active',
+              avatarUrl: users.find(u => u.id === selectedUser)?.avatarUrl,
+              badges: users.find(u => u.id === selectedUser)?.badges || [],
+              lastLogin: users.find(u => u.id === selectedUser)?.lastLogin,
+              createdAt: users.find(u => u.id === selectedUser)?.createdAt || users.find(u => u.id === selectedUser)?.created_at || '',
               isAdmin: users.find(u => u.id === selectedUser)?.role === 'admin'
             }}
           />

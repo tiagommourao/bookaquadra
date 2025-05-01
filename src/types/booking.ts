@@ -1,3 +1,4 @@
+
 // Tipos para reservas
 import { PaymentStatus } from './payment';
 
@@ -24,6 +25,8 @@ export interface Booking {
     type_id: string;
     image_url?: string | null;
   };
+  // Propriedade que estava sendo usada em useBookingForm.ts
+  booking?: any;
 }
 
 export interface BookingRequest {

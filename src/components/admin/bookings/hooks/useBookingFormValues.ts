@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Booking, BookingStatus } from '@/types';
 
@@ -15,7 +16,7 @@ interface BookingFormData {
   notes: string;
 }
 
-export const useBookingFormValues = (booking?: Booking) => {
+export const useBookingFormValues = (booking?: Booking | null) => {
   const [bookingData, setBookingData] = useState<BookingFormData>({
     userId: booking?.user_id || '',
     courtId: booking?.court_id || '',

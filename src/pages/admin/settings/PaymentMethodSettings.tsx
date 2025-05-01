@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -8,22 +8,32 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { PaymentMethodConfig } from '@/types';
+import { PaymentMethodConfig, SiteSettings } from '@/types';
 
 export const PaymentMethodSettings = () => {
+  const queryClient = useQueryClient();
   const [selectedMethod, setSelectedMethod] = useState<'mercadopago' | 'stripe'>('mercadopago');
 
   // Buscar a configuração atual
   const { data: settings, isLoading: isLoadingSettings } = useQuery({
     queryKey: ['site-settings'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('*')
-        .single();
-      
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('*')
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Erro ao carregar configurações:', error);
+          return null;
+        }
+        
+        return data as SiteSettings | null;
+      } catch (error) {
+        console.error('Erro ao buscar configurações:', error);
+        return null;
+      }
     },
   });
 
@@ -31,21 +41,26 @@ export const PaymentMethodSettings = () => {
   const { data: mercadoPagoConfig, isLoading: isLoadingMercadoPago } = useQuery({
     queryKey: ['mercado-pago-config'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('integrations_mercadopago')
-        .select('*')
-        .limit(1)
-        .single();
-      
-      if (error) {
-        // Se não encontrar, retorna objeto vazio
-        if (error.code === 'PGRST116') {
-          return { status: 'inactive' };
+      try {
+        const { data, error } = await supabase
+          .from('integrations_mercadopago')
+          .select('*')
+          .limit(1)
+          .maybeSingle();
+        
+        if (error) {
+          // Se não encontrar, retorna objeto vazio
+          if (error.code === 'PGRST116') {
+            return { status: 'inactive' } as const;
+          }
+          throw error;
         }
-        throw error;
+        
+        return data;
+      } catch (error) {
+        console.error('Erro ao buscar configuração do Mercado Pago:', error);
+        return { status: 'inactive' } as const;
       }
-      
-      return data;
     },
   });
 
@@ -53,55 +68,93 @@ export const PaymentMethodSettings = () => {
   const { data: stripeConfig, isLoading: isLoadingStripe } = useQuery({
     queryKey: ['stripe-config'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('integrations_stripe')
-        .select('*')
-        .limit(1)
-        .single();
-      
-      if (error) {
-        // Se não encontrar, retorna objeto vazio
-        if (error.code === 'PGRST116') {
-          return { status: 'inactive' };
+      try {
+        const { data, error } = await supabase
+          .from('integrations_stripe')
+          .select('*')
+          .limit(1)
+          .maybeSingle();
+        
+        if (error) {
+          // Se não encontrar, retorna objeto vazio
+          if (error.code === 'PGRST116') {
+            return { status: 'inactive' } as const;
+          }
+          throw error;
         }
-        throw error;
+        
+        return data;
+      } catch (error) {
+        console.error('Erro ao buscar configuração do Stripe:', error);
+        return { status: 'inactive' } as const;
       }
-      
-      return data;
     },
   });
 
   // Mutação para salvar as configurações
   const updateSettings = useMutation({
     mutationFn: async () => {
+      // Verifica se o mercadoPagoConfig e stripeConfig estão disponíveis
+      const mercadoPagoEnvironment = typeof mercadoPagoConfig === 'object' && mercadoPagoConfig && 
+                                     'environment' in mercadoPagoConfig ? 
+                                     mercadoPagoConfig.environment : 'sandbox';
+      
+      const stripeEnvironment = typeof stripeConfig === 'object' && stripeConfig && 
+                               'environment' in stripeConfig ? 
+                               stripeConfig.environment : 'test';
+
       const paymentMethod: PaymentMethodConfig = {
         default: selectedMethod,
         mercadopago: {
-          enabled: mercadoPagoConfig?.status === 'active',
-          environment: mercadoPagoConfig?.environment || 'sandbox'
+          enabled: typeof mercadoPagoConfig === 'object' && mercadoPagoConfig && mercadoPagoConfig.status === 'active',
+          environment: mercadoPagoEnvironment as 'sandbox' | 'production'
         },
         stripe: {
-          enabled: stripeConfig?.status === 'active',
-          environment: stripeConfig?.environment || 'test'
+          enabled: typeof stripeConfig === 'object' && stripeConfig && stripeConfig.status === 'active',
+          environment: stripeEnvironment as 'test' | 'production'
         }
       };
 
-      const { data, error } = await supabase
-        .from('site_settings')
-        .update({
-          paymentMethod
-        })
-        .eq('id', settings?.id)
-        .select();
-      
-      if (error) throw error;
-      return data;
+      // Verifica se settings existe para decidir entre atualizar ou inserir
+      if (settings && settings.id) {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .update({
+            paymentMethod
+          })
+          .eq('id', settings.id)
+          .select();
+        
+        if (error) throw error;
+        return data;
+      } else {
+        // Se não existir, cria um novo registro
+        const { data, error } = await supabase
+          .from('site_settings')
+          .insert([{
+            companyName: 'BookaQuadra',
+            logo: '',
+            primaryColor: '#06b6d4',
+            secondaryColor: '#0891b2',
+            contactEmail: '',
+            contactPhone: '',
+            cancellationPolicy: '',
+            mercadoPagoKey: '',
+            googleCalendarIntegration: false,
+            paymentMethod
+          }])
+          .select();
+        
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       toast({
         title: 'Configurações salvas',
         description: 'Método de pagamento atualizado com sucesso.',
       });
+      queryClient.invalidateQueries({ queryKey: ['site-settings'] });
     },
     onError: (error) => {
       console.error('Erro ao salvar configurações:', error);
@@ -121,8 +174,8 @@ export const PaymentMethodSettings = () => {
   }, [settings]);
 
   const isLoading = isLoadingSettings || isLoadingMercadoPago || isLoadingStripe;
-  const isMercadoPagoAvailable = mercadoPagoConfig?.status === 'active';
-  const isStripeAvailable = stripeConfig?.status === 'active';
+  const isMercadoPagoAvailable = typeof mercadoPagoConfig === 'object' && mercadoPagoConfig && mercadoPagoConfig.status === 'active';
+  const isStripeAvailable = typeof stripeConfig === 'object' && stripeConfig && stripeConfig.status === 'active';
 
   return (
     <div className="container mx-auto p-6">

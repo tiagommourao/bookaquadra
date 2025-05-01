@@ -1,12 +1,12 @@
+
 import { PaymentMethodConfig } from './payment';
-import { Booking, BookingStatus, BookingRequest, BookingResponse } from './booking';
-import { Court, AvailableTimeSlot, Schedule, ScheduleBlock, Holiday } from './court';
-import { PaymentStatus, Payment, PaymentStatusLog, PaymentStatistics, MercadoPagoNotification, MercadoPagoPaymentResponse, TestConnectionResult } from './payment';
 
 // Tipos de autenticação e usuário
 export interface User {
   id: string;
-  email: string | null; // Alterado para permitir null
+  email: string | null;
+  name?: string; // Adicionado para compatibilidade
+  avatarUrl?: string; // Adicionado para compatibilidade
   app_metadata?: {
     provider?: string;
     [key: string]: any;
@@ -127,31 +127,9 @@ export interface GameTypePreference {
   selected: boolean;
 }
 
-// Atualizar o tipo BookingStatus
-export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
-
-// Reexportar os tipos de outros arquivos
-export type { 
-  Booking, 
-  BookingStatus, 
-  BookingRequest, 
-  BookingResponse,
-  Court, 
-  AvailableTimeSlot, 
-  Schedule, 
-  ScheduleBlock, 
-  Holiday,
-  PaymentStatus, 
-  Payment, 
-  PaymentStatusLog, 
-  PaymentStatistics, 
-  MercadoPagoNotification, 
-  MercadoPagoPaymentResponse,
-  TestConnectionResult,
-  PaymentMethodConfig
-};
-
+// Tipo para configurações do site
 export interface SiteSettings {
+  id?: string;
   companyName: string;
   logo: string;
   primaryColor: string;
@@ -162,4 +140,52 @@ export interface SiteSettings {
   mercadoPagoKey: string;
   googleCalendarIntegration: boolean;
   paymentMethod?: PaymentMethodConfig;
+  created_at?: string;
+  updated_at?: string;
 }
+
+// Importar todos os outros tipos de arquivos separados
+import {
+  Booking,
+  BookingRequest,
+  BookingResponse
+} from './booking';
+
+import {
+  AvailableTimeSlot,
+  Schedule,
+  ScheduleBlock,
+  Holiday
+} from './court';
+
+import {
+  PaymentStatus,
+  Payment,
+  PaymentStatusLog,
+  PaymentStatistics,
+  MercadoPagoNotification,
+  MercadoPagoPaymentResponse,
+  TestConnectionResult
+} from './payment';
+
+// Reexportar para compatibilidade - sem criar conflitos
+export {
+  Booking,
+  BookingRequest,
+  BookingResponse,
+  AvailableTimeSlot,
+  Schedule,
+  ScheduleBlock,
+  Holiday,
+  PaymentStatus,
+  Payment,
+  PaymentStatusLog,
+  PaymentStatistics,
+  MercadoPagoNotification,
+  MercadoPagoPaymentResponse,
+  TestConnectionResult,
+  PaymentMethodConfig
+};
+
+// Export do tipo BookingStatus do arquivo booking.ts
+export type { BookingStatus } from './booking';
