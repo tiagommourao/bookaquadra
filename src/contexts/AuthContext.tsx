@@ -8,6 +8,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isLoading: boolean;
   isAuthenticated: boolean;
+  error: string | null;
   signIn: (email: string, password: string) => Promise<{
     success: boolean;
     error: string | null;
@@ -36,8 +37,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
 
   // Função para mapear o usuário do Supabase para nosso tipo User
-  const mapUserToCustomUser = (supabaseUser: any): User => {
+  const mapUserToCustomUser = (supabaseUser: any): User | null => {
     if (!supabaseUser) return null;
+    
+    console.log('Mapeando usuário:', supabaseUser);
+    
     return {
       id: supabaseUser.id,
       email: supabaseUser.email,
@@ -53,6 +57,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Função para verificar se o usuário é admin
   const checkUserRole = async (userId: string) => {
     try {
+      console.log('Verificando papel do usuário:', userId);
+      
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
@@ -60,6 +66,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
 
       if (error) throw error;
+      
+      console.log('Resultado da verificação de papel:', data);
+      
       return data?.role === 'admin';
     } catch (error) {
       console.error('Erro ao verificar papel do usuário:', error);
@@ -70,6 +79,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Função para carregar o perfil do usuário
   const loadUserProfile = async (userId: string) => {
     try {
+      console.log('Carregando perfil do usuário:', userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -77,10 +88,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
 
       if (error) throw error;
+      
+      console.log('Perfil carregado:', data);
+      
       return data;
     } catch (error) {
       console.error('Erro ao carregar perfil do usuário:', error);
       return null;
+    }
+  };
+
+  // Função para atualizar o estado do usuário
+  const updateUserState = async (sessionUser: any) => {
+    try {
+      console.log('Atualizando estado do usuário:', sessionUser);
+      
+      if (!sessionUser) {
+        setUser(null);
+        setProfile(null);
+        setIsAdmin(false);
+        setIsAuthenticated(false);
+        setError(null);
+        return;
+      }
+
+      const customUser = mapUserToCustomUser(sessionUser);
+      
+      // Carregar dados do usuário em paralelo
+      const [userProfile, userIsAdmin] = await Promise.all([
+        loadUserProfile(sessionUser.id),
+        checkUserRole(sessionUser.id)
+      ]);
+
+      setUser(customUser);
+      setProfile(userProfile);
+      setIsAdmin(userIsAdmin);
+      setIsAuthenticated(true);
+      setError(null);
+      
+      console.log('Estado do usuário atualizado:', {
+        user: customUser,
+        profile: userProfile,
+        isAdmin: userIsAdmin
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar estado do usuário:', error);
+      setError(error.message);
     }
   };
 
@@ -90,79 +143,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const checkSession = async () => {
       try {
+        console.log('Iniciando verificação de sessão');
         setIsLoading(true);
         setError(null);
 
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
+        console.log('Sessão recuperada:', session);
+        
         if (sessionError) throw sessionError;
 
         if (session?.user && mounted) {
-          const customUser = mapUserToCustomUser(session.user);
-          
-          // Carregar dados do usuário em paralelo
-          const [userProfile, userIsAdmin] = await Promise.all([
-            loadUserProfile(session.user.id),
-            checkUserRole(session.user.id)
-          ]);
-
-          if (mounted) {
-            setUser(customUser);
-            setProfile(userProfile);
-            setIsAdmin(userIsAdmin);
-            setIsAuthenticated(true);
-          }
+          await updateUserState(session.user);
         } else if (mounted) {
-          setUser(null);
-          setProfile(null);
-          setIsAdmin(false);
-          setIsAuthenticated(false);
+          await updateUserState(null);
         }
       } catch (error) {
         console.error('Erro ao verificar sessão:', error);
         if (mounted) {
           setError(error.message);
-          setUser(null);
-          setProfile(null);
-          setIsAdmin(false);
-          setIsAuthenticated(false);
+          await updateUserState(null);
         }
       } finally {
         if (mounted) {
           setIsLoading(false);
+          console.log('Verificação de sessão concluída');
         }
       }
     };
 
+    // Verificar sessão inicial
     checkSession();
 
+    // Configurar listener para mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
+        console.log('Evento de autenticação:', event, session);
+
         try {
           if (event === 'SIGNED_IN' && session?.user) {
-            const customUser = mapUserToCustomUser(session.user);
-            
-            // Carregar dados do usuário em paralelo
-            const [userProfile, userIsAdmin] = await Promise.all([
-              loadUserProfile(session.user.id),
-              checkUserRole(session.user.id)
-            ]);
-
-            if (mounted) {
-              setUser(customUser);
-              setProfile(userProfile);
-              setIsAdmin(userIsAdmin);
-              setIsAuthenticated(true);
-              setError(null);
-            }
-          } else if (event === 'SIGNED_OUT' && mounted) {
-            setUser(null);
-            setProfile(null);
-            setIsAdmin(false);
-            setIsAuthenticated(false);
-            setError(null);
+            await updateUserState(session.user);
+          } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+            await updateUserState(null);
           }
         } catch (error) {
           console.error('Erro ao processar mudança de autenticação:', error);
@@ -174,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     return () => {
+      console.log('Limpando efeito de autenticação');
       mounted = false;
       subscription?.unsubscribe();
     };
@@ -182,31 +207,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Função de login
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Iniciando login:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        console.error('Erro ao fazer login:', error);
-        return { success: false, error: error.message };
-      }
+      if (error) throw error;
 
       if (data?.user) {
-        const customUser = mapUserToCustomUser(data.user);
-        setUser(customUser);
-        setIsAuthenticated(true);
-
-        // Carregar perfil e verificar papel
-        const userProfile = await loadUserProfile(data.user.id);
-        setProfile(userProfile);
-
-        const userIsAdmin = await checkUserRole(data.user.id);
-        setIsAdmin(userIsAdmin);
+        await updateUserState(data.user);
       }
 
       return { success: true, error: null };
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao fazer login:', error);
       return { success: false, error: error.message };
     }
@@ -248,22 +263,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const contextValue = {
+    user,
+    profile,
+    isAdmin,
+    isLoading,
+    isAuthenticated,
+    error,
+    signIn,
+    signUp,
+    signOut,
+    // Aliases para compatibilidade com código existente
+    login: signIn,
+    logout: signOut,
+  };
+
+  console.log('Estado atual do contexto:', contextValue);
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        isAdmin,
-        isLoading,
-        isAuthenticated,
-        signIn,
-        signUp,
-        signOut,
-        // Aliases para compatibilidade com código existente
-        login: signIn,
-        logout: signOut,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
