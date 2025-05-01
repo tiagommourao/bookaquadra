@@ -5,6 +5,10 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://yvgdtiuhrticewtlutio.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2Z2R0aXVocnRpY2V3dGx1dGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MzQ1NzQsImV4cCI6MjA2MDMxMDU3NH0.VjQZP6CTvcT5xRhShy87n_yB3Tgly4LZ74o6Rxi2aQU";
 
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error('Supabase URL and Anon Key são obrigatórios');
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
@@ -12,8 +16,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     persistSession: true,
     storageKey: 'bookaquadra_auth_token',
-    storage: window.localStorage,
+    storage: typeof window !== 'undefined' ? window.localStorage : null,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    flowType: 'pkce',
   },
 });

@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionChecked, setSessionChecked] = useState<boolean>(false);
 
   // Função para mapear o usuário do Supabase para nosso tipo User
   const mapUserToCustomUser = (supabaseUser: any): User | null => {
@@ -142,6 +143,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let mounted = true;
 
     const checkSession = async () => {
+      if (!mounted || sessionChecked) return;
+
       try {
         console.log('Iniciando verificação de sessão');
         setIsLoading(true);
@@ -167,6 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } finally {
         if (mounted) {
           setIsLoading(false);
+          setSessionChecked(true);
           console.log('Verificação de sessão concluída');
         }
       }
@@ -202,13 +206,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [sessionChecked]);
 
   // Função de login
   const signIn = async (email: string, password: string) => {
     try {
       console.log('Iniciando login:', email);
       
+      setIsLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -224,6 +229,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Erro ao fazer login:', error);
       return { success: false, error: error.message };
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -253,13 +260,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Função de logout
   const signOut = async () => {
     try {
+      console.log('Iniciando logout');
+      setIsLoading(true);
       await supabase.auth.signOut();
-      setUser(null);
-      setProfile(null);
-      setIsAdmin(false);
-      setIsAuthenticated(false);
+      await updateUserState(null);
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
