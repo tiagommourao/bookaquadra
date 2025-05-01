@@ -29,4 +29,7 @@ services:
       - "80:80"
     environment:
       - NODE_ENV=production
-    restart: unless-stopped 
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_STRIPE_PUBLIC_KEY=${VITE_STRIPE_PUBLIC_KEY}
+    restart: unless-stopped

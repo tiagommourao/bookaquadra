@@ -19,4 +19,8 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Garantir que as variáveis de ambiente com prefixo VITE_ sejam expostas
+  define: {
+    __APP_ENV__: JSON.stringify(process.env.APP_ENV),
+  },
 }));

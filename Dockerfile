@@ -37,10 +37,20 @@ COPY postcss.config.js ./
 
 RUN npm install
 
+# Copiar arquivo .env se existir
+COPY .env* ./
+
+# Copiar código fonte
 COPY src/ ./src/
 COPY public/ ./public/
 COPY index.html ./
 
+# Certifique-se de que as variáveis de ambiente estão disponíveis durante o build
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_STRIPE_PUBLIC_KEY
+
+# Construir o app
 RUN npm run build
 
 # Estágio de produção
@@ -54,4 +64,4 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"] 
+CMD ["nginx", "-g", "daemon off;"]
