@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,17 +33,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Função para mapear o usuário do Supabase para nosso tipo User
   const mapUserToCustomUser = (supabaseUser: any): User => {
+    if (!supabaseUser) return null;
     return {
       id: supabaseUser.id,
       email: supabaseUser.email,
       created_at: supabaseUser.created_at,
       app_metadata: supabaseUser.app_metadata,
       user_metadata: supabaseUser.user_metadata,
-      role: null, // Será definido posteriormente
-      // Adicionado para compatibilidade com o código existente
+      role: null,
       name: supabaseUser.user_metadata?.full_name || '',
       avatarUrl: supabaseUser.user_metadata?.avatar_url || null
     };
@@ -59,11 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (error) {
-        console.error('Erro ao buscar papel do usuário:', error);
-        return false;
-      }
-
+      if (error) throw error;
       return data?.role === 'admin';
     } catch (error) {
       console.error('Erro ao verificar papel do usuário:', error);
@@ -80,11 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) {
-        console.error('Erro ao carregar perfil do usuário:', error);
-        return null;
-      }
-
+      if (error) throw error;
       return data;
     } catch (error) {
       console.error('Erro ao carregar perfil do usuário:', error);
@@ -94,23 +86,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Efeito para verificar autenticação inicial
   useEffect(() => {
+    let mounted = true;
+
     const checkSession = async () => {
       try {
         setIsLoading(true);
+        setError(null);
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+
+        if (session?.user && mounted) {
           const customUser = mapUserToCustomUser(session.user);
-          setUser(customUser);
-          setIsAuthenticated(true);
+          
+          // Carregar dados do usuário em paralelo
+          const [userProfile, userIsAdmin] = await Promise.all([
+            loadUserProfile(session.user.id),
+            checkUserRole(session.user.id)
+          ]);
 
-          // Carregar perfil e verificar papel
-          const userProfile = await loadUserProfile(session.user.id);
-          setProfile(userProfile);
-
-          const userIsAdmin = await checkUserRole(session.user.id);
-          setIsAdmin(userIsAdmin);
-        } else {
+          if (mounted) {
+            setUser(customUser);
+            setProfile(userProfile);
+            setIsAdmin(userIsAdmin);
+            setIsAuthenticated(true);
+          }
+        } else if (mounted) {
           setUser(null);
           setProfile(null);
           setIsAdmin(false);
@@ -118,37 +120,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         console.error('Erro ao verificar sessão:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkSession();
-
-    // Configurar listener para mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          const customUser = mapUserToCustomUser(session.user);
-          setUser(customUser);
-          setIsAuthenticated(true);
-
-          // Carregar perfil e verificar papel
-          const userProfile = await loadUserProfile(session.user.id);
-          setProfile(userProfile);
-
-          const userIsAdmin = await checkUserRole(session.user.id);
-          setIsAdmin(userIsAdmin);
-        } else if (event === 'SIGNED_OUT') {
+        if (mounted) {
+          setError(error.message);
           setUser(null);
           setProfile(null);
           setIsAdmin(false);
           setIsAuthenticated(false);
         }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
+
+        try {
+          if (event === 'SIGNED_IN' && session?.user) {
+            const customUser = mapUserToCustomUser(session.user);
+            
+            // Carregar dados do usuário em paralelo
+            const [userProfile, userIsAdmin] = await Promise.all([
+              loadUserProfile(session.user.id),
+              checkUserRole(session.user.id)
+            ]);
+
+            if (mounted) {
+              setUser(customUser);
+              setProfile(userProfile);
+              setIsAdmin(userIsAdmin);
+              setIsAuthenticated(true);
+              setError(null);
+            }
+          } else if (event === 'SIGNED_OUT' && mounted) {
+            setUser(null);
+            setProfile(null);
+            setIsAdmin(false);
+            setIsAuthenticated(false);
+            setError(null);
+          }
+        } catch (error) {
+          console.error('Erro ao processar mudança de autenticação:', error);
+          if (mounted) {
+            setError(error.message);
+          }
+        }
       }
     );
 
     return () => {
+      mounted = false;
       subscription?.unsubscribe();
     };
   }, []);
