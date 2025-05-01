@@ -1,29 +1,26 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { GameTypePreference } from '@/types';
 
 export interface PreferencesStepProps {
   onNext: () => void;
+  onBack: () => void;
+  currentStep: string;
 }
 
-export interface GameTypePreference {
-  id: string;
-  name: string;
-  description?: string;
-  selected: boolean;
-}
-
-const gameTypeOptions = [
-  { id: 'competitive', name: 'Competitivo', description: 'Focado em vencer e melhorar o desempenho.' },
-  { id: 'social', name: 'Social', description: 'Prioriza a diversão e o contato com outras pessoas.' },
-  { id: 'exercise', name: 'Exercício', description: 'Busca a prática esportiva como forma de se exercitar.' },
-  { id: 'relaxation', name: 'Relaxamento', description: 'Utiliza o esporte para relaxar e aliviar o estresse.' },
+const gameTypeOptions: GameTypePreference[] = [
+  { id: 'competitive', name: 'Competitivo', description: 'Focado em vencer e melhorar o desempenho.', selected: false },
+  { id: 'social', name: 'Social', description: 'Prioriza a diversão e o contato com outras pessoas.', selected: false },
+  { id: 'exercise', name: 'Exercício', description: 'Busca a prática esportiva como forma de se exercitar.', selected: false },
+  { id: 'relaxation', name: 'Relaxamento', description: 'Utiliza o esporte para relaxar e aliviar o estresse.', selected: false },
 ];
 
-const PreferencesStep = ({ onNext }: PreferencesStepProps) => {
+const PreferencesStep = ({ onNext, onBack }: PreferencesStepProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [gameTypes, setGameTypes] = useState<GameTypePreference[]>(gameTypeOptions);
 
@@ -34,18 +31,7 @@ const PreferencesStep = ({ onNext }: PreferencesStepProps) => {
   const updateGameTypePreference = (id: string, selected: boolean) => {
     setGameTypes(prev => 
       prev.map(item => {
-        if (typeof item === 'string') {
-          // Lidar com entradas string (convertendo para objeto)
-          const preference = gameTypeOptions.find(opt => opt.id === item) || {
-            id: item,
-            name: item,
-            selected: false,
-          };
-          return preference.id === id ? { ...preference, selected } : preference;
-        } else {
-          // Lidar com objetos GameTypePreference
-          return item.id === id ? { ...item, selected } : item;
-        }
+        return item.id === id ? { ...item, selected } : item;
       })
     );
   };
@@ -80,7 +66,10 @@ const PreferencesStep = ({ onNext }: PreferencesStepProps) => {
             ))}
           </div>
         </div>
-        <Button onClick={onNext}>Próximo</Button>
+        <div className="flex justify-between">
+          <Button variant="outline" onClick={onBack}>Voltar</Button>
+          <Button onClick={onNext}>Próximo</Button>
+        </div>
       </CardContent>
     </Card>
   );

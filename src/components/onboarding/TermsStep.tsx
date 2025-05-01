@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,9 +32,7 @@ const TermsStep = ({ onNext, onBack }: TermsStepProps) => {
               id="terms"
               checked={acceptedTerms}
               onCheckedChange={(checked) => {
-                if (checked !== undefined) {
-                  handleAcceptTerms(checked);
-                }
+                handleAcceptTerms(checked === true);
               }}
             />
             <span>Eu aceito os termos e condições</span>

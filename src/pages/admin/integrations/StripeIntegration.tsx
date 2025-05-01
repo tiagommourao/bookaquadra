@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +35,7 @@ export const StripeIntegrationPage = () => {
           .from('integrations_stripe')
           .select('*')
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (error) {
           // Se houver erro, retorna um config padrão
@@ -57,17 +58,19 @@ export const StripeIntegrationPage = () => {
           status: 'inactive' as const
         };
       }
-    },
-    onSuccess: (data) => {
-      if (data) {
-        setEnvironment(data.environment as 'test' | 'production');
-        setPublishableKey(data.publishable_key || "");
-        if (data.secret_key) setSecretKey(data.secret_key);
-        if (data.webhook_secret) setWebhookSecret(data.webhook_secret);
-        setIsActive(data.status === 'active');
-      }
     }
   });
+
+  // Efeito para atualizar os campos quando o stripeConfig for carregado
+  React.useEffect(() => {
+    if (stripeConfig) {
+      setEnvironment(stripeConfig.environment as 'test' | 'production');
+      setPublishableKey(stripeConfig.publishable_key || "");
+      if (stripeConfig.secret_key) setSecretKey(stripeConfig.secret_key);
+      if (stripeConfig.webhook_secret) setWebhookSecret(stripeConfig.webhook_secret);
+      setIsActive(stripeConfig.status === 'active');
+    }
+  }, [stripeConfig]);
 
   // Mutação para salvar configurações
   const saveConfig = useMutation({

@@ -1,126 +1,91 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@12.4.0?target=deno';
+import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
 
-interface StripeConfig {
-  id: string;
-  environment: 'test' | 'production';
-  publishable_key: string;
-  secret_key: string;
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
-    // Criar cliente Supabase usando as credenciais de serviço
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const { secretKey } = await req.json();
     
-    // Obter informações do usuário a partir do token JWT
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!secretKey) {
       return new Response(
-        JSON.stringify({ success: false, message: 'Não autorizado. Token ausente.' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ success: false, message: 'Usuário não encontrado ou token inválido.' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Verificar se o usuário é administrador
-    const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin');
-    
-    if (adminError || !isAdmin) {
-      return new Response(
-        JSON.stringify({ success: false, message: 'Acesso negado. Permissões insuficientes.' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Parse body request
-    const { id } = await req.json();
-    
-    if (!id) {
-      return new Response(
-        JSON.stringify({ success: false, message: 'ID da configuração não fornecido.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Get Stripe integration
-    const { data: stripeConfig, error: stripeError } = await supabaseClient
-      .from('integrations_stripe')
-      .select('*')
-      .eq('id', id)
-      .single();
-      
-    if (stripeError || !stripeConfig) {
-      return new Response(
-        JSON.stringify({ success: false, message: 'Configuração do Stripe não encontrada.' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Test Stripe connection
-    let testResult = {
-      success: false,
-      message: 'Configuração incompleta.'
-    };
-    
-    if (stripeConfig.secret_key) {
-      try {
-        // Inicializa o cliente Stripe com a chave secreta
-        const stripe = new Stripe(stripeConfig.secret_key, {
-          apiVersion: '2023-10-16',
-        });
-        
-        // Tenta obter o account balance para testar a conexão
-        await stripe.balance.retrieve();
-        
-        testResult = {
-          success: true,
-          message: 'Conexão com o Stripe estabelecida com sucesso!'
-        };
-      } catch (error) {
-        console.error('Erro ao conectar com o Stripe:', error);
-        testResult = {
+        JSON.stringify({
           success: false,
-          message: `Erro ao conectar com o Stripe: ${error.message}`
-        };
-      }
+          message: 'Chave secreta não fornecida'
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
     }
-    
-    // Atualiza o status do teste na base de dados
-    await supabaseClient
-      .from('integrations_stripe')
-      .update({
-        last_tested_at: new Date().toISOString(),
-        last_test_success: testResult.success,
-        test_result_message: testResult.message,
-        updated_by: user.id
-      })
-      .eq('id', id);
+
+    const stripe = new Stripe(secretKey, {
+      apiVersion: '2023-10-16',
+      httpClient: Stripe.createFetchHttpClient(),
+    });
+
+    // Try to fetch balance to test if the API key is valid
+    try {
+      await stripe.balance.retrieve();
       
-    return new Response(
-      JSON.stringify(testResult),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
-    
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Conexão com o Stripe estabelecida com sucesso',
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Erro ao testar a conexão com o Stripe:', error);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `Falha na conexão com o Stripe: ${error.message}`,
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
   } catch (error) {
-    console.error('Erro na função test-stripe:', error);
+    console.error('Erro interno:', error);
+    
     return new Response(
-      JSON.stringify({ success: false, message: `Erro interno: ${error.message}` }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: false,
+        message: `Erro interno do servidor: ${error.message}`,
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
     );
   }
 });

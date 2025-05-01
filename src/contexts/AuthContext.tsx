@@ -1,62 +1,86 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Session, User as SupabaseUser, AuthChangeEvent } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { Profile, User } from '@/types';
-import { Provider } from '@supabase/supabase-js';
+import { User, Profile } from '@/types';
 
-interface AuthContextType {
-  session: Session | null;
+export interface AuthContextType {
   user: User | null;
   profile: Profile | null;
-  isLoading: boolean;
   isAdmin: boolean;
-  signInWithOAuth: (provider: Provider) => Promise<void>;
-  signOut: () => Promise<void>;
+  isLoading: boolean;
+  isAuthenticated: boolean; // Adicionada propriedade faltante
+  login: (email: string, password: string) => Promise<void>;
+  loginWithProvider: (provider: 'google' | 'facebook') => Promise<void>;
+  logout: () => Promise<void>; // Adicionada propriedade faltante
+  register: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updateProfile: (profile: Partial<Profile>) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<string | null>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const defaultAuthContext: AuthContextType = {
+  user: null,
+  profile: null,
+  isAdmin: false,
+  isLoading: true,
+  isAuthenticated: false, // Adicionada propriedade faltante
+  login: async () => {},
+  loginWithProvider: async () => {},
+  logout: async () => {}, // Adicionada propriedade faltante
+  register: async () => {},
+  resetPassword: async () => {},
+  updateProfile: async () => {},
+  uploadAvatar: async () => null,
+};
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
+export const AuthContext = createContext<AuthContextType>(defaultAuthContext);
 
-const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [session, setSession] = useState<Session | null>(null);
+
+  // Adicionada propriedade isAuthenticated baseada no estado existente
+  const isAuthenticated = !!user;
 
   useEffect(() => {
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+      try {
+        setIsLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
-      });
-    }
+
+        if (session) {
+          setUser(session.user);
+          await fetchProfile(session.user.id);
+          await checkAdminRole(session.user.id);
+        }
+      } catch (error) {
+        console.error("Erro ao obter sessão:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
     getSession();
-  }, []);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const fetchUser = async () => {
-      if (session?.user) {
-        const formattedUser = formatUserData(session.user);
-        setUser(formattedUser);
-        await fetchProfile(formattedUser.id);
-        await checkAdminRole(formattedUser.id);
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      if (session) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
+        await checkAdminRole(session.user.id);
       } else {
         setUser(null);
         setProfile(null);
         setIsAdmin(false);
       }
-      setIsLoading(false);
-    };
-
-    fetchUser();
-  }, [session]);
+    });
+  }, []);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -69,10 +93,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) {
         console.error("Erro ao buscar perfil:", error);
         setProfile(null);
+      } else {
+        setProfile(profileData);
       }
-
-      setProfile(profileData || null);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao buscar perfil:", error);
       setProfile(null);
     }
@@ -81,89 +105,187 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAdminRole = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('user_roles')
+        .from('users_roles')
         .select('role')
         .eq('user_id', userId)
-        .eq('role', 'admin')
         .single();
 
       if (error) {
+        console.error("Erro ao verificar role de admin:", error);
         setIsAdmin(false);
       } else {
-        setIsAdmin(!!data);
+        setIsAdmin(data?.role === 'admin');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao verificar role de admin:", error);
       setIsAdmin(false);
     }
   };
 
-  // Corrigir o método de formatação de usuário para lidar corretamente com os tipos
-  const formatUserData = (userData: any): User => {
-    return {
-      id: userData.id,
-      email: userData.email,
-      created_at: userData.created_at || new Date().toISOString(),
-      app_metadata: userData.app_metadata || {},
-      user_metadata: userData.user_metadata || {},
-      role: userData.role || 'user'
-    };
+  const login = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        await fetchProfile(data.user.id);
+        await checkAdminRole(data.user.id);
+      }
+    } catch (error: any) {
+      console.error("Erro ao fazer login:", error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const signInWithOAuth = async (provider: Provider) => {
+  const loginWithProvider = async (provider: 'google' | 'facebook') => {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        }
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({ provider: provider });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      console.error("Erro ao fazer login com provedor:", error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Implementação da função logout
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setIsAdmin(false);
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
+
+  const register = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        await fetchProfile(data.user.id);
+        await checkAdminRole(data.user.id);
+      }
+    } catch (error: any) {
+      console.error("Erro ao registrar:", error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback`,
       });
 
       if (error) {
         throw error;
       }
     } catch (error: any) {
-      console.error("Erro ao fazer login com OAuth:", error);
+      console.error("Erro ao resetar a senha:", error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const signOut = async () => {
+  const updateProfile = async (profileData: Partial<Profile>) => {
     try {
-      const { error } = await supabase.auth.signOut();
+      setIsLoading(true);
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(profileData)
+        .eq('id', user.id)
+        .select()
+        .single();
+
       if (error) {
         throw error;
       }
-      setUser(null);
-      setProfile(null);
-      setIsAdmin(false);
+
+      setProfile(data);
     } catch (error: any) {
-      console.error("Erro ao fazer logout:", error);
+      console.error("Erro ao atualizar perfil:", error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const value: AuthContextType = {
-    session,
-    user,
-    profile,
-    isLoading,
-    isAdmin,
-    signInWithOAuth,
-    signOut,
+  const uploadAvatar = async (file: File): Promise<string | null> => {
+    try {
+      setIsLoading(true);
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const filePath = `avatars/${user.id}/${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const publicURL = `${supabase.storageUrl}/avatars/${filePath}`;
+      await updateProfile({ avatar_url: publicURL });
+      return publicURL;
+    } catch (error: any) {
+      console.error("Erro ao fazer upload do avatar:", error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        isAdmin,
+        isLoading,
+        isAuthenticated, // Adicionada propriedade faltante
+        login,
+        loginWithProvider,
+        logout, // Adicionada propriedade faltante
+        register,
+        resetPassword,
+        updateProfile,
+        uploadAvatar,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
-
-const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-};
-
-export { AuthProvider, useAuth };
