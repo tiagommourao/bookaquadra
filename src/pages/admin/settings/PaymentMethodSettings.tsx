@@ -10,6 +10,23 @@ import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { PaymentMethodConfig, SiteSettings } from '@/types';
 
+// Interface para representar os dados que buscamos da tabela site_settings
+interface SiteSettingsRow {
+  id: string;
+  company_name: string;
+  logo: string;
+  primary_color: string;
+  secondary_color: string;
+  contact_email: string;
+  contact_phone: string;
+  cancellation_policy: string;
+  mercado_pago_key: string;
+  google_calendar_integration: boolean;
+  payment_method: PaymentMethodConfig | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const PaymentMethodSettings = () => {
   const queryClient = useQueryClient();
   const [selectedMethod, setSelectedMethod] = useState<'mercadopago' | 'stripe'>('mercadopago');
@@ -29,7 +46,7 @@ export const PaymentMethodSettings = () => {
           return null;
         }
         
-        return data as SiteSettings | null;
+        return data as SiteSettingsRow | null;
       } catch (error) {
         console.error('Erro ao buscar configurações:', error);
         return null;
@@ -120,7 +137,7 @@ export const PaymentMethodSettings = () => {
         const { data, error } = await supabase
           .from('site_settings')
           .update({
-            paymentMethod
+            payment_method: paymentMethod
           })
           .eq('id', settings.id)
           .select();
@@ -132,16 +149,16 @@ export const PaymentMethodSettings = () => {
         const { data, error } = await supabase
           .from('site_settings')
           .insert([{
-            companyName: 'BookaQuadra',
+            company_name: 'BookaQuadra',
             logo: '',
-            primaryColor: '#06b6d4',
-            secondaryColor: '#0891b2',
-            contactEmail: '',
-            contactPhone: '',
-            cancellationPolicy: '',
-            mercadoPagoKey: '',
-            googleCalendarIntegration: false,
-            paymentMethod
+            primary_color: '#06b6d4',
+            secondary_color: '#0891b2',
+            contact_email: '',
+            contact_phone: '',
+            cancellation_policy: '',
+            mercado_pago_key: '',
+            google_calendar_integration: false,
+            payment_method: paymentMethod
           }])
           .select();
         
@@ -168,8 +185,8 @@ export const PaymentMethodSettings = () => {
 
   // Configurar o método inicial assim que os dados forem carregados
   useEffect(() => {
-    if (settings?.paymentMethod?.default) {
-      setSelectedMethod(settings.paymentMethod.default);
+    if (settings?.payment_method?.default) {
+      setSelectedMethod(settings.payment_method.default);
     }
   }, [settings]);
 

@@ -637,6 +637,48 @@ export type Database = {
           },
         ]
       }
+      integrations_stripe_logs: {
+        Row: {
+          action: string
+          created_at: string
+          created_by: string | null
+          details: Json | null
+          id: string
+          integration_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          created_by?: string | null
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          created_by?: string | null
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_stripe_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "auth_users_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_stripe_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations_stripe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_status_logs: {
         Row: {
           created_at: string
@@ -998,6 +1040,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      site_settings: {
+        Row: {
+          cancellation_policy: string | null
+          company_name: string
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          google_calendar_integration: boolean | null
+          id: string
+          logo: string | null
+          mercado_pago_key: string | null
+          payment_method: Json | null
+          primary_color: string | null
+          secondary_color: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancellation_policy?: string | null
+          company_name?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          google_calendar_integration?: boolean | null
+          id?: string
+          logo?: string | null
+          mercado_pago_key?: string | null
+          payment_method?: Json | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancellation_policy?: string | null
+          company_name?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          google_calendar_integration?: boolean | null
+          id?: string
+          logo?: string | null
+          mercado_pago_key?: string | null
+          payment_method?: Json | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       skill_levels: {
         Row: {
@@ -1620,6 +1710,10 @@ export type Database = {
         Returns: boolean
       }
       test_mercadopago_integration: {
+        Args: { integration_id: string }
+        Returns: Json
+      }
+      test_stripe_integration: {
         Args: { integration_id: string }
         Returns: Json
       }
